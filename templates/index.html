@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Serverless Auth</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
+        input, button { padding: 10px; margin: 5px 0; }
+        input { width: 100%; box-sizing: border-box; }
+        .section { margin-bottom: 40px; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="section">
+        <h2>1. Authenticate</h2>
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Log In</button>
+    </div>
+
+    <div class="section">
+        <h2>2. Access Secure Backend</h2>
+        <button onclick="callSecureAPI()">Fetch Secure Data</button>
+        <p id="output" style="color: blue; font-weight: bold;"></p>
+    </div>
+
+    <script type="module">
+        // Import Firebase SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+				const firebaseConfig = {
+					apiKey: "AIzaSyA80IB4rvoqoTo0FCaJhg48bWjSm1n2I4g",
+					authDomain: "covered-calls-ab5d1.firebaseapp.com",
+					projectId: "covered-calls-ab5d1",
+					storageBucket: "covered-calls-ab5d1.firebasestorage.app",
+					messagingSenderId: "395032013974",
+					appId: "1:395032013974:web:ee980f78db6ce8502fe6b7",
+					measurementId: "G-YFWTHS1GY3"
+				};
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Attach login function to the global window object so the HTML button can trigger it
+        window.login = async () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                document.getElementById('output').innerText = "Logged in successfully!";
+            } catch (error) {
+                document.getElementById('output').innerText = "Login failed: " + error.message;
+            }
+        };
+
+        // Attach API call function to the global window object
+        window.callSecureAPI = async () => {
+            const user = auth.currentUser;
+            if (!user) {
+                document.getElementById('output').innerText = "You must log in first.";
+                return;
+            }
+            
+            // Get the JWT token
+            const token = await user.getIdToken();
+            
+            // Send the token to your Python backend
+            const response = await fetch('/api/hello', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                document.getElementById('output').innerText = data.message;
+            } else {
+                document.getElementById('output').innerText = "Error: " + data.error;
+            }
+        };
+    </script>
+</body>
+</html>
