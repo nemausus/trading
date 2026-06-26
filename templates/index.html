@@ -1,80 +1,120 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Serverless Auth</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure SPA</title>
     <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
-        input, button { padding: 10px; margin: 5px 0; }
-        input { width: 100%; box-sizing: border-box; }
-        .section { margin-bottom: 40px; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        body { font-family: sans-serif; padding: 20px; }
+        .view { display: none; }
+        .active-view { display: block; }
+        .card { border: 1px solid #ccc; padding: 20px; border-radius: 8px; max-width: 400px; }
+        button { margin-top: 10px; padding: 8px 16px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="section">
-        <h2>1. Authenticate</h2>
-        <input type="email" id="email" placeholder="Email">
-        <input type="password" id="password" placeholder="Password">
-        <button onclick="login()">Log In</button>
+
+    <div id="view-loading" class="view active-view card">
+        <p>Checking authentication state...</p>
     </div>
 
-    <div class="section">
-        <h2>2. Access Secure Backend</h2>
-        <button onclick="callSecureAPI()">Fetch Secure Data</button>
-        <p id="output" style="color: blue; font-weight: bold;"></p>
+    <div id="view-login" class="view card">
+        <h2>Login</h2>
+        <input type="email" id="email" placeholder="Email" style="display:block; margin-bottom:10px; width:90%;">
+        <input type="password" id="password" placeholder="Password" style="display:block; margin-bottom:10px; width:90%;">
+        <button onclick="handleLogin()">Sign In</button>
+        <p id="login-error" style="color: red;"></p>
+    </div>
+
+    <div id="view-main" class="view card">
+        <h2>Dashboard</h2>
+        <p>Welcome, <strong id="user-display-email"></strong></p>
+        
+        <hr>
+        
+        <h3>Backend Connection</h3>
+        <button onclick="callSecureAPI()">Fetch Secure Data from app.py</button>
+        <p id="api-output" style="color: blue; font-weight: bold;"></p>
+        
+        <hr>
+
+        <button onclick="handleLogout()">Log Out</button>
     </div>
 
     <script type="module">
-        // Import Firebase SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-				const firebaseConfig = {
-					apiKey: "AIzaSyA80IB4rvoqoTo0FCaJhg48bWjSm1n2I4g",
-					authDomain: "covered-calls-ab5d1.firebaseapp.com",
-					projectId: "covered-calls-ab5d1",
-					storageBucket: "covered-calls-ab5d1.firebasestorage.app",
-					messagingSenderId: "395032013974",
-					appId: "1:395032013974:web:ee980f78db6ce8502fe6b7",
-					measurementId: "G-YFWTHS1GY3"
-				};
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        const firebaseConfig = {
+            apiKey: "AIzaSyA80IB4rvoqoTo0FCaJhg48bWjSm1n2I4g",
+            authDomain: "covered-calls-ab5d1.firebaseapp.com",
+            projectId: "covered-calls-ab5d1",
+            storageBucket: "covered-calls-ab5d1.firebasestorage.app",
+            messagingSenderId: "395032013974",
+            appId: "1:395032013974:web:ee980f78db6ce8502fe6b7",
+            measurementId: "G-YFWTHS1GY3"
+        };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
 
-        // Attach login function to the global window object so the HTML button can trigger it
-        window.login = async () => {
+        // View Router
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(view => {
+                view.classList.remove('active-view');
+            });
+            document.getElementById(viewId).classList.add('active-view');
+        }
+
+        // Auth Lifecycle Observer
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('user-display-email').innerText = user.email;
+                showView('view-main');
+            } else {
+                showView('view-login');
+                // Clear the API output on logout so the next user doesn't see it
+                document.getElementById('api-output').innerText = ""; 
+            }
+        });
+
+        // Global functions
+        window.handleLogin = async () => {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            document.getElementById('login-error').innerText = "";
+
             try {
                 await signInWithEmailAndPassword(auth, email, password);
-                document.getElementById('output').innerText = "Logged in successfully!";
             } catch (error) {
-                document.getElementById('output').innerText = "Login failed: " + error.message;
+                document.getElementById('login-error').innerText = "Authentication failed: " + error.message;
             }
         };
 
-        // Attach API call function to the global window object
+        window.handleLogout = async () => {
+            try { await signOut(auth); } 
+            catch (error) { console.error("Logout failed", error); }
+        };
+
+        // Connects to your Python backend
         window.callSecureAPI = async () => {
             const user = auth.currentUser;
-            if (!user) {
-                document.getElementById('output').innerText = "You must log in first.";
-                return;
-            }
+            if (!user) return;
             
-            // Get the JWT token
+            // 1. Get the secure token generated by Firebase
             const token = await user.getIdToken();
             
-            // Send the token to your Python backend
+            // 2. Send it to app.py
             const response = await fetch('/api/hello', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             
             const data = await response.json();
             
+            // 3. Display the response from Python
             if (response.ok) {
-                document.getElementById('output').innerText = data.message;
+                document.getElementById('api-output').innerText = data.message;
             } else {
-                document.getElementById('output').innerText = "Error: " + data.error;
+                document.getElementById('api-output').innerText = "Error: " + data.error;
             }
         };
     </script>
