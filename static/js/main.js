@@ -52,8 +52,8 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// Global functions
-window.handleLogin = async () => {
+// Event Listeners for static buttons
+document.getElementById('btn-login').addEventListener('click', async () => {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     document.getElementById('login-error').innerText = "";
@@ -63,15 +63,14 @@ window.handleLogin = async () => {
     } catch (error) {
         document.getElementById('login-error').innerText = "Authentication failed: " + error.message;
     }
-};
+});
 
-window.handleLogout = async () => {
+document.getElementById('btn-logout').addEventListener('click', async () => {
     try { await signOut(auth); }
     catch (error) { console.error("Logout failed", error); }
-};
+});
 
-// Connects to your Python backend
-window.callSecureAPI = async () => {
+document.getElementById('btn-fetch-hello').addEventListener('click', async () => {
     const user = auth.currentUser;
     if (!user) return;
 
@@ -91,7 +90,7 @@ window.callSecureAPI = async () => {
     } else {
         document.getElementById('api-output').innerText = "Error: " + data.error;
     }
-};
+});
 
 async function checkSchwabStatus() {
     const user = auth.currentUser;
@@ -113,13 +112,16 @@ async function checkSchwabStatus() {
             statusText.innerText = "Connected";
             statusText.style.color = "green";
             actionsDiv.innerHTML = `
-                <button onclick="fetchSchwabAccounts()">Fetch Account Details</button>
-                <button onclick="disconnectSchwab()" style="background-color: #ffcccc; color: #cc0000; border: 1px solid #cc0000; margin-left: 10px;">Disconnect</button>
+                <button id="btn-fetch-accounts">Fetch Account Details</button>
+                <button id="btn-disconnect" style="background-color: #ffcccc; color: #cc0000; border: 1px solid #cc0000; margin-left: 10px;">Disconnect</button>
             `;
+            document.getElementById('btn-fetch-accounts').addEventListener('click', fetchSchwabAccounts);
+            document.getElementById('btn-disconnect').addEventListener('click', disconnectSchwab);
         } else {
             statusText.innerText = "Disconnected";
             statusText.style.color = "red";
-            actionsDiv.innerHTML = `<button onclick="connectSchwab()">Connect Schwab</button>`;
+            actionsDiv.innerHTML = `<button id="btn-connect">Connect Schwab</button>`;
+            document.getElementById('btn-connect').addEventListener('click', connectSchwab);
         }
     } catch (error) {
         console.error("Error checking Schwab status:", error);
@@ -128,7 +130,7 @@ async function checkSchwabStatus() {
     }
 }
 
-window.connectSchwab = async () => {
+async function connectSchwab() {
     const user = auth.currentUser;
     if (!user) return;
     try {
@@ -146,9 +148,9 @@ window.connectSchwab = async () => {
     } catch (error) {
         console.error("Failed to connect Schwab:", error);
     }
-};
+}
 
-window.fetchSchwabAccounts = async () => {
+async function fetchSchwabAccounts() {
     const user = auth.currentUser;
     if (!user) return;
     const outputPre = document.getElementById('schwab-output');
@@ -168,9 +170,9 @@ window.fetchSchwabAccounts = async () => {
     } catch (error) {
         outputPre.innerText = "Error: " + error.message;
     }
-};
+}
 
-window.disconnectSchwab = async () => {
+async function disconnectSchwab() {
     if (!confirm("Are you sure you want to disconnect your Schwab account? This will revoke access token storage.")) return;
     const user = auth.currentUser;
     if (!user) return;
@@ -191,4 +193,4 @@ window.disconnectSchwab = async () => {
     } catch (error) {
         console.error("Disconnect failed", error);
     }
-};
+}

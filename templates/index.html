@@ -22,7 +22,7 @@
         <h2>Login</h2>
         <input type="email" id="email" placeholder="Email" style="display:block; margin-bottom:10px; width:90%;">
         <input type="password" id="password" placeholder="Password" style="display:block; margin-bottom:10px; width:90%;">
-        <button onclick="handleLogin()">Sign In</button>
+        <button id="btn-login">Sign In</button>
         <p id="login-error" style="color: red;"></p>
     </div>
 
@@ -33,7 +33,7 @@
         <hr>
 
         <h3>Backend Connection</h3>
-        <button onclick="callSecureAPI()">Fetch Secure Data from app.py</button>
+        <button id="btn-fetch-hello">Fetch Secure Data from app.py</button>
         <p id="api-output" style="color: blue; font-weight: bold;"></p>
 
         <hr>
@@ -45,7 +45,7 @@
 
         <hr>
 
-        <button onclick="handleLogout()">Log Out</button>
+        <button id="btn-logout">Log Out</button>
     </div>
 
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
