@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, jsonify, redirect, make_response
-import firebase_admin
-from firebase_admin import auth, firestore
+from firebase_admin import auth
 from flask_talisman import Talisman
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -10,12 +9,8 @@ import datetime
 import requests
 import urllib.parse
 from functools import wraps
+import firestore_db
 from schwab_auth import SchwabAuthManager, SCHWAB_REQUEST_TIMEOUT
-
-# 1. EXPLICITLY set your exact project ID here
-firebase_admin.initialize_app(options={
-    'projectId': 'covered-calls-ab5d1'
-})
 
 schwab_auth = SchwabAuthManager()
 
@@ -96,12 +91,8 @@ def schwab_authorize(decoded_token):
     state = secrets.token_urlsafe(16)
 
     # Store state -> uid in Firestore with expiration (10 minutes)
-    db = firestore.client()
     expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=10)
-    db.collection('schwab_auth_states').document(state).set({
-        'uid': uid,
-        'expires_at': expires_at
-    })
+    firestore_db.save_schwab_auth_state(state, uid, expires_at)
 
     # Build Schwab authorization URL
     params = {
@@ -129,19 +120,7 @@ def schwab_callback():
     if not cookie_state or state != cookie_state:
         return redirect_error("CSRF token validation failed. Invalid or missing state cookie.")
 
-    db = firestore.client()
-    state_ref = db.collection('schwab_auth_states').document(state)
-
-    @firestore.transactional
-    def consume_state(transaction, doc_ref):
-        snapshot = doc_ref.get(transaction=transaction)
-        if snapshot.exists:
-            transaction.delete(doc_ref)
-            return snapshot.to_dict()
-        return None
-
-    transaction = db.transaction()
-    state_data = consume_state(transaction, state_ref)
+    state_data = firestore_db.consume_schwab_auth_state(state)
 
     if not state_data:
         return redirect_error("Invalid or expired session state.")

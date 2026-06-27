@@ -1,6 +1,6 @@
 ## Deployment
 
-gcloud run deploy covered_calls --source . \
+gcloud run deploy covered-calls --source . \
 --region us-central1 \
 --allow-unauthenticated \
 --service-account="cloud-run-app-runner@<PROJECT_ID>.iam.gserviceaccount.com" \

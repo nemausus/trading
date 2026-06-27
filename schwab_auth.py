@@ -5,6 +5,7 @@ import base64
 import logging
 import requests
 from cryptography.fernet import Fernet
+import firestore_db
 
 SCHWAB_REQUEST_TIMEOUT = (5, 30)  # (connect, read) seconds
 
@@ -31,35 +32,17 @@ class SchwabAuthManager:
         decrypted = self.fernet.decrypt(encrypted_str.encode())
         return json.loads(decrypted.decode())
 
-    def _get_db(self):
-        """Lazy loader for Firestore to ensure Firebase Admin is initialized first."""
-        from firebase_admin import firestore
-        return firestore.client(), firestore
-
     def save_user_tokens(self, uid: str, tokens: dict) -> None:
         """Encrypts and saves Schwab tokens to the user's Firestore document."""
         if 'retrieved_at' not in tokens:
             tokens['retrieved_at'] = datetime.datetime.now().isoformat()
 
         encrypted_data = self.encrypt_tokens(tokens)
-        db, firestore = self._get_db()
-
-        user_ref = db.collection('users').document(uid)
-        user_ref.set({
-            'schwab_credentials': encrypted_data,
-            'schwab_connected': True,
-            'schwab_updated_at': firestore.SERVER_TIMESTAMP
-        }, merge=True)
+        firestore_db.save_user_schwab_credentials(uid, encrypted_data)
 
     def get_user_tokens(self, uid: str) -> dict | None:
         """Retrieves and decrypts the Schwab tokens for the user."""
-        db, _ = self._get_db()
-        user_doc = db.collection('users').document(uid).get()
-        if not user_doc.exists:
-            return None
-
-        data = user_doc.to_dict()
-        encrypted_data = data.get('schwab_credentials')
+        encrypted_data = firestore_db.get_user_schwab_credentials(uid)
         if not encrypted_data:
             return None
 
@@ -71,13 +54,7 @@ class SchwabAuthManager:
 
     def disconnect_user(self, uid: str) -> None:
         """Removes the Schwab credentials from the user's Firestore document."""
-        db, firestore = self._get_db()
-        user_ref = db.collection('users').document(uid)
-        user_ref.update({
-            'schwab_credentials': firestore.DELETE_FIELD,
-            'schwab_connected': False,
-            'schwab_updated_at': firestore.SERVER_TIMESTAMP
-        })
+        firestore_db.delete_user_schwab_credentials(uid)
 
     def is_access_token_expired(self, tokens: dict) -> bool:
         """Checks if the access token is close to expiration (with 5-minute buffer)."""
