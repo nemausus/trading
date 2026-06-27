@@ -28,7 +28,7 @@ def require_firebase_auth(f):
 
         token = auth_header.split('Bearer ')[1].strip()
         try:
-            decoded_token = auth.verify_id_token(token, check_revoked=True)
+            decoded_token = auth.verify_id_token(token)
         except Exception as e:
             app.logger.warning(f"Token verification failed: {e}")
             return jsonify({'error': 'Unauthorized - Invalid or expired token'}), 401
