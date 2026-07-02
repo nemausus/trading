@@ -453,7 +453,7 @@ class TestMPRAndDelta(unittest.TestCase):
 
     def test_no_mpr_when_dte_zero(self):
         """MPR should be 0 when DTE is 0 or negative (avoid division by zero)."""
-        today = datetime.date.today()
+        today = datetime.datetime.now(sp.SCHWAB_TZ).date()
         # Build a symbol expiring today using actual date
         exp_str = today.strftime('%y%m%d')
         sym = f'AAPL  {exp_str}C00200000'
@@ -611,5 +611,80 @@ class TestPositionSort(unittest.TestCase):
         self.assertEqual(positions[1]['symbol'], 'AAPL  260821C00295000')
 
 
+# ---------------------------------------------------------------------------
+# fetch_option_chain
+# ---------------------------------------------------------------------------
+
+class TestFetchOptionChain(unittest.TestCase):
+
+    @patch('requests.get')
+    def test_fetch_option_chain_parsing(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'underlying': {'symbol': 'AAPL', 'last': 200.0, 'change': 2.5, 'percentChange': 1.26},
+            'callExpDateMap': {
+                '2026-08-21:50': {
+                    '200.0': [{
+                        'symbol': 'AAPL  260821C00200000',
+                        'expirationDate': '2026-08-21T00:00:00.000+00:00',
+                        'daysToExpiration': 50,
+                        'strikePrice': 200.0,
+                        'bid': 10.0,
+                        'ask': 11.0,
+                        'mark': 10.5,
+                        'delta': 0.50,
+                        'volatility': 25.0,
+                        'totalVolume': 50,
+                        'openInterest': 100,
+                        'timeValue': 10.5
+                    }]
+                }
+            }
+        }
+        mock_get.return_value = mock_response
+
+        res = sp.fetch_option_chain('fake_token', 'AAPL', 'CALL')
+
+        self.assertEqual(res['underlying']['symbol'], 'AAPL')
+        self.assertEqual(res['underlying']['price'], 200.0)
+        self.assertEqual(len(res['chain']), 1)
+
+        opt = res['chain'][0]
+        self.assertEqual(opt['symbol'], 'AAPL  260821C00200000')
+        self.assertEqual(opt['contractType'], 'CALL')
+        self.assertEqual(opt['strikePrice'], 200.0)
+        self.assertEqual(opt['dte'], 50)
+        self.assertEqual(opt['delta'], 0.50)
+        self.assertAlmostEqual(opt['change'], 0.0)  # strike 200 == stock 200
+
+    @patch('requests.get')
+    def test_fetch_option_chain_server_side_filtering(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'underlying': {'symbol': 'AAPL', 'last': 200.0},
+            'callExpDateMap': {
+                '2026-08-21:50': {
+                    '200.0': [
+                        {'symbol': 'C1', 'daysToExpiration': 5, 'delta': 0.20, 'strikePrice': 200.0},
+                        {'symbol': 'C2', 'daysToExpiration': 30, 'delta': 0.25, 'strikePrice': 210.0},
+                        {'symbol': 'C3', 'daysToExpiration': 45, 'delta': 0.50, 'strikePrice': 220.0},
+                    ]
+                }
+            }
+        }
+        mock_get.return_value = mock_response
+
+        # Filter: min_dte=7, max_dte=60, min_delta=0.1, max_delta=0.3
+        res = sp.fetch_option_chain('fake_token', 'AAPL', 'CALL', min_dte=7, max_dte=60, min_delta=0.1, max_delta=0.3)
+
+        self.assertEqual(res['totalContracts'], 3)
+        self.assertEqual(len(res['chain']), 1)
+        self.assertEqual(res['chain'][0]['symbol'], 'C2')
+
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+

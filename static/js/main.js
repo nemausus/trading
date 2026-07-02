@@ -465,3 +465,256 @@ function clearDashboard() {
         </div>
     `;
 }
+
+// =====================================================================================
+// --- HEADER TAB NAVIGATION ---
+// =====================================================================================
+const tabBtnPortfolio = document.getElementById('tab-btn-portfolio');
+const tabBtnChain = document.getElementById('tab-btn-chain');
+const tabContentPortfolio = document.getElementById('tab-content-portfolio');
+const tabContentChain = document.getElementById('tab-content-chain');
+
+if (tabBtnPortfolio && tabBtnChain) {
+    tabBtnPortfolio.addEventListener('click', () => {
+        tabBtnPortfolio.classList.add('active');
+        tabBtnChain.classList.remove('active');
+        tabContentPortfolio.classList.add('active-tab-content');
+        tabContentChain.classList.remove('active-tab-content');
+    });
+
+    tabBtnChain.addEventListener('click', () => {
+        tabBtnChain.classList.add('active');
+        tabBtnPortfolio.classList.remove('active');
+        tabContentChain.classList.add('active-tab-content');
+        tabContentPortfolio.classList.remove('active-tab-content');
+        // Auto-fetch default chain if not loaded yet
+        if (!_rawChainData.chain || _rawChainData.chain.length === 0) {
+            fetchOptionChain();
+        }
+    });
+}
+
+// =====================================================================================
+// --- OPTION CHAIN EXPLORER ---
+// =====================================================================================
+let _rawChainData = { underlying: {}, chain: [] };
+
+document.getElementById('btn-fetch-chain')?.addEventListener('click', fetchOptionChain);
+
+document.getElementById('chain-symbol')?.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') fetchOptionChain();
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const symbol = btn.dataset.symbol;
+        const input = document.getElementById('chain-symbol');
+        if (input) {
+            input.value = symbol;
+            fetchOptionChain();
+        }
+    });
+});
+
+document.getElementById('btn-reset-filters')?.addEventListener('click', () => {
+    document.getElementById('chain-type').value = 'CALL';
+    document.getElementById('chain-min-dte').value = '21';
+    document.getElementById('chain-max-dte').value = '60';
+    document.getElementById('chain-min-delta').value = '0.15';
+    document.getElementById('chain-max-delta').value = '0.30';
+    fetchOptionChain();
+});
+
+// Real-time server-side fetching on input change
+['chain-type', 'chain-min-dte', 'chain-max-dte', 'chain-min-delta', 'chain-max-delta'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', fetchOptionChain);
+});
+
+async function fetchOptionChain() {
+    const user = auth.currentUser;
+    if (!user) {
+        alert("Please sign in first.");
+        return;
+    }
+
+    const symbolInput = document.getElementById('chain-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').trim().toUpperCase();
+    const typeSelect = document.getElementById('chain-type')?.value || 'CALL';
+    const minDte = document.getElementById('chain-min-dte')?.value;
+    const maxDte = document.getElementById('chain-max-dte')?.value;
+    const minDelta = document.getElementById('chain-min-delta')?.value;
+    const maxDelta = document.getElementById('chain-max-delta')?.value;
+
+    const fetchBtn = document.getElementById('btn-fetch-chain');
+    const chainContainer = document.getElementById('chain-container');
+
+    if (!symbol) return;
+
+    if (fetchBtn) {
+        fetchBtn.disabled = true;
+        fetchBtn.innerText = "Fetching...";
+    }
+
+    chainContainer.innerHTML = `<div class="no-data-msg"><p>Fetching options chain for ${symbol}...</p></div>`;
+
+    try {
+        const token = await user.getIdToken();
+        const query = new URLSearchParams({
+            symbol: symbol,
+            contractType: typeSelect
+        });
+        if (minDte !== '' && minDte !== null && !isNaN(minDte)) query.append('minDte', minDte);
+        if (maxDte !== '' && maxDte !== null && !isNaN(maxDte)) query.append('maxDte', maxDte);
+        if (minDelta !== '' && minDelta !== null && !isNaN(minDelta)) query.append('minDelta', minDelta);
+        if (maxDelta !== '' && maxDelta !== null && !isNaN(maxDelta)) query.append('maxDelta', maxDelta);
+
+        const url = `/api/schwab/chain?${query.toString()}`;
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            _rawChainData = data;
+            renderUnderlyingBanner(data.underlying, data.totalContracts, data.chain ? data.chain.length : 0);
+            renderOptionChainTable(data.chain || []);
+        } else {
+            const errMsg = data.error || `Failed to fetch option chain for ${symbol}`;
+            chainContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
+            document.getElementById('chain-underlying-container').innerHTML = '';
+        }
+    } catch (error) {
+        console.error("Failed to fetch option chain:", error);
+        chainContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Network Error: ${error.message}</p></div>`;
+    } finally {
+        if (fetchBtn) {
+            fetchBtn.disabled = false;
+            fetchBtn.innerText = "Fetch Chain";
+        }
+    }
+}
+
+function renderUnderlyingBanner(underlying, totalContracts, matchingCount) {
+    const container = document.getElementById('chain-underlying-container');
+    if (!underlying || !underlying.symbol) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const changeVal = underlying.change || 0.0;
+    const changeClass = changeVal >= 0 ? 'val-positive' : 'val-negative';
+    const changeSign = changeVal >= 0 ? '+' : '';
+    const pctVal = underlying.percentChange || 0.0;
+
+    const totalStr = totalContracts ? `${matchingCount} / ${totalContracts}` : `${matchingCount}`;
+
+    container.innerHTML = `
+        <div class="underlying-banner">
+            <div>
+                <span class="underlying-title">${underlying.symbol}</span>
+                <span style="margin-left: 12px; font-size: 1.4rem; font-weight: 700;">${formatCurrency(underlying.price)}</span>
+                <span class="${changeClass}" style="margin-left: 8px; font-size: 1rem;">
+                    ${changeSign}${formatNumber(changeVal)} (${changeSign}${formatNumber(pctVal, 2)}%)
+                </span>
+            </div>
+            <div class="underlying-stats">
+                <div class="underlying-stat">
+                    <span class="underlying-stat-label">Matching Contracts</span>
+                    <span class="underlying-stat-value" id="chain-contracts-count">${totalStr}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderOptionChainTable(contracts) {
+    const container = document.getElementById('chain-container');
+    if (!contracts || contracts.length === 0) {
+        container.innerHTML = `<div class="no-data-msg"><p>No option contracts match the selected filters.</p></div>`;
+        return;
+    }
+
+    let prevDte = null;
+    let dteGroupIndex = 0;
+
+    let rowsHtml = contracts.map(opt => {
+        const badgeClass = opt.contractType === 'CALL' ? 'badge-call' : 'badge-put';
+        const deltaDisplay = opt.delta !== 0 ? formatNumber(opt.delta, 2) : '-';
+        const ivDisplay = opt.volatility ? formatNumber(opt.volatility, 1) + '%' : '-';
+        const mprDisplay = opt.mpr ? formatPercent(opt.mpr) : '-';
+
+        const changeVal = opt.change || 0.0;
+        const changeClass = changeVal >= 0 ? 'val-positive' : 'val-negative';
+        const changeSign = changeVal >= 0 ? '+' : '';
+
+        const beChangeVal = opt.beChange || 0.0;
+        const beChangeClass = beChangeVal >= 0 ? 'val-positive' : 'val-negative';
+        const beChangeSign = beChangeVal >= 0 ? '+' : '';
+
+        let dteGroupHeaderHtml = '';
+        if (opt.dte !== prevDte) {
+            if (prevDte !== null) {
+                dteGroupIndex++;
+            }
+            prevDte = opt.dte;
+            dteGroupHeaderHtml = `
+                <tr class="dte-group-row">
+                    <td colspan="13">
+                        <div class="dte-header-content">
+                            <span class="dte-group-pill">${opt.dte} DTE</span>
+                            <span class="dte-group-date">Expiration: <strong>${opt.expirationDate}</strong></span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        const rowBgClass = (dteGroupIndex % 2 === 0) ? 'dte-bg-group-0' : 'dte-bg-group-1';
+
+        return dteGroupHeaderHtml + `
+            <tr class="${rowBgClass}">
+                <td><span class="badge-option">${opt.symbol}</span></td>
+                <td style="text-align: center;"><span class="${badgeClass}">${opt.contractType}</span></td>
+                <td style="text-align: right; font-weight: 700;">$${formatNumber(opt.strikePrice, 2)}</td>
+                <td style="text-align: center;">${opt.expirationDate}</td>
+                <td style="text-align: center;"><span class="dte-pill">${opt.dte}</span></td>
+                <td style="text-align: right;">${formatCurrency(opt.bid)}</td>
+                <td style="text-align: right;">${formatCurrency(opt.ask)}</td>
+                <td style="text-align: right; font-weight: 600;">${formatCurrency(opt.mark)}</td>
+                <td style="text-align: center; font-weight: 600; color: var(--accent-blue);">${deltaDisplay}</td>
+                <td style="text-align: center;">${ivDisplay}</td>
+                <td style="text-align: center;" class="val-positive">${mprDisplay}</td>
+                <td style="text-align: right;" class="${changeClass}">${changeSign}${formatNumber(changeVal, 2)}%</td>
+                <td style="text-align: right;" class="${beChangeClass}">${beChangeSign}${formatNumber(beChangeVal, 2)}%</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th style="text-align: center;">Type</th>
+                        <th style="text-align: right;">Strike</th>
+                        <th style="text-align: center;">Exp Date</th>
+                        <th style="text-align: center;">DTE</th>
+                        <th style="text-align: right;">Bid</th>
+                        <th style="text-align: right;">Ask</th>
+                        <th style="text-align: right;">Mark</th>
+                        <th style="text-align: center;">Delta</th>
+                        <th style="text-align: center;">IV</th>
+                        <th style="text-align: center;">MPR</th>
+                        <th style="text-align: right;">Strike Δ%</th>
+                        <th style="text-align: right;">Break-Even Δ%</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+

@@ -195,3 +195,31 @@ def schwab_accounts(decoded_token):
     except Exception as e:
         app.logger.error(f"Error fetching Schwab accounts for user {uid}: {e}")
         return jsonify({'error': 'Failed to retrieve Schwab accounts'}), 502
+
+@app.route('/api/schwab/chain')
+@limiter.limit("30 per minute")
+@require_firebase_auth
+def schwab_chain(decoded_token):
+    uid = decoded_token['uid']
+
+    access_token = schwab_auth.refresh_user_tokens_if_needed(uid)
+    if not access_token:
+        return jsonify({'error': 'Schwab account not connected or failed to refresh session'}), 400
+
+    symbol = request.args.get('symbol', 'AAPL').upper().strip()
+    contract_type = request.args.get('contractType', 'CALL').upper().strip()
+    min_dte = request.args.get('minDte', type=int)
+    max_dte = request.args.get('maxDte', type=int)
+    min_delta = request.args.get('minDelta', type=float)
+    max_delta = request.args.get('maxDelta', type=float)
+
+    try:
+        chain_data = schwab_portfolio.fetch_option_chain(
+            access_token, symbol, contract_type,
+            min_dte=min_dte, max_dte=max_dte,
+            min_delta=min_delta, max_delta=max_delta
+        )
+        return jsonify(chain_data)
+    except Exception as e:
+        app.logger.error(f"Error fetching option chain for user {uid} symbol {symbol}: {e}")
+        return jsonify({'error': f'Failed to retrieve option chain for {symbol}'}), 502

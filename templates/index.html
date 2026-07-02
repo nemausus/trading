@@ -36,7 +36,13 @@
         <!-- STICKY HEADER -->
         <header class="app-header">
             <div class="header-container">
-                <div class="header-logo">Antigravity Portfolio</div>
+                <div class="header-left">
+                    <div class="header-logo">Antigravity Portfolio</div>
+                    <nav class="header-nav">
+                        <button id="tab-btn-portfolio" class="nav-tab active">Portfolio</button>
+                        <button id="tab-btn-chain" class="nav-tab">Option Chains</button>
+                    </nav>
+                </div>
                 <div class="header-right">
                     <span class="user-email" id="user-display-email"></span>
 
@@ -57,44 +63,123 @@
         <!-- DASHBOARD BODY -->
         <main class="dashboard-container">
 
-            <!-- ACCOUNTS SUMMARY CONTAINER -->
-            <div id="summaries-container" class="summary-grid">
-                <!-- Dynamically populated summaries -->
-            </div>
+            <!-- TAB 1: PORTFOLIO CONTENT -->
+            <div id="tab-content-portfolio" class="tab-content active-tab-content">
+                <!-- ACCOUNTS SUMMARY CONTAINER -->
+                <div id="summaries-container" class="summary-grid">
+                    <!-- Dynamically populated summaries -->
+                </div>
 
-            <!-- POSITIONS CONTAINER -->
-            <div class="section-card">
-                <div class="section-header-row">
-                    <h3>Account Positions</h3>
-                    <div style="display:flex; align-items:center; gap: 10px;">
-                        <button id="btn-group-underlying" class="btn-toggle" data-grouped="false" title="Group positions by underlying symbol">
-                            <span class="toggle-icon">⊞</span> Group by Underlying
-                        </button>
-                        <button id="btn-refresh-portfolio" class="btn-action-refresh" style="display: none;">Refresh Data</button>
+                <!-- POSITIONS CONTAINER -->
+                <div class="section-card">
+                    <div class="section-header-row">
+                        <h3>Account Positions</h3>
+                        <div style="display:flex; align-items:center; gap: 10px;">
+                            <button id="btn-group-underlying" class="btn-toggle" data-grouped="false" title="Group positions by underlying symbol">
+                                <span class="toggle-icon">⊞</span> Group by Underlying
+                            </button>
+                            <button id="btn-refresh-portfolio" class="btn-action-refresh" style="display: none;">Refresh Data</button>
+                        </div>
+                    </div>
+
+                    <div id="positions-container">
+                        <div class="no-data-msg">
+                            <p>No portfolio data retrieved yet.</p>
+                        </div>
                     </div>
                 </div>
 
-                <div id="positions-container">
-                    <div class="no-data-msg">
-                        <p>No portfolio data retrieved yet.</p>
+                <!-- ACTIVE ORDERS CONTAINER -->
+                <div class="section-card">
+                    <div class="section-header-row">
+                        <h3>Working Orders</h3>
+                    </div>
+
+                    <div id="orders-container">
+                        <div class="no-data-msg">
+                            <p>No working orders active.</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- ACTIVE ORDERS CONTAINER -->
-            <div class="section-card">
-                <div class="section-header-row">
-                    <h3>Working Orders</h3>
+            <!-- TAB 2: OPTION CHAINS CONTENT -->
+            <div id="tab-content-chain" class="tab-content">
+                <div class="section-card">
+                    <div class="section-header-row" style="margin-bottom: 16px;">
+                        <h3>Option Chain Explorer</h3>
+                        <div class="quick-presets">
+                            <span style="font-size: 0.8rem; color: var(--text-secondary); margin-right: 4px;">Presets:</span>
+                            <button class="preset-btn" data-symbol="AAPL">AAPL</button>
+                            <button class="preset-btn" data-symbol="AMZN">AMZN</button>
+                            <button class="preset-btn" data-symbol="GOOG">GOOG</button>
+                            <button class="preset-btn" data-symbol="META">META</button>
+                            <button class="preset-btn" data-symbol="MSFT">MSFT</button>
+                            <button class="preset-btn" data-symbol="NVDA">NVDA</button>
+                            <button class="preset-btn" data-symbol="SPY">SPY</button>
+                            <button class="preset-btn" data-symbol="QQQ">QQQ</button>
+                            <button class="preset-btn" data-symbol="TSLA">TSLA</button>
+                            <button class="preset-btn" data-symbol="$SPX">$SPX</button>
+                        </div>
+                    </div>
+
+                    <div class="chain-filter-bar">
+                        <div class="filter-group">
+                            <label for="chain-symbol">Symbol</label>
+                            <input type="text" id="chain-symbol" value="AAPL" placeholder="e.g. AAPL" style="text-transform: uppercase;">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="chain-type">Contract Type</label>
+                            <select id="chain-type">
+                                <option value="CALL" selected>Calls Only</option>
+                                <option value="ALL">All (Calls & Puts)</option>
+                                <option value="PUT">Puts Only</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="chain-min-dte">Min DTE</label>
+                            <input type="number" id="chain-min-dte" value="7" placeholder="7" min="0">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="chain-max-dte">Max DTE</label>
+                            <input type="number" id="chain-max-dte" value="60" placeholder="60" min="0">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="chain-min-delta">Min Delta</label>
+                            <input type="number" id="chain-min-delta" value="0.1" placeholder="0.1" step="0.05">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="chain-max-delta">Max Delta</label>
+                            <input type="number" id="chain-max-delta" value="0.3" placeholder="0.3" step="0.05">
+                        </div>
+
+                        <div class="filter-actions">
+                            <button id="btn-fetch-chain" class="btn-action-refresh">Fetch Chain</button>
+                            <button id="btn-reset-filters" class="btn-toggle">Reset Filters</button>
+                        </div>
+                    </div>
                 </div>
 
-                <div id="orders-container">
-                    <div class="no-data-msg">
-                        <p>No working orders active.</p>
+                <!-- UNDERLYING BANNER -->
+                <div id="chain-underlying-container"></div>
+
+                <!-- CHAIN TABLE -->
+                <div class="section-card">
+                    <div id="chain-container">
+                        <div class="no-data-msg">
+                            <p>Enter a symbol and click "Fetch Chain" to retrieve option contracts.</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
         </main>
+
     </div>
 
     <!-- Firebase SDKs and main.js -->

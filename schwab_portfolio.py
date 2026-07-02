@@ -197,6 +197,137 @@ def fetch_active_orders(access_token: str, account_hashes: list) -> list:
     return active_orders
 
 
+def _parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) -> list:
+    """Helper to flatten Schwab callExpDateMap / putExpDateMap structures into a list of option dicts."""
+    contracts = []
+    if not exp_map or not isinstance(exp_map, dict):
+        return contracts
+
+    for exp_key, strike_map in exp_map.items():
+        if not isinstance(strike_map, dict):
+            continue
+        for strike_key, contract_list in strike_map.items():
+            if not isinstance(contract_list, list):
+                continue
+            for item in contract_list:
+                if not isinstance(item, dict):
+                    continue
+
+                symbol = item.get('symbol', '')
+                strike = float(item.get('strikePrice', 0.0))
+                dte = int(item.get('daysToExpiration', 0))
+                exp_date_raw = item.get('expirationDate', '')
+                exp_date = exp_date_raw[:10] if exp_date_raw else ''
+
+                bid = float(item.get('bid', 0.0) or 0.0)
+                ask = float(item.get('ask', 0.0) or 0.0)
+                mark = float(item.get('mark', 0.0) or (bid + ask) / 2.0)
+                delta = float(item.get('delta', 0.0) or 0.0)
+                volatility = float(item.get('volatility', 0.0) or 0.0)
+                volume = int(item.get('totalVolume', 0) or 0)
+                open_interest = int(item.get('openInterest', 0) or 0)
+                time_value = float(item.get('timeValue', 0.0) or 0.0)
+
+                change_pct = (strike * 100.0 / stock_price - 100.0) if stock_price > 0 else 0.0
+                be_price = strike + mark if delta > 0 else strike - mark
+                be_change_pct = (be_price * 100.0 / stock_price - 100.0) if stock_price > 0 else 0.0
+
+                denom = (stock_price if delta > 0 else strike) - mark
+                mpr = (time_value * 3000.0 / (1 if dte == 0 else dte) / denom) if (dte >= 0 and denom > 0) else 0.0
+
+                contracts.append({
+                    'symbol': symbol,
+                    'contractType': contract_type_label,
+                    'strikePrice': strike,
+                    'expirationDate': exp_date,
+                    'dte': dte,
+                    'bid': bid,
+                    'ask': ask,
+                    'mark': mark,
+                    'delta': delta,
+                    'volatility': volatility,
+                    'volume': volume,
+                    'openInterest': open_interest,
+                    'timeValue': time_value,
+                    'change': change_pct,
+                    'beChange': be_change_pct,
+                    'mpr': mpr
+                })
+    return contracts
+
+
+def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CALL',
+                       min_dte: int | None = None, max_dte: int | None = None,
+                       min_delta: float | None = None, max_delta: float | None = None) -> dict:
+    """Fetch options chain from Schwab API, filter server-side by DTE and delta, and return structured format."""
+    today = datetime.datetime.now(SCHWAB_TZ).date()
+
+    from_date = (today + datetime.timedelta(days=min_dte)).isoformat() if min_dte is not None and min_dte >= 0 else None
+    to_date = (today + datetime.timedelta(days=max_dte)).isoformat() if max_dte is not None and max_dte >= 0 else None
+
+    headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+    params = {
+        'symbol': symbol,
+        'contractType': contract_type if contract_type in ('CALL', 'PUT', 'ALL') else 'ALL',
+        'includeUnderlyingQuote': True
+    }
+    if from_date:
+        params['fromDate'] = from_date
+    if to_date:
+        params['toDate'] = to_date
+
+    url = "https://api.schwabapi.com/marketdata/v1/chains"
+    try:
+        res = requests.get(url, headers=headers, params=params, timeout=SCHWAB_REQUEST_TIMEOUT)
+        if res.status_code != 200:
+            logging.error(f"Error fetching option chain for {symbol}: {res.status_code} {res.text}")
+            return {'underlying': {'symbol': symbol, 'price': 0.0, 'change': 0.0, 'percentChange': 0.0}, 'chain': [], 'totalContracts': 0}
+
+        data = res.json()
+        underlying_data = data.get('underlying', {})
+        stock_price = float(underlying_data.get('last', 0.0) or underlying_data.get('mark', 0.0) or 0.0)
+
+        underlying_info = {
+            'symbol': symbol,
+            'price': stock_price,
+            'change': float(underlying_data.get('change', 0.0) or 0.0),
+            'percentChange': float(underlying_data.get('percentChange', 0.0) or 0.0)
+        }
+
+        chain = []
+        if 'callExpDateMap' in data:
+            chain.extend(_parse_exp_map(data['callExpDateMap'], stock_price, 'CALL'))
+        if 'putExpDateMap' in data:
+            chain.extend(_parse_exp_map(data['putExpDateMap'], stock_price, 'PUT'))
+
+        total_contracts = len(chain)
+
+        # Apply server-side filtering
+        filtered_chain = []
+        for opt in chain:
+            if min_dte is not None and opt['dte'] < min_dte:
+                continue
+            if max_dte is not None and opt['dte'] > max_dte:
+                continue
+            if min_delta is not None and opt['delta'] < min_delta:
+                continue
+            if max_delta is not None and opt['delta'] > max_delta:
+                continue
+            filtered_chain.append(opt)
+
+        filtered_chain.sort(key=lambda x: (x['expirationDate'], x['strikePrice'], x['contractType']))
+
+        return {
+            'underlying': underlying_info,
+            'chain': filtered_chain,
+            'totalContracts': total_contracts
+        }
+    except Exception as e:
+        logging.error(f"Failed to fetch option chain for {symbol}: {e}")
+        return {'underlying': {'symbol': symbol, 'price': 0.0, 'change': 0.0, 'percentChange': 0.0}, 'chain': [], 'totalContracts': 0}
+
+
+
 # ---------------------------------------------------------------------------
 # Private computation helpers
 # ---------------------------------------------------------------------------
