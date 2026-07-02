@@ -256,10 +256,41 @@ def _parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) 
     return contracts
 
 
+def _validate_chain_params(symbol: str, min_dte: int | None, max_dte: int | None,
+                            min_delta: float | None, max_delta: float | None) -> None:
+    """Validate DTE, Delta, and symbol parameters, raising ValueError for malicious or out-of-bounds values."""
+    if not symbol or not isinstance(symbol, str) or len(symbol) > 4:
+        raise ValueError(f"Invalid symbol: '{symbol}'. Must be an alphanumeric ticker up to 10 characters.")
+
+    if min_dte is not None:
+        if not isinstance(min_dte, int) or min_dte < 0 or min_dte > 1000:
+            raise ValueError(f"Invalid min_dte: {min_dte}. Must be an integer between 0 and 1000.")
+
+    if max_dte is not None:
+        if not isinstance(max_dte, int) or max_dte < 0 or max_dte > 1000:
+            raise ValueError(f"Invalid max_dte: {max_dte}. Must be an integer between 0 and 1000.")
+
+    if min_dte is not None and max_dte is not None and min_dte > max_dte:
+        raise ValueError(f"min_dte ({min_dte}) cannot be greater than max_dte ({max_dte}).")
+
+    if min_delta is not None:
+        if not isinstance(min_delta, (int, float)) or min_delta < -1.0 or min_delta > 1.0:
+            raise ValueError(f"Invalid min_delta: {min_delta}. Must be a float between -1.0 and 1.0.")
+
+    if max_delta is not None:
+        if not isinstance(max_delta, (int, float)) or max_delta < -1.0 or max_delta > 1.0:
+            raise ValueError(f"Invalid max_delta: {max_delta}. Must be a float between -1.0 and 1.0.")
+
+    if min_delta is not None and max_delta is not None and min_delta > max_delta:
+        raise ValueError(f"min_delta ({min_delta}) cannot be greater than max_delta ({max_delta}).")
+
+
 def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CALL',
                        min_dte: int | None = None, max_dte: int | None = None,
                        min_delta: float | None = None, max_delta: float | None = None) -> dict:
     """Fetch options chain from Schwab API, filter server-side by DTE and delta, and return structured format."""
+    _validate_chain_params(symbol, min_dte, max_dte, min_delta, max_delta)
+
     today = datetime.datetime.now(SCHWAB_TZ).date()
 
     from_date = (today + datetime.timedelta(days=min_dte)).isoformat() if min_dte is not None and min_dte >= 0 else None

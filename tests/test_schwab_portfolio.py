@@ -683,6 +683,30 @@ class TestFetchOptionChain(unittest.TestCase):
         self.assertEqual(len(res['chain']), 1)
         self.assertEqual(res['chain'][0]['symbol'], 'C2')
 
+    def test_fetch_option_chain_validation_errors(self):
+        """Verify ValueError is raised for negative DTE, out-of-range delta, or min > max."""
+        with self.assertRaises(ValueError):
+            sp.fetch_option_chain('fake_token', 'AAPL', min_dte=-5)
+
+        with self.assertRaises(ValueError):
+            sp.fetch_option_chain('fake_token', 'AAPL', max_dte=5000)
+
+        with self.assertRaises(ValueError):
+            sp.fetch_option_chain('fake_token', 'AAPL', min_dte=60, max_dte=30)
+
+        with self.assertRaises(ValueError):
+            sp.fetch_option_chain('fake_token', 'AAPL', min_delta=-2.5)
+
+        with self.assertRaises(ValueError):
+            sp.fetch_option_chain('fake_token', 'AAPL', max_delta=1.5)
+
+        with self.assertRaises(ValueError):
+            sp.fetch_option_chain('fake_token', 'AAPL', min_delta=0.5, max_delta=0.2)
+
+        with self.assertRaises(ValueError):
+            sp.fetch_option_chain('fake_token', 'AAPL_WITH_EXCESSIVELY_LONG_SYMBOL_NAME_HERE')
+
+
 
 
 if __name__ == '__main__':

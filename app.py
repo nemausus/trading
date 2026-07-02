@@ -220,6 +220,8 @@ def schwab_chain(decoded_token):
             min_delta=min_delta, max_delta=max_delta
         )
         return jsonify(chain_data)
+    except ValueError as ve:
+        return jsonify({'error': str(ve)}), 400
     except Exception as e:
         app.logger.error(f"Error fetching option chain for user {uid} symbol {symbol}: {e}")
         return jsonify({'error': f'Failed to retrieve option chain for {symbol}'}), 502
