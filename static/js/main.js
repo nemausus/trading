@@ -85,6 +85,15 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
 
 document.getElementById('btn-refresh-portfolio').addEventListener('click', fetchSchwabPortfolio);
 
+document.getElementById('btn-group-underlying').addEventListener('click', () => {
+    const btn = document.getElementById('btn-group-underlying');
+    const isGrouped = btn.dataset.grouped === 'true';
+    btn.dataset.grouped = String(!isGrouped);
+    btn.classList.toggle('active', !isGrouped);
+    if (_lastPositions.length > 0) renderPositions(_lastPositions);
+});
+
+
 async function checkSchwabStatus() {
     const user = auth.currentUser;
     if (!user) return;
@@ -213,9 +222,36 @@ async function fetchSchwabPortfolio() {
     }
 }
 
+// Cache last-fetched positions so the group toggle can re-render without a new fetch
+let _lastPositions = [];
+
+// Extract the base underlying ticker from a symbol (AAPL from 'AAPL  260821C00295000')
+function baseUnderlying(symbol) {
+    if (symbol.length <= 4) return symbol;
+    return symbol.slice(0, 6).trimEnd();
+}
+
+// Sort positions grouped: stock/ETF first, then its options, all under the same underlying
+function sortPositionsGrouped(positions) {
+    return [...positions].sort((a, b) => {
+        if (a.accountNumber < b.accountNumber) return -1;
+        if (a.accountNumber > b.accountNumber) return 1;
+        const ua = baseUnderlying(a.symbol);
+        const ub = baseUnderlying(b.symbol);
+        if (ua < ub) return -1;
+        if (ua > ub) return 1;
+        // Within same underlying: equity (short symbol) before options
+        const aIsOpt = a.symbol.length > 4;
+        const bIsOpt = b.symbol.length > 4;
+        if (aIsOpt !== bIsOpt) return aIsOpt ? 1 : -1;
+        return a.symbol < b.symbol ? -1 : a.symbol > b.symbol ? 1 : 0;
+    });
+}
+
 function renderDashboard(data) {
+    _lastPositions = data.positions || [];
     renderSummaries(data.summaries || []);
-    renderPositions(data.positions || []);
+    renderPositions(_lastPositions);
     renderOrders(data.orders || []);
 }
 
@@ -248,7 +284,7 @@ function renderSummaries(summaries) {
                 <div class="summary-value">${formatCurrency(sum.Net)}</div>
                 <div class="summary-subtext">Cash: <strong>${formatCurrency(sum.Cash)}</strong></div>
                 <div class="summary-subtext" style="margin-top: 4px;">
-                    Total Loan: <strong>${formatCurrency(sum.TotalLoan)}</strong>
+                    Total Loan: <strong>${formatCurrency(sum['Total Loan'])}</strong>
                     <span style="font-size:0.75rem; color:var(--text-secondary); display:block;">
                         (Margin: ${formatCurrency(sum.Margin)} | Box: ${formatCurrency(sum.BOX)} | CSP: ${formatCurrency(sum.CSP)})
                     </span>
@@ -272,7 +308,14 @@ function renderPositions(positions) {
         return;
     }
 
-    let rowsHtml = positions.map(pos => {
+    const grouped = document.getElementById('btn-group-underlying')?.dataset.grouped === 'true';
+    const displayPositions = grouped ? sortPositionsGrouped(positions) : positions;
+
+    // In grouped mode inject a separator row whenever the underlying changes
+    let prevUnderlying = null;
+    let prevAccount = null;
+
+    let rowsHtml = displayPositions.map(pos => {
         const isOption = pos.symbol.length > 4;
         const symbolBadgeClass = isOption ? 'badge-option' : 'badge-underlying';
 
@@ -286,9 +329,20 @@ function renderPositions(positions) {
 
         const dteDisplay = pos.dte >= 0 ? pos.dte : '-';
         const deltaDisplay = pos.delta !== 0 ? formatNumber(pos.delta, 2) : '-';
-        const mprDisplay = pos.mpr !== 0 ? formatPercent(pos.mpr * 100) : '-';
+        const mprDisplay = pos.mpr !== 0 ? formatPercent(pos.mpr) : '-';
 
-        return `
+        let groupHeaderHtml = '';
+        if (grouped) {
+            const underlying = baseUnderlying(pos.symbol);
+            if (underlying !== prevUnderlying || pos.accountNumber !== prevAccount) {
+                const colCount = 11;
+                groupHeaderHtml = `<tr class="group-header-row"><td colspan="${colCount}">${pos.accountNumber} &mdash; ${underlying}</td></tr>`;
+                prevUnderlying = underlying;
+                prevAccount = pos.accountNumber;
+            }
+        }
+
+        return groupHeaderHtml + `
             <tr>
                 <td><span class="${symbolBadgeClass}">${pos.symbol}</span></td>
                 <td style="text-align: right;">${pos.quantity}</td>
@@ -355,7 +409,7 @@ function renderOrders(orders) {
         const valShareDisplay = ord['value/share'] ? formatCurrency(ord['value/share']) : '-';
         const dteDisplay = ord.dte >= 0 ? ord.dte : '-';
         const deltaDisplay = ord.delta ? formatNumber(ord.delta, 2) : '-';
-        const mprDisplay = ord.mpr ? formatPercent(ord.mpr * 100) : '-';
+        const mprDisplay = ord.mpr ? formatPercent(ord.mpr) : '-';
 
         return `
             <tr>
