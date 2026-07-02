@@ -11,6 +11,8 @@ import urllib.parse
 from functools import wraps
 import firestore_db
 from schwab_auth import SchwabAuthManager, SCHWAB_REQUEST_TIMEOUT
+import schwab_portfolio
+
 
 schwab_auth = SchwabAuthManager()
 
@@ -173,7 +175,7 @@ def schwab_accounts(decoded_token):
     if not access_token:
         return jsonify({'error': 'Schwab account not connected or failed to refresh session'}), 400
 
-    # Make API call to Schwab
+    # Make API call to Schwab with fields=positions
     try:
         headers = {
             "Authorization": f"Bearer {access_token}",
@@ -182,10 +184,14 @@ def schwab_accounts(decoded_token):
         response = requests.get(
             "https://api.schwabapi.com/trader/v1/accounts",
             headers=headers,
+            params={"fields": "positions"},
             timeout=SCHWAB_REQUEST_TIMEOUT,
         )
         response.raise_for_status()
-        return jsonify(response.json())
+
+        # Process the accounts data to match the accounts command logic
+        parsed_data = schwab_portfolio.process_accounts_data(response.json(), access_token)
+        return jsonify(parsed_data)
     except Exception as e:
         app.logger.error(f"Error fetching Schwab accounts for user {uid}: {e}")
         return jsonify({'error': 'Failed to retrieve Schwab accounts'}), 502

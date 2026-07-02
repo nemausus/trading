@@ -3,51 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure SPA</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .view { display: none; }
-        .active-view { display: block; }
-        .card { border: 1px solid #ccc; padding: 20px; border-radius: 8px; max-width: 400px; }
-        button { margin-top: 10px; padding: 8px 16px; cursor: pointer; }
-    </style>
+    <title>Covered Calls Portfolio Manager</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
-    <div id="view-loading" class="view active-view card">
-        <p>Checking authentication state...</p>
+    <!-- LOADING VIEW -->
+    <div id="view-loading" class="view active-view center-container">
+        <div class="auth-card">
+            <h2 style="font-size: 1.4rem; margin-bottom: 0;">Verifying Authentication...</h2>
+        </div>
     </div>
 
-    <div id="view-login" class="view card">
-        <h2>Login</h2>
-        <input type="email" id="email" placeholder="Email" style="display:block; margin-bottom:10px; width:90%;">
-        <input type="password" id="password" placeholder="Password" style="display:block; margin-bottom:10px; width:90%;">
-        <button id="btn-login">Sign In</button>
-        <p id="login-error" style="color: red;"></p>
+    <!-- LOGIN VIEW -->
+    <div id="view-login" class="view center-container">
+        <div class="auth-card">
+            <h2>Sign In</h2>
+            <input type="email" id="email" placeholder="Email Address">
+            <input type="password" id="password" placeholder="Password">
+            <button id="btn-login">Sign In</button>
+            <p id="login-error" class="auth-error"></p>
+        </div>
     </div>
 
-    <div id="view-main" class="view card" style="max-width: 600px;">
-        <h2>Dashboard</h2>
-        <p>Welcome, <strong id="user-display-email"></strong></p>
+    <!-- MAIN VIEW -->
+    <div id="view-main" class="view">
+        <!-- STICKY HEADER -->
+        <header class="app-header">
+            <div class="header-container">
+                <div class="header-logo">Antigravity Portfolio</div>
+                <div class="header-right">
+                    <span class="user-email" id="user-display-email"></span>
 
-        <hr>
+                    <!-- Schwab Status Pill -->
+                    <span id="schwab-status-pill" class="status-pill disconnected">
+                        Schwab: <span id="schwab-status-text">Disconnected</span>
+                    </span>
 
-        <h3>Backend Connection</h3>
-        <button id="btn-fetch-hello">Fetch Secure Data from app.py</button>
-        <p id="api-output" style="color: blue; font-weight: bold;"></p>
+                    <!-- Schwab Action Button (Connect/Disconnect) -->
+                    <div id="schwab-actions" style="display: inline-block;"></div>
 
-        <hr>
+                    <!-- Log Out -->
+                    <button id="btn-logout" class="btn-header">Log Out</button>
+                </div>
+            </div>
+        </header>
 
-        <h3>Schwab Integration</h3>
-        <p>Status: <strong id="schwab-status-text" style="color: gray;">Checking...</strong></p>
-        <div id="schwab-actions"></div>
-        <pre id="schwab-output" style="color: #006600; background-color: #f5f5f5; padding: 10px; border-radius: 4px; border: 1px solid #ddd; max-height: 200px; overflow: auto; font-family: monospace; font-size: 11px; margin-top: 10px; display: none;"></pre>
+        <!-- DASHBOARD BODY -->
+        <main class="dashboard-container">
 
-        <hr>
+            <!-- ACCOUNTS SUMMARY CONTAINER -->
+            <div id="summaries-container" class="summary-grid">
+                <!-- Dynamically populated summaries -->
+            </div>
 
-        <button id="btn-logout">Log Out</button>
+            <!-- POSITIONS CONTAINER -->
+            <div class="section-card">
+                <div class="section-header-row">
+                    <h3>Account Positions</h3>
+                    <button id="btn-refresh-portfolio" class="btn-action-refresh" style="display: none;">Refresh Data</button>
+                </div>
+
+                <div id="positions-container">
+                    <div class="no-data-msg">
+                        <p>No portfolio data retrieved yet.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACTIVE ORDERS CONTAINER -->
+            <div class="section-card">
+                <div class="section-header-row">
+                    <h3>Working Orders</h3>
+                </div>
+
+                <div id="orders-container">
+                    <div class="no-data-msg">
+                        <p>No working orders active.</p>
+                    </div>
+                </div>
+            </div>
+
+        </main>
     </div>
 
+    <!-- Firebase SDKs and main.js -->
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
