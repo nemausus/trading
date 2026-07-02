@@ -659,7 +659,7 @@ function renderOptionChainTable(contracts) {
             prevDte = opt.dte;
             dteGroupHeaderHtml = `
                 <tr class="dte-group-row">
-                    <td colspan="13">
+                    <td colspan="10">
                         <div class="dte-header-content">
                             <span class="dte-group-pill">${opt.dte} DTE</span>
                             <span class="dte-group-date">Expiration: <strong>${opt.expirationDate}</strong></span>
@@ -674,10 +674,7 @@ function renderOptionChainTable(contracts) {
         return dteGroupHeaderHtml + `
             <tr class="${rowBgClass}">
                 <td><span class="badge-option">${opt.symbol}</span></td>
-                <td style="text-align: center;"><span class="${badgeClass}">${opt.contractType}</span></td>
                 <td style="text-align: right; font-weight: 700;">$${formatNumber(opt.strikePrice, 2)}</td>
-                <td style="text-align: center;">${opt.expirationDate}</td>
-                <td style="text-align: center;"><span class="dte-pill">${opt.dte}</span></td>
                 <td style="text-align: right;">${formatCurrency(opt.bid)}</td>
                 <td style="text-align: right;">${formatCurrency(opt.ask)}</td>
                 <td style="text-align: right; font-weight: 600;">${formatCurrency(opt.mark)}</td>
@@ -696,10 +693,7 @@ function renderOptionChainTable(contracts) {
                 <thead>
                     <tr>
                         <th>Symbol</th>
-                        <th style="text-align: center;">Type</th>
                         <th style="text-align: right;">Strike</th>
-                        <th style="text-align: center;">Exp Date</th>
-                        <th style="text-align: center;">DTE</th>
                         <th style="text-align: right;">Bid</th>
                         <th style="text-align: right;">Ask</th>
                         <th style="text-align: right;">Mark</th>
