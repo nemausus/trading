@@ -39,7 +39,8 @@
                 <div class="header-left">
                     <div class="header-logo">Antigravity Portfolio</div>
                     <nav class="header-nav">
-                        <button id="tab-btn-portfolio" class="nav-tab active">Portfolio</button>
+                        <button id="tab-btn-portfolio" class="nav-tab">Portfolio</button>
+                        <button id="tab-btn-options" class="nav-tab active">Options</button>
                         <button id="tab-btn-chain" class="nav-tab">Option Chains</button>
                     </nav>
                 </div>
@@ -64,7 +65,7 @@
         <main class="dashboard-container">
 
             <!-- TAB 1: PORTFOLIO CONTENT -->
-            <div id="tab-content-portfolio" class="tab-content active-tab-content">
+            <div id="tab-content-portfolio" class="tab-content">
                 <!-- ACCOUNTS SUMMARY CONTAINER -->
                 <div id="summaries-container" class="summary-grid">
                     <!-- Dynamically populated summaries -->
@@ -98,6 +99,25 @@
                     <div id="orders-container">
                         <div class="no-data-msg">
                             <p>No working orders active.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: OPTIONS CONTENT -->
+            <div id="tab-content-options" class="tab-content active-tab-content">
+                <div class="section-card">
+                    <div class="section-header-row">
+                        <h3>Options Portfolio</h3>
+                        <div style="display:flex; align-items:center; gap: 10px;">
+                            <button id="btn-group-options" class="btn-toggle" data-grouped="false" title="Group positions by underlying symbol">
+                                <span class="toggle-icon">⊞</span> Group by Underlying
+                            </button>
+                        </div>
+                    </div>
+                    <div id="options-only-container">
+                        <div class="no-data-msg">
+                            <p>No options data retrieved yet.</p>
                         </div>
                     </div>
                 </div>

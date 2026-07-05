@@ -25,6 +25,11 @@ export function clearDashboard() {
             <p>Connect your Schwab account to retrieve working orders.</p>
         </div>
     `;
+    document.getElementById('options-only-container').innerHTML = `
+        <div class="no-data-msg">
+            <p>Connect your Schwab account to retrieve options.</p>
+        </div>
+    `;
 }
 
 export function renderDashboard(data) {
@@ -32,6 +37,7 @@ export function renderDashboard(data) {
     renderSummaries(data.summaries || []);
     renderPositions(lastPositions);
     renderOrders(data.orders || []);
+    renderOptions(lastPositions);
 }
 
 export function renderSummaries(summaries) {
@@ -110,6 +116,13 @@ export function renderPositions(positions) {
                 prevUnderlying = underlying;
                 prevAccount = pos.accountNumber;
             }
+        } else {
+            if (pos.accountNumber !== prevAccount) {
+                const colCount = 11;
+                groupHeaderHtml = `<tr class="group-header-row"><td colspan="${colCount}">Account: ${pos.accountNumber}</td></tr>`;
+                prevAccount = pos.accountNumber;
+                prevUnderlying = null;
+            }
         }
 
         return groupHeaderHtml + `
@@ -140,6 +153,92 @@ export function renderPositions(positions) {
                         <th style="text-align: right;">Mark</th>
                         <th style="text-align: right;">Cost Basis</th>
                         <th style="text-align: right;">Market Value</th>
+                        <th style="text-align: right;">P/L</th>
+                        <th style="text-align: right;">P/L%</th>
+                        <th style="text-align: center;">DTE</th>
+                        <th style="text-align: center;">Delta</th>
+                        <th style="text-align: center;">MPR</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+export function renderOptions(positions) {
+    const container = document.getElementById('options-only-container');
+    if (!positions || positions.length === 0) {
+        container.innerHTML = `<div class="no-data-msg"><p>No open options found in Schwab accounts.</p></div>`;
+        return;
+    }
+
+    const optionsOnly = positions.filter(pos => pos.symbol.length > 4 && !pos.symbol.startsWith('SPX'));
+
+    if (optionsOnly.length === 0) {
+        container.innerHTML = `<div class="no-data-msg"><p>No open options (excluding SPX) found.</p></div>`;
+        return;
+    }
+
+    const grouped = document.getElementById('btn-group-options')?.dataset.grouped === 'true';
+    const displayPositions = grouped ? sortPositionsGrouped(optionsOnly) : optionsOnly;
+
+    let prevUnderlying = null;
+    let prevAccount = null;
+
+    let rowsHtml = displayPositions.map(pos => {
+        const symbolBadgeClass = getSymbolBadgeClass(pos.symbol);
+        const pl = getPLFormatting(pos['P/L']);
+        const plPercent = getPLPercentFormatting(pos['P/L%']);
+
+        const dteDisplay = pos.dte >= 0 ? pos.dte : '-';
+        const deltaDisplay = pos.delta !== 0 ? formatNumber(pos.delta, 2) : '-';
+        const mprDisplay = pos.mpr !== 0 ? formatPercent(pos.mpr) : '-';
+
+        let groupHeaderHtml = '';
+        if (grouped) {
+            const underlying = baseUnderlying(pos.symbol);
+            if (underlying !== prevUnderlying || pos.accountNumber !== prevAccount) {
+                const colCount = 9;
+                groupHeaderHtml = `<tr class="group-header-row"><td colspan="${colCount}">${pos.accountNumber} &mdash; ${underlying}</td></tr>`;
+                prevUnderlying = underlying;
+                prevAccount = pos.accountNumber;
+            }
+        } else {
+            if (pos.accountNumber !== prevAccount) {
+                const colCount = 9;
+                groupHeaderHtml = `<tr class="group-header-row"><td colspan="${colCount}">Account: ${pos.accountNumber}</td></tr>`;
+                prevAccount = pos.accountNumber;
+                prevUnderlying = null;
+            }
+        }
+
+        return groupHeaderHtml + `
+            <tr>
+                <td><span class="${symbolBadgeClass}">${pos.symbol}</span></td>
+                <td style="text-align: right;">${pos.quantity}</td>
+                <td style="text-align: right;">${formatCurrency(pos['cost/share'])}</td>
+                <td style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
+                <td style="text-align: right;" class="${pl.cssClass}">${pl.sign}${pl.valDisplay}</td>
+                <td style="text-align: right;" class="${plPercent.cssClass}">${plPercent.sign}${plPercent.valDisplay}</td>
+                <td style="text-align: center;">${dteDisplay}</td>
+                <td style="text-align: center;">${deltaDisplay}</td>
+                <td style="text-align: center;">${mprDisplay}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th style="text-align: right;">Qty</th>
+                        <th style="text-align: right;">Cost/Share</th>
+                        <th style="text-align: right;">Mark</th>
                         <th style="text-align: right;">P/L</th>
                         <th style="text-align: right;">P/L%</th>
                         <th style="text-align: center;">DTE</th>

@@ -1,6 +1,6 @@
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './auth.js';
 import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, rawChainData } from './api.js';
-import { showView, clearDashboard, renderPositions, lastPositions } from './ui.js';
+import { showView, clearDashboard, renderPositions, renderOptions, lastPositions } from './ui.js';
 
 // Parse URL params on load
 const urlParams = new URLSearchParams(window.location.search);
@@ -57,28 +57,51 @@ document.getElementById('btn-group-underlying').addEventListener('click', () => 
     if (lastPositions.length > 0) renderPositions(lastPositions);
 });
 
+document.getElementById('btn-group-options').addEventListener('click', () => {
+    const btn = document.getElementById('btn-group-options');
+    const isGrouped = btn.dataset.grouped === 'true';
+    btn.dataset.grouped = String(!isGrouped);
+    btn.classList.toggle('active', !isGrouped);
+    if (lastPositions.length > 0) renderOptions(lastPositions);
+});
+
 
 // =====================================================================================
 // --- HEADER TAB NAVIGATION ---
 // =====================================================================================
 const tabBtnPortfolio = document.getElementById('tab-btn-portfolio');
+const tabBtnOptions = document.getElementById('tab-btn-options');
 const tabBtnChain = document.getElementById('tab-btn-chain');
 const tabContentPortfolio = document.getElementById('tab-content-portfolio');
+const tabContentOptions = document.getElementById('tab-content-options');
 const tabContentChain = document.getElementById('tab-content-chain');
 
-if (tabBtnPortfolio && tabBtnChain) {
+if (tabBtnPortfolio && tabBtnOptions && tabBtnChain) {
     tabBtnPortfolio.addEventListener('click', () => {
         tabBtnPortfolio.classList.add('active');
+        tabBtnOptions.classList.remove('active');
         tabBtnChain.classList.remove('active');
         tabContentPortfolio.classList.add('active-tab-content');
+        tabContentOptions.classList.remove('active-tab-content');
+        tabContentChain.classList.remove('active-tab-content');
+    });
+
+    tabBtnOptions.addEventListener('click', () => {
+        tabBtnOptions.classList.add('active');
+        tabBtnPortfolio.classList.remove('active');
+        tabBtnChain.classList.remove('active');
+        tabContentOptions.classList.add('active-tab-content');
+        tabContentPortfolio.classList.remove('active-tab-content');
         tabContentChain.classList.remove('active-tab-content');
     });
 
     tabBtnChain.addEventListener('click', () => {
         tabBtnChain.classList.add('active');
         tabBtnPortfolio.classList.remove('active');
+        tabBtnOptions.classList.remove('active');
         tabContentChain.classList.add('active-tab-content');
         tabContentPortfolio.classList.remove('active-tab-content');
+        tabContentOptions.classList.remove('active-tab-content');
         // Auto-fetch default chain if not loaded yet
         if (!rawChainData.chain || rawChainData.chain.length === 0) {
             fetchOptionChain();
