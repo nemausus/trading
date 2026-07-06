@@ -30,6 +30,10 @@ export function clearDashboard() {
             <p>Connect your Schwab account to retrieve options.</p>
         </div>
     `;
+    const boxContainer = document.getElementById('box-container');
+    if (boxContainer) {
+        boxContainer.innerHTML = `<div class="no-data-msg"><p>Select a date range and click "Find Boxes" to scan for SPX box spread opportunities.</p></div>`;
+    }
 }
 
 export function renderDashboard(data) {
@@ -422,6 +426,61 @@ export function renderOptionChainTable(contracts) {
                         <th style="text-align: center;">MPR</th>
                         <th style="text-align: right;">Strike Δ%</th>
                         <th style="text-align: right;">Break-Even Δ%</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+export function renderBoxes(boxes) {
+    const container = document.getElementById('box-container');
+    if (!boxes || boxes.length === 0) {
+        container.innerHTML = `<div class="no-data-msg"><p>No SPX box spreads found for the selected criteria. Try adjusting the date range or box size.</p></div>`;
+        return;
+    }
+
+    let prevExpDate = null;
+
+    let rowsHtml = boxes.map(box => {
+        const rateClass = box.rate >= 5.5 ? 'val-positive' : (box.rate >= 4.5 ? '' : 'val-negative');
+
+        let expHeaderHtml = '';
+        if (box.expirationDate !== prevExpDate) {
+            prevExpDate = box.expirationDate;
+            expHeaderHtml = `<tr class="group-header-row"><td colspan="9">Expiration: ${box.expirationDate} &mdash; ${box.dte} DTE</td></tr>`;
+        }
+
+        return expHeaderHtml + `
+            <tr>
+                <td style="text-align: center; font-weight: 600; color: var(--text-secondary);">${box.size}</td>
+                <td style="text-align: right; font-weight: 700;">$${formatNumber(box.btoPut, 0)}</td>
+                <td style="text-align: right; font-weight: 700;">$${formatNumber(box.stoPut, 0)}</td>
+                <td style="text-align: right; font-weight: 700;">$${formatNumber(box.stoCall, 0)}</td>
+                <td style="text-align: right; font-weight: 700;">$${formatNumber(box.btoCall, 0)}</td>
+                <td style="text-align: right; font-weight: 600;">$${formatNumber(box.netCredit, 2)}</td>
+                <td style="text-align: right;" class="${rateClass} font-weight: 700;">${formatNumber(box.rate, 2)}%</td>
+                <td style="text-align: right; color: var(--text-secondary);">${box.liquidity.toLocaleString()}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align: center;">Size</th>
+                        <th style="text-align: right;">BTO PUT</th>
+                        <th style="text-align: right;">STO PUT</th>
+                        <th style="text-align: right;">STO CALL</th>
+                        <th style="text-align: right;">BTO CALL</th>
+                        <th style="text-align: right;">Net Credit</th>
+                        <th style="text-align: right;">Ann. Rate</th>
+                        <th style="text-align: right;">Liquidity</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -285,10 +285,25 @@ def _validate_chain_params(symbol: str, min_dte: int | None, max_dte: int | None
         raise ValueError(f"min_delta ({min_delta}) cannot be greater than max_delta ({max_delta}).")
 
 
+def _fetch_chains(access_token: str, params: dict) -> dict | None:
+    """GET /marketdata/v1/chains and return parsed JSON, or None on error."""
+    headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+    url = "https://api.schwabapi.com/marketdata/v1/chains"
+    try:
+        res = requests.get(url, headers=headers, params=params, timeout=SCHWAB_REQUEST_TIMEOUT)
+        if res.status_code != 200:
+            logging.error("Error fetching chains: %s %s", res.status_code, res.text)
+            return None
+        return res.json()
+    except requests.exceptions.RequestException as e:
+        logging.error("Network error fetching chains: %s", e)
+        return None
+
+
 def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CALL',
                        min_dte: int | None = None, max_dte: int | None = None,
                        min_delta: float | None = None, max_delta: float | None = None) -> dict:
-    """Fetch options chain from Schwab API, filter server-side by DTE and delta, and return structured format."""
+    """Fetch options chain from Schwab API, filter by DTE and delta, and return structured format."""
     _validate_chain_params(symbol, min_dte, max_dte, min_delta, max_delta)
 
     today = datetime.datetime.now(SCHWAB_TZ).date()
@@ -296,7 +311,6 @@ def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CAL
     from_date = (today + datetime.timedelta(days=min_dte)).isoformat() if min_dte is not None and min_dte >= 0 else None
     to_date = (today + datetime.timedelta(days=max_dte)).isoformat() if max_dte is not None and max_dte >= 0 else None
 
-    headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
     params = {
         'symbol': symbol,
         'contractType': contract_type if contract_type in ('CALL', 'PUT', 'ALL') else 'ALL',
@@ -307,56 +321,145 @@ def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CAL
     if to_date:
         params['toDate'] = to_date
 
-    url = "https://api.schwabapi.com/marketdata/v1/chains"
-    try:
-        res = requests.get(url, headers=headers, params=params, timeout=SCHWAB_REQUEST_TIMEOUT)
-        if res.status_code != 200:
-            logging.error(f"Error fetching option chain for {symbol}: {res.status_code} {res.text}")
-            return {'underlying': {'symbol': symbol, 'price': 0.0, 'change': 0.0, 'percentChange': 0.0}, 'chain': [], 'totalContracts': 0}
+    empty = {
+        'underlying': {'symbol': symbol, 'price': 0.0, 'change': 0.0, 'percentChange': 0.0},
+        'chain': [],
+        'totalContracts': 0
+    }
+    data = _fetch_chains(access_token, params)
+    if data is None:
+        return empty
 
-        data = res.json()
-        underlying_data = data.get('underlying', {})
-        stock_price = float(underlying_data.get('last', 0.0) or underlying_data.get('mark', 0.0) or 0.0)
+    underlying_data = data.get('underlying', {})
+    stock_price = float(underlying_data.get('last', 0.0) or underlying_data.get('mark', 0.0) or 0.0)
 
-        underlying_info = {
-            'symbol': symbol,
-            'price': stock_price,
-            'change': float(underlying_data.get('change', 0.0) or 0.0),
-            'percentChange': float(underlying_data.get('percentChange', 0.0) or 0.0)
+    underlying_info = {
+        'symbol': symbol,
+        'price': stock_price,
+        'change': float(underlying_data.get('change', 0.0) or 0.0),
+        'percentChange': float(underlying_data.get('percentChange', 0.0) or 0.0)
+    }
+
+    chain = []
+    if 'callExpDateMap' in data:
+        chain.extend(_parse_exp_map(data['callExpDateMap'], stock_price, 'CALL'))
+    if 'putExpDateMap' in data:
+        chain.extend(_parse_exp_map(data['putExpDateMap'], stock_price, 'PUT'))
+
+    total_contracts = len(chain)
+
+    filtered_chain = [
+        opt for opt in chain
+        if (min_dte is None or opt['dte'] >= min_dte)
+        and (max_dte is None or opt['dte'] <= max_dte)
+        and (min_delta is None or opt['delta'] >= min_delta)
+        and (max_delta is None or opt['delta'] <= max_delta)
+    ]
+
+    filtered_chain.sort(key=lambda x: (x['expirationDate'], x['strikePrice'], x['contractType']))
+
+    return {
+        'underlying': underlying_info,
+        'chain': filtered_chain,
+        'totalContracts': total_contracts
+    }
+
+def fetch_spx_boxes(access_token: str, from_date: str | None, to_date: str | None, sizes: list[int] | None = None) -> list[dict]:
+    """Fetch SPX option chains and identify box spreads."""
+    params = {
+        'symbol': '$SPX',
+        'contractType': 'ALL',
+        'includeUnderlyingQuote': False
+    }
+    if from_date:
+        params['fromDate'] = from_date
+    if to_date:
+        params['toDate'] = to_date
+
+    data = _fetch_chains(access_token, params)
+    if data is None:
+        return []
+
+    calls_map = data.get('callExpDateMap', {})
+    puts_map = data.get('putExpDateMap', {})
+
+    # Reuse _parse_exp_map to extract mark/dte/openInterest uniformly.
+    # stock_price=0.0 because includeUnderlyingQuote is False;
+    # change/beChange/mpr are not used in box spread calculations.
+    all_contracts = (
+        _parse_exp_map(calls_map, 0.0, 'CALL') +
+        _parse_exp_map(puts_map,  0.0, 'PUT')
+    )
+
+    # Keep only monthly SPX contracts (exclude SPXW weeklies) with open interest.
+    monthly = [
+        c for c in all_contracts
+        if c['symbol'].startswith('SPX  ') and c['openInterest'] > 0
+    ]
+
+    # Index by (expiration_date, strike) -> {contract_type: {mark, oi, dte}}
+    options_by_exp_strike: dict = {}
+    for c in monthly:
+        key = (c['expirationDate'], c['strikePrice'])
+        if key not in options_by_exp_strike:
+            options_by_exp_strike[key] = {}
+        options_by_exp_strike[key][c['contractType']] = {
+            'mark': c['mark'],
+            'oi':   c['openInterest'],
+            'dte':  c['dte'],
         }
 
-        chain = []
-        if 'callExpDateMap' in data:
-            chain.extend(_parse_exp_map(data['callExpDateMap'], stock_price, 'CALL'))
-        if 'putExpDateMap' in data:
-            chain.extend(_parse_exp_map(data['putExpDateMap'], stock_price, 'PUT'))
+    boxes = []
+    if sizes is None or not sizes:
+        sizes = [100, 200, 500, 1000]
 
-        total_contracts = len(chain)
+    for (exp_date, lower_strike), legs in options_by_exp_strike.items():
+        if 'CALL' not in legs or 'PUT' not in legs:
+            continue
 
-        # Apply server-side filtering
-        filtered_chain = []
-        for opt in chain:
-            if min_dte is not None and opt['dte'] < min_dte:
+        lower_call = legs['CALL']
+        lower_put  = legs['PUT']
+        dte = lower_call['dte']
+        if dte <= 0:
+            continue
+
+        for size in sizes:
+            higher_strike = lower_strike + size
+            higher_key = (exp_date, higher_strike)
+
+            if higher_key not in options_by_exp_strike:
                 continue
-            if max_dte is not None and opt['dte'] > max_dte:
-                continue
-            if min_delta is not None and opt['delta'] < min_delta:
-                continue
-            if max_delta is not None and opt['delta'] > max_delta:
-                continue
-            filtered_chain.append(opt)
 
-        filtered_chain.sort(key=lambda x: (x['expirationDate'], x['strikePrice'], x['contractType']))
+            higher_legs = options_by_exp_strike[higher_key]
+            if 'CALL' not in higher_legs or 'PUT' not in higher_legs:
+                continue
 
-        return {
-            'underlying': underlying_info,
-            'chain': filtered_chain,
-            'totalContracts': total_contracts
-        }
-    except Exception as e:
-        logging.error(f"Failed to fetch option chain for {symbol}: {e}")
-        return {'underlying': {'symbol': symbol, 'price': 0.0, 'change': 0.0, 'percentChange': 0.0}, 'chain': [], 'totalContracts': 0}
+            higher_call = higher_legs['CALL']
+            higher_put  = higher_legs['PUT']
 
+            liquidity = lower_call['oi'] + lower_put['oi'] + higher_call['oi'] + higher_put['oi']
+            net_credit = (lower_call['mark'] - higher_call['mark']) + (higher_put['mark'] - lower_put['mark'])
+
+            if net_credit <= 0:
+                continue
+
+            rate = (((size - net_credit) / net_credit) * (365.0 / dte) * 100.0)
+
+            boxes.append({
+                'expirationDate': exp_date,
+                'dte':       dte,
+                'btoPut':    lower_strike,
+                'stoPut':    higher_strike,
+                'stoCall':   lower_strike,
+                'btoCall':   higher_strike,
+                'netCredit': net_credit,
+                'rate':      rate,
+                'size':      size,
+                'liquidity': liquidity,
+            })
+
+    boxes.sort(key=lambda x: x['liquidity'], reverse=True)
+    return boxes[:15]
 
 
 # ---------------------------------------------------------------------------

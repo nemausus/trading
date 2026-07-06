@@ -42,6 +42,7 @@
                         <button id="tab-btn-portfolio" class="nav-tab">Portfolio</button>
                         <button id="tab-btn-options" class="nav-tab active">Options</button>
                         <button id="tab-btn-chain" class="nav-tab">Option Chains</button>
+                        <button id="tab-btn-box" class="nav-tab">Box</button>
                     </nav>
                 </div>
                 <div class="header-right">
@@ -193,6 +194,53 @@
                     <div id="chain-container">
                         <div class="no-data-msg">
                             <p>Enter a symbol and click "Fetch Chain" to retrieve option contracts.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: BOX SPREADS CONTENT -->
+            <div id="tab-content-box" class="tab-content">
+                <div class="section-card">
+                    <div class="section-header-row" style="margin-bottom: 16px;">
+                        <h3>SPX Box Spread Scanner</h3>
+                    </div>
+
+                    <div class="chain-filter-bar">
+                        <div class="filter-group">
+                            <label for="box-from-date">From Date</label>
+                            <input type="date" id="box-from-date">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="box-to-date">To Date</label>
+                            <input type="date" id="box-to-date">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="box-sizes">Box Size</label>
+                            <select id="box-sizes">
+                                <option value="">All (100, 200, 500, 1000)</option>
+                                <option value="100">100</option>
+                                <option value="200">200</option>
+                                <option value="500">500</option>
+                                <option value="1000">1000</option>
+                                <option value="100,200">100 &amp; 200</option>
+                                <option value="500,1000">500 &amp; 1000</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-actions">
+                            <button id="btn-fetch-boxes" class="btn-action-refresh">Find Boxes</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BOX RESULTS TABLE -->
+                <div class="section-card">
+                    <div id="box-container">
+                        <div class="no-data-msg">
+                            <p>Select a date range and click "Find Boxes" to scan for SPX box spread opportunities.</p>
                         </div>
                     </div>
                 </div>

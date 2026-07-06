@@ -1,5 +1,5 @@
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './auth.js';
-import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, rawChainData } from './api.js';
+import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, rawChainData } from './api.js';
 import { showView, clearDashboard, renderPositions, renderOptions, lastPositions } from './ui.js';
 
 // Parse URL params on load
@@ -72,36 +72,28 @@ document.getElementById('btn-group-options').addEventListener('click', () => {
 const tabBtnPortfolio = document.getElementById('tab-btn-portfolio');
 const tabBtnOptions = document.getElementById('tab-btn-options');
 const tabBtnChain = document.getElementById('tab-btn-chain');
+const tabBtnBox = document.getElementById('tab-btn-box');
 const tabContentPortfolio = document.getElementById('tab-content-portfolio');
 const tabContentOptions = document.getElementById('tab-content-options');
 const tabContentChain = document.getElementById('tab-content-chain');
+const tabContentBox = document.getElementById('tab-content-box');
 
-if (tabBtnPortfolio && tabBtnOptions && tabBtnChain) {
-    tabBtnPortfolio.addEventListener('click', () => {
-        tabBtnPortfolio.classList.add('active');
-        tabBtnOptions.classList.remove('active');
-        tabBtnChain.classList.remove('active');
-        tabContentPortfolio.classList.add('active-tab-content');
-        tabContentOptions.classList.remove('active-tab-content');
-        tabContentChain.classList.remove('active-tab-content');
-    });
+const allTabBtns = [tabBtnPortfolio, tabBtnOptions, tabBtnChain, tabBtnBox];
+const allTabContents = [tabContentPortfolio, tabContentOptions, tabContentChain, tabContentBox];
 
-    tabBtnOptions.addEventListener('click', () => {
-        tabBtnOptions.classList.add('active');
-        tabBtnPortfolio.classList.remove('active');
-        tabBtnChain.classList.remove('active');
-        tabContentOptions.classList.add('active-tab-content');
-        tabContentPortfolio.classList.remove('active-tab-content');
-        tabContentChain.classList.remove('active-tab-content');
-    });
+function switchTab(activeBtn, activeContent) {
+    allTabBtns.forEach(b => b && b.classList.remove('active'));
+    allTabContents.forEach(c => c && c.classList.remove('active-tab-content'));
+    activeBtn.classList.add('active');
+    activeContent.classList.add('active-tab-content');
+}
 
+if (tabBtnPortfolio && tabBtnOptions && tabBtnChain && tabBtnBox) {
+    tabBtnPortfolio.addEventListener('click', () => switchTab(tabBtnPortfolio, tabContentPortfolio));
+    tabBtnOptions.addEventListener('click', () => switchTab(tabBtnOptions, tabContentOptions));
+    tabBtnBox.addEventListener('click', () => switchTab(tabBtnBox, tabContentBox));
     tabBtnChain.addEventListener('click', () => {
-        tabBtnChain.classList.add('active');
-        tabBtnPortfolio.classList.remove('active');
-        tabBtnOptions.classList.remove('active');
-        tabContentChain.classList.add('active-tab-content');
-        tabContentPortfolio.classList.remove('active-tab-content');
-        tabContentOptions.classList.remove('active-tab-content');
+        switchTab(tabBtnChain, tabContentChain);
         // Auto-fetch default chain if not loaded yet
         if (!rawChainData.chain || rawChainData.chain.length === 0) {
             fetchOptionChain();
@@ -143,3 +135,8 @@ document.getElementById('btn-reset-filters')?.addEventListener('click', () => {
 ['chain-type', 'chain-min-dte', 'chain-max-dte', 'chain-min-delta', 'chain-max-delta'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', fetchOptionChain);
 });
+
+// =====================================================================================
+// --- BOX SPREAD SCANNER ---
+// =====================================================================================
+document.getElementById('btn-fetch-boxes')?.addEventListener('click', fetchSPXBoxes);

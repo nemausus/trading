@@ -225,3 +225,31 @@ def schwab_chain(decoded_token):
     except Exception as e:
         app.logger.error(f"Error fetching option chain for user {uid} symbol {symbol}: {e}")
         return jsonify({'error': f'Failed to retrieve option chain for {symbol}'}), 502
+
+@app.route('/api/schwab/boxes')
+@limiter.limit("10 per minute")
+@require_firebase_auth
+def schwab_boxes(decoded_token):
+    uid = decoded_token['uid']
+
+    access_token = schwab_auth.refresh_user_tokens_if_needed(uid)
+    if not access_token:
+        return jsonify({'error': 'Schwab account not connected or failed to refresh session'}), 400
+
+    from_date = request.args.get('fromDate')
+    to_date = request.args.get('toDate')
+    sizes_raw = request.args.get('sizes')
+
+    sizes = None
+    if sizes_raw:
+        try:
+            sizes = [int(s.strip()) for s in sizes_raw.split(',') if s.strip().isdigit()]
+        except ValueError:
+            return jsonify({'error': 'Invalid sizes parameter. Must be comma-separated integers.'}), 400
+
+    try:
+        boxes = schwab_portfolio.fetch_spx_boxes(access_token, from_date, to_date, sizes)
+        return jsonify({'boxes': boxes})
+    except Exception as e:
+        app.logger.error(f"Error fetching SPX boxes for user {uid}: {e}")
+        return jsonify({'error': 'Failed to retrieve SPX box spreads'}), 502

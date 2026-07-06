@@ -193,3 +193,54 @@ export async function fetchOptionChain() {
         }
     }
 }
+
+export async function fetchSPXBoxes() {
+    const user = auth.currentUser;
+    if (!user) {
+        alert("Please sign in first.");
+        return;
+    }
+
+    const fromDate = document.getElementById('box-from-date')?.value || '';
+    const toDate = document.getElementById('box-to-date')?.value || '';
+    const sizes = document.getElementById('box-sizes')?.value || '';
+
+    const fetchBtn = document.getElementById('btn-fetch-boxes');
+    const boxContainer = document.getElementById('box-container');
+
+    if (fetchBtn) {
+        fetchBtn.disabled = true;
+        fetchBtn.innerText = "Scanning...";
+    }
+    boxContainer.innerHTML = `<div class="no-data-msg"><p>Scanning SPX options chain for box spread opportunities...</p></div>`;
+
+    try {
+        const token = await user.getIdToken();
+        const query = new URLSearchParams();
+        if (fromDate) query.append('fromDate', fromDate);
+        if (toDate) query.append('toDate', toDate);
+        if (sizes) query.append('sizes', sizes);
+
+        const url = `/api/schwab/boxes?${query.toString()}`;
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            const { renderBoxes } = await import('./ui.js');
+            renderBoxes(data.boxes || []);
+        } else {
+            const errMsg = data.error || 'Failed to fetch SPX box spreads';
+            boxContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
+        }
+    } catch (error) {
+        console.error("Failed to fetch SPX boxes:", error);
+        boxContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Network Error: ${error.message}</p></div>`;
+    } finally {
+        if (fetchBtn) {
+            fetchBtn.disabled = false;
+            fetchBtn.innerText = "Find Boxes";
+        }
+    }
+}
