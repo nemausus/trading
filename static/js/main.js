@@ -20,6 +20,8 @@ onAuthStateChanged(auth, (user) => {
         document.getElementById('user-display-email').innerText = user.email;
         showView('view-main');
         checkSchwabStatus();
+        // Navigate to the tab indicated by the URL hash (or default)
+        applyHashNavigation();
     } else {
         showView('view-login');
         clearDashboard();
@@ -83,33 +85,67 @@ const tabContentTransactions = document.getElementById('tab-content-transactions
 const allTabBtns = [tabBtnPortfolio, tabBtnOptions, tabBtnChain, tabBtnBox, tabBtnTransactions];
 const allTabContents = [tabContentPortfolio, tabContentOptions, tabContentChain, tabContentBox, tabContentTransactions];
 
-function switchTab(activeBtn, activeContent) {
+// Map of hash fragment -> { btn, content } for each tab
+const TAB_MAP = {
+    portfolio:    { btn: tabBtnPortfolio,    content: tabContentPortfolio },
+    options:      { btn: tabBtnOptions,      content: tabContentOptions },
+    chain:        { btn: tabBtnChain,        content: tabContentChain },
+    box:          { btn: tabBtnBox,          content: tabContentBox },
+    transactions: { btn: tabBtnTransactions, content: tabContentTransactions },
+};
+
+let txnsLoaded = false;
+
+function switchTab(activeBtn, activeContent, tabKey) {
     allTabBtns.forEach(b => b && b.classList.remove('active'));
     allTabContents.forEach(c => c && c.classList.remove('active-tab-content'));
     activeBtn.classList.add('active');
     activeContent.classList.add('active-tab-content');
+    // Keep URL in sync (pushState so back/forward works)
+    if (tabKey && window.location.hash !== '#' + tabKey) {
+        history.pushState({ tab: tabKey }, '', '#' + tabKey);
+    }
 }
 
-if (tabBtnPortfolio && tabBtnOptions && tabBtnChain && tabBtnBox && tabBtnTransactions) {
-    tabBtnPortfolio.addEventListener('click', () => switchTab(tabBtnPortfolio, tabContentPortfolio));
-    tabBtnOptions.addEventListener('click', () => switchTab(tabBtnOptions, tabContentOptions));
-    tabBtnBox.addEventListener('click', () => switchTab(tabBtnBox, tabContentBox));
-    tabBtnChain.addEventListener('click', () => {
-        switchTab(tabBtnChain, tabContentChain);
-        // Auto-fetch default chain if not loaded yet
+/**
+ * Navigate to a tab identified by its hash key (e.g. 'chain').
+ * Triggers any side-effects (auto-fetch chain, load transactions).
+ * Falls back to 'options' if the key is unknown.
+ */
+function navigateToTab(tabKey) {
+    const entry = TAB_MAP[tabKey] || TAB_MAP['options'];
+    switchTab(entry.btn, entry.content, tabKey in TAB_MAP ? tabKey : 'options');
+
+    if (tabKey === 'chain') {
         if (!rawChainData.chain || rawChainData.chain.length === 0) {
             fetchOptionChain();
         }
-    });
-    // Auto-load stored transactions when switching to the tab
-    let txnsLoaded = false;
-    tabBtnTransactions.addEventListener('click', () => {
-        switchTab(tabBtnTransactions, tabContentTransactions);
+    } else if (tabKey === 'transactions') {
         if (!txnsLoaded) {
             txnsLoaded = true;
             fetchTransactions();
         }
-    });
+    }
+}
+
+// Read initial hash (e.g. when the user pastes a URL with /#chain)
+function applyHashNavigation() {
+    const hash = window.location.hash.replace('#', '');
+    navigateToTab(hash || 'options');
+}
+
+// Update tab when the user navigates with the browser back/forward buttons
+window.addEventListener('hashchange', () => {
+    const hash = window.location.hash.replace('#', '');
+    navigateToTab(hash || 'options');
+});
+
+if (tabBtnPortfolio && tabBtnOptions && tabBtnChain && tabBtnBox && tabBtnTransactions) {
+    tabBtnPortfolio.addEventListener('click',    () => navigateToTab('portfolio'));
+    tabBtnOptions.addEventListener('click',      () => navigateToTab('options'));
+    tabBtnChain.addEventListener('click',        () => navigateToTab('chain'));
+    tabBtnBox.addEventListener('click',          () => navigateToTab('box'));
+    tabBtnTransactions.addEventListener('click', () => navigateToTab('transactions'));
 }
 
 // =====================================================================================
