@@ -43,6 +43,7 @@
                         <button id="tab-btn-options" class="nav-tab active">Options</button>
                         <button id="tab-btn-chain" class="nav-tab">Option Chains</button>
                         <button id="tab-btn-box" class="nav-tab">Box</button>
+                        <button id="tab-btn-transactions" class="nav-tab">Transactions</button>
                     </nav>
                 </div>
                 <div class="header-right">
@@ -241,6 +242,49 @@
                     <div id="box-container">
                         <div class="no-data-msg">
                             <p>Select a date range and click "Find Boxes" to scan for SPX box spread opportunities.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: TRANSACTIONS CONTENT -->
+            <div id="tab-content-transactions" class="tab-content">
+                <div class="section-card">
+                    <div class="section-header-row">
+                        <div>
+                            <h3>Transaction History</h3>
+                            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px;">
+                                Stored from Schwab &mdash; click <strong>Sync</strong> to pull latest.
+                            </p>
+                        </div>
+                        <div style="display:flex; align-items:center; gap: 10px;">
+                            <span id="txn-sync-status" class="txn-sync-status"></span>
+                            <button id="btn-sync-transactions" class="btn-action-refresh">&#8635; Sync</button>
+                        </div>
+                    </div>
+
+                    <!-- Summary stats bar -->
+                    <div id="txn-stats-bar" class="txn-stats-bar" style="display:none;">
+                        <div class="txn-stat">
+                            <span class="txn-stat-label">Total Stored</span>
+                            <span class="txn-stat-value" id="txn-stat-count">—</span>
+                        </div>
+                        <div class="txn-stat">
+                            <span class="txn-stat-label">Earliest</span>
+                            <span class="txn-stat-value" id="txn-stat-earliest">—</span>
+                        </div>
+                        <div class="txn-stat">
+                            <span class="txn-stat-label">Latest</span>
+                            <span class="txn-stat-value" id="txn-stat-latest">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transaction Table -->
+                <div class="section-card">
+                    <div id="transactions-container">
+                        <div class="no-data-msg">
+                            <p>No transactions loaded yet. Click <strong>Sync</strong> to fetch from Schwab, or switch to this tab to load stored records.</p>
                         </div>
                     </div>
                 </div>

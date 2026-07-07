@@ -5,11 +5,14 @@ import base64
 import logging
 import requests
 from cryptography.fernet import Fernet
-import firestore_db
 
-SCHWAB_REQUEST_TIMEOUT = (5, 30)  # (connect, read) seconds
+import firestore_db
+from constants import SCHWAB_REQUEST_TIMEOUT
 
 class SchwabAuthManager:
+    # Proactively refresh the access token this many seconds before it expires.
+    EXPIRATION_BUFFER_SECONDS = 300
+
     def __init__(self):
         # Encryption key for securing tokens at rest in Firestore
         self.key = os.environ.get('SCHWAB_ENCRYPTION_KEY')
@@ -49,7 +52,7 @@ class SchwabAuthManager:
         try:
             return self.decrypt_tokens(encrypted_data)
         except Exception as e:
-            logging.error(f"Failed to decrypt Schwab tokens for user {uid}: {e}")
+            logging.error("Failed to decrypt Schwab tokens for user %s: %s", uid, e)
             return None
 
     def disconnect_user(self, uid: str) -> None:
@@ -61,9 +64,9 @@ class SchwabAuthManager:
         if 'retrieved_at' not in tokens or 'expires_in' not in tokens:
             return True
         retrieved_time = datetime.datetime.fromisoformat(tokens['retrieved_at'])
-        EXPIRATION_BUFFER_SECONDS = 300  # Proactively refresh 5 minutes before actual expiry
         expiration_threshold = retrieved_time + datetime.timedelta(
-            seconds=tokens['expires_in'] - EXPIRATION_BUFFER_SECONDS)
+            seconds=tokens['expires_in'] - self.EXPIRATION_BUFFER_SECONDS
+        )
         return datetime.datetime.now() >= expiration_threshold
 
     def _make_token_request(self, payload: dict) -> dict | None:
@@ -85,9 +88,10 @@ class SchwabAuthManager:
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            logging.error(f"Error during Schwab token request: {e}")
+            logging.error("Error during Schwab token request: %s", e)
             if hasattr(e, 'response') and e.response is not None:
-                logging.error(f"Response status: {e.response.status_code}, body: {e.response.text}")
+                logging.error("Response status: %s, body: %s",
+                              e.response.status_code, e.response.text)
             return None
 
     def refresh_user_tokens_if_needed(self, uid: str) -> str | None:
@@ -101,10 +105,10 @@ class SchwabAuthManager:
 
         refresh_token = tokens.get('refresh_token')
         if not refresh_token:
-            logging.warning(f"No refresh token available for user {uid}")
+            logging.warning("No refresh token available for user %s", uid)
             return None
 
-        logging.info(f"Refreshing Schwab access token for user {uid}...")
+        logging.info("Refreshing Schwab access token for user %s...", uid)
         payload = {
             "grant_type": "refresh_token",
             "refresh_token": refresh_token
@@ -125,7 +129,8 @@ class SchwabAuthManager:
     def exchange_code_for_tokens(self, auth_code: str) -> dict | None:
         """Exchanges an authorization code for access and refresh tokens."""
         if not self.client_id or not self.client_secret or not self.redirect_uri:
-            logging.error("Schwab CLIENT_ID, CLIENT_SECRET, or REDIRECT_URI environment variables are missing.")
+            logging.error("Schwab CLIENT_ID, CLIENT_SECRET, or REDIRECT_URI "
+                          "environment variables are missing.")
             return None
 
         payload = {

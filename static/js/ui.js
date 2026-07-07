@@ -490,3 +490,121 @@ export function renderBoxes(boxes) {
         </div>
     `;
 }
+
+// =====================================================================================
+// --- TRANSACTIONS ---
+// =====================================================================================
+
+/** Extract the primary non-currency transfer item from a transaction. */
+function _primaryTransferItem(txn) {
+    const items = txn.transferItems || [];
+    return items.find(it => it.instrument && it.instrument.assetType !== 'CURRENCY') || items[0] || null;
+}
+
+/** Format an ISO date string to a short readable date. */
+function _shortDate(isoStr) {
+    if (!isoStr) return '—';
+    try {
+        return isoStr.slice(0, 10); // YYYY-MM-DD
+    } catch (_) {
+        return isoStr;
+    }
+}
+
+/** Return badge HTML and CSS class for a transaction type. */
+function _typeBadge(type) {
+    switch (type) {
+        case 'TRADE':
+            return '<span class="txn-badge txn-badge-trade">TRADE</span>';
+        case 'DIVIDEND_OR_INTEREST':
+            return '<span class="txn-badge txn-badge-dividend">DIVIDEND</span>';
+        case 'RECEIVE_AND_DELIVER':
+            return '<span class="txn-badge txn-badge-assignment">ASSIGN</span>';
+        default:
+            return `<span class="txn-badge">${type}</span>`;
+    }
+}
+
+/** Return CSS class for positionEffect (OPENING/CLOSING). */
+function _effectClass(effect) {
+    if (effect === 'OPENING') return 'txn-effect-open';
+    if (effect === 'CLOSING') return 'txn-effect-close';
+    return '';
+}
+
+export function renderTransactions(transactions) {
+    const container = document.getElementById('transactions-container');
+    const statsBar = document.getElementById('txn-stats-bar');
+
+    if (!transactions || transactions.length === 0) {
+        container.innerHTML = `<div class="no-data-msg"><p>No transactions stored yet. Click <strong>Sync</strong> to fetch from Schwab.</p></div>`;
+        if (statsBar) statsBar.style.display = 'none';
+        return;
+    }
+
+    // --- Populate stats bar ---
+    if (statsBar) {
+        const times = transactions.map(t => t.time).filter(Boolean).sort();
+        document.getElementById('txn-stat-count').textContent = transactions.length;
+        document.getElementById('txn-stat-earliest').textContent = _shortDate(times[0]);
+        document.getElementById('txn-stat-latest').textContent = _shortDate(times[times.length - 1]);
+        statsBar.style.display = 'flex';
+    }
+
+    // --- Build rows ---
+    let rowsHtml = transactions.map(txn => {
+        const primary = _primaryTransferItem(txn);
+        const instrument = primary?.instrument || {};
+        const symbol = instrument.symbol || '—';
+        const assetType = instrument.assetType || '';
+        const posEffect = primary?.positionEffect || '';
+        const price = primary?.price;
+        const amount = primary?.amount;
+
+        const priceDisplay = price != null && price !== 0
+            ? formatCurrency(price)
+            : '—';
+        const amountDisplay = amount != null ? formatNumber(amount, 0) : '—';
+
+        const netClass = (txn.netAmount || 0) >= 0 ? 'val-positive' : 'val-negative';
+        const netSign = (txn.netAmount || 0) >= 0 ? '+' : '';
+
+        const symbolBadgeClass = symbol.length > 4 ? 'badge-option' : 'badge-equity';
+
+        return `
+            <tr>
+                <td style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(txn.time)}</td>
+                <td>${_typeBadge(txn.type)}</td>
+                <td><span class="${symbolBadgeClass}">${symbol !== 'CURRENCY_USD' ? symbol : '—'}</span></td>
+                <td style="font-size:0.75rem; color:var(--text-secondary); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${assetType}</td>
+                <td class="${_effectClass(posEffect)}" style="text-align:center; font-size:0.8rem; font-weight:600;">${posEffect || '—'}</td>
+                <td style="text-align:right;">${amountDisplay}</td>
+                <td style="text-align:right;">${priceDisplay}</td>
+                <td style="text-align:right; font-weight:600;" class="${netClass}">${netSign}${formatCurrency(txn.netAmount)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Symbol</th>
+                        <th>Asset</th>
+                        <th style="text-align:center;">Effect</th>
+                        <th style="text-align:right;">Qty</th>
+                        <th style="text-align:right;">Price</th>
+                        <th style="text-align:right;">Net Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+

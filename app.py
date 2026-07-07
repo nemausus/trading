@@ -1,22 +1,34 @@
+import logging
+import os
+import secrets
+import datetime
+import urllib.parse
+from functools import wraps
+
 from flask import Flask, render_template, request, jsonify, redirect, make_response
 from firebase_admin import auth
 from flask_talisman import Talisman
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-import os
-import secrets
-import datetime
-import requests
-import urllib.parse
-from functools import wraps
+
 import firestore_db
-from schwab_auth import SchwabAuthManager, SCHWAB_REQUEST_TIMEOUT
+from schwab_auth import SchwabAuthManager
 import schwab_portfolio
+import schwab_transactions
 
 
 schwab_auth = SchwabAuthManager()
 
+# app must be defined before Talisman/Limiter and before decorators that reference it.
+app = Flask(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Auth decorators
+# ---------------------------------------------------------------------------
+
 def require_firebase_auth(f):
+    """Verify a Firebase Bearer token and pass the decoded payload to the view."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
@@ -27,12 +39,34 @@ def require_firebase_auth(f):
         try:
             decoded_token = auth.verify_id_token(token)
         except Exception as e:
-            app.logger.warning(f"Token verification failed: {e}")
+            logging.warning("Token verification failed: %s", e)
             return jsonify({'error': 'Unauthorized - Invalid or expired token'}), 401
         return f(decoded_token, *args, **kwargs)
     return decorated_function
 
-app = Flask(__name__)
+
+def require_schwab_token(f):
+    """Resolve and inject a valid Schwab access token.
+
+    Must be stacked *inside* @require_firebase_auth so that decoded_token is
+    already available.  Injects ``access_token`` as the second positional
+    argument to the wrapped view.
+    """
+    @wraps(f)
+    def decorated(decoded_token, *args, **kwargs):
+        uid = decoded_token.get('uid')
+        if not uid:
+            return jsonify({'error': 'Unauthorized - Missing uid'}), 401
+        access_token = schwab_auth.refresh_user_tokens_if_needed(uid)
+        if not access_token:
+            return jsonify({'error': 'Schwab account not connected or failed to refresh session'}), 400
+        return f(decoded_token, access_token, *args, **kwargs)
+    return decorated
+
+
+# ---------------------------------------------------------------------------
+# Security middleware
+# ---------------------------------------------------------------------------
 
 # Configure Content Security Policy (CSP) to allow Firebase SDK loading
 csp = {
@@ -68,20 +102,20 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/api/hello')
-@limiter.limit("10 per minute")
-@require_firebase_auth
-def secure_hello(decoded_token):
-    user_email = decoded_token.get('email', 'Unknown User')
-    return jsonify({'message': f'Secure Hello World! Welcome, {user_email}.'})
 
 def redirect_error(message: str):
     err_msg = urllib.parse.quote(message)
     return redirect(f'/?schwab=error&message={err_msg}')
+
 
 @app.route('/api/auth/schwab', methods=['POST'])
 @limiter.limit("5 per minute")
@@ -108,6 +142,7 @@ def schwab_authorize(decoded_token):
     response = jsonify({'url': auth_url})
     response.set_cookie('schwab_oauth_state', state, httponly=True, secure=True, samesite='Lax', max_age=600)
     return response
+
 
 @app.route('/api/auth/schwab/callback')
 @limiter.limit("10 per minute")
@@ -147,6 +182,7 @@ def schwab_callback():
     response.set_cookie('schwab_oauth_state', '', expires=0)
     return response
 
+
 @app.route('/api/schwab/status')
 @limiter.limit("30 per minute")
 @require_firebase_auth
@@ -156,6 +192,7 @@ def schwab_status(decoded_token):
     connected = tokens is not None
     return jsonify({'connected': connected})
 
+
 @app.route('/api/schwab/disconnect', methods=['POST'])
 @limiter.limit("5 per minute")
 @require_firebase_auth
@@ -164,47 +201,28 @@ def schwab_disconnect(decoded_token):
     schwab_auth.disconnect_user(uid)
     return jsonify({'message': 'Successfully disconnected from Schwab.'})
 
+
 @app.route('/api/schwab/accounts')
 @limiter.limit("10 per minute")
 @require_firebase_auth
-def schwab_accounts(decoded_token):
+@require_schwab_token
+def schwab_accounts(decoded_token, access_token):
     uid = decoded_token['uid']
-
-    # Get a valid, decrypted, auto-refreshed access token
-    access_token = schwab_auth.refresh_user_tokens_if_needed(uid)
-    if not access_token:
-        return jsonify({'error': 'Schwab account not connected or failed to refresh session'}), 400
-
-    # Make API call to Schwab with fields=positions
     try:
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json"
-        }
-        response = requests.get(
-            "https://api.schwabapi.com/trader/v1/accounts",
-            headers=headers,
-            params={"fields": "positions"},
-            timeout=SCHWAB_REQUEST_TIMEOUT,
-        )
-        response.raise_for_status()
-
-        # Process the accounts data to match the accounts command logic
-        parsed_data = schwab_portfolio.process_accounts_data(response.json(), access_token)
+        raw_accounts = schwab_portfolio.fetch_accounts_raw(access_token)
+        parsed_data = schwab_portfolio.process_accounts_data(raw_accounts, access_token)
         return jsonify(parsed_data)
     except Exception as e:
-        app.logger.error(f"Error fetching Schwab accounts for user {uid}: {e}")
+        app.logger.error("Error fetching Schwab accounts for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to retrieve Schwab accounts'}), 502
+
 
 @app.route('/api/schwab/chain')
 @limiter.limit("30 per minute")
 @require_firebase_auth
-def schwab_chain(decoded_token):
+@require_schwab_token
+def schwab_chain(decoded_token, access_token):
     uid = decoded_token['uid']
-
-    access_token = schwab_auth.refresh_user_tokens_if_needed(uid)
-    if not access_token:
-        return jsonify({'error': 'Schwab account not connected or failed to refresh session'}), 400
 
     symbol = request.args.get('symbol', 'AAPL').upper().strip()
     contract_type = request.args.get('contractType', 'CALL').upper().strip()
@@ -223,18 +241,16 @@ def schwab_chain(decoded_token):
     except ValueError as ve:
         return jsonify({'error': str(ve)}), 400
     except Exception as e:
-        app.logger.error(f"Error fetching option chain for user {uid} symbol {symbol}: {e}")
+        app.logger.error("Error fetching option chain for user %s symbol %s: %s", uid, symbol, e)
         return jsonify({'error': f'Failed to retrieve option chain for {symbol}'}), 502
+
 
 @app.route('/api/schwab/boxes')
 @limiter.limit("10 per minute")
 @require_firebase_auth
-def schwab_boxes(decoded_token):
+@require_schwab_token
+def schwab_boxes(decoded_token, access_token):
     uid = decoded_token['uid']
-
-    access_token = schwab_auth.refresh_user_tokens_if_needed(uid)
-    if not access_token:
-        return jsonify({'error': 'Schwab account not connected or failed to refresh session'}), 400
 
     from_date = request.args.get('fromDate')
     to_date = request.args.get('toDate')
@@ -243,7 +259,7 @@ def schwab_boxes(decoded_token):
     sizes = None
     if sizes_raw:
         try:
-            sizes = [int(s.strip()) for s in sizes_raw.split(',') if s.strip().isdigit()]
+            sizes = [int(s.strip()) for s in sizes_raw.split(',')]
         except ValueError:
             return jsonify({'error': 'Invalid sizes parameter. Must be comma-separated integers.'}), 400
 
@@ -251,5 +267,46 @@ def schwab_boxes(decoded_token):
         boxes = schwab_portfolio.fetch_spx_boxes(access_token, from_date, to_date, sizes)
         return jsonify({'boxes': boxes})
     except Exception as e:
-        app.logger.error(f"Error fetching SPX boxes for user {uid}: {e}")
+        app.logger.error("Error fetching SPX boxes for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to retrieve SPX box spreads'}), 502
+
+
+@app.route('/api/schwab/sync_transactions', methods=['POST'])
+@limiter.limit("5 per minute")
+@require_firebase_auth
+@require_schwab_token
+def schwab_sync_transactions(decoded_token, access_token):
+    uid = decoded_token['uid']
+    try:
+        result = schwab_transactions.sync_transactions(uid, access_token)
+        if 'error' in result:
+            app.logger.error(
+                "Transaction sync error for user %s: %s", uid, result['error']
+            )
+            return jsonify({'error': result['error']}), 502
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error("Error syncing transactions for user %s: %s", uid, e)
+        return jsonify({'error': 'Failed to sync transactions'}), 502
+
+
+@app.route('/api/schwab/transactions')
+@limiter.limit("30 per minute")
+@require_firebase_auth
+def schwab_get_transactions(decoded_token):
+    uid = decoded_token['uid']
+
+    # Auto-discover the primary account hash from Firestore (no Schwab call needed)
+    account_hash = firestore_db.get_primary_account_hash()
+    if not account_hash:
+        return jsonify({'transactions': [], 'account_hash': None})
+
+    limit = request.args.get('limit', default=500, type=int)
+    limit = min(limit, 500)  # cap to prevent abuse
+
+    try:
+        txns = firestore_db.get_transactions(uid, account_hash, limit)
+        return jsonify({'transactions': txns, 'account_hash': account_hash})
+    except Exception as e:
+        app.logger.error("Error reading transactions for user %s: %s", uid, e)
+        return jsonify({'error': 'Failed to read transactions'}), 502

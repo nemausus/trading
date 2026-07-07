@@ -1,5 +1,5 @@
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './auth.js';
-import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, rawChainData } from './api.js';
+import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData } from './api.js';
 import { showView, clearDashboard, renderPositions, renderOptions, lastPositions } from './ui.js';
 
 // Parse URL params on load
@@ -73,13 +73,15 @@ const tabBtnPortfolio = document.getElementById('tab-btn-portfolio');
 const tabBtnOptions = document.getElementById('tab-btn-options');
 const tabBtnChain = document.getElementById('tab-btn-chain');
 const tabBtnBox = document.getElementById('tab-btn-box');
+const tabBtnTransactions = document.getElementById('tab-btn-transactions');
 const tabContentPortfolio = document.getElementById('tab-content-portfolio');
 const tabContentOptions = document.getElementById('tab-content-options');
 const tabContentChain = document.getElementById('tab-content-chain');
 const tabContentBox = document.getElementById('tab-content-box');
+const tabContentTransactions = document.getElementById('tab-content-transactions');
 
-const allTabBtns = [tabBtnPortfolio, tabBtnOptions, tabBtnChain, tabBtnBox];
-const allTabContents = [tabContentPortfolio, tabContentOptions, tabContentChain, tabContentBox];
+const allTabBtns = [tabBtnPortfolio, tabBtnOptions, tabBtnChain, tabBtnBox, tabBtnTransactions];
+const allTabContents = [tabContentPortfolio, tabContentOptions, tabContentChain, tabContentBox, tabContentTransactions];
 
 function switchTab(activeBtn, activeContent) {
     allTabBtns.forEach(b => b && b.classList.remove('active'));
@@ -88,7 +90,7 @@ function switchTab(activeBtn, activeContent) {
     activeContent.classList.add('active-tab-content');
 }
 
-if (tabBtnPortfolio && tabBtnOptions && tabBtnChain && tabBtnBox) {
+if (tabBtnPortfolio && tabBtnOptions && tabBtnChain && tabBtnBox && tabBtnTransactions) {
     tabBtnPortfolio.addEventListener('click', () => switchTab(tabBtnPortfolio, tabContentPortfolio));
     tabBtnOptions.addEventListener('click', () => switchTab(tabBtnOptions, tabContentOptions));
     tabBtnBox.addEventListener('click', () => switchTab(tabBtnBox, tabContentBox));
@@ -97,6 +99,15 @@ if (tabBtnPortfolio && tabBtnOptions && tabBtnChain && tabBtnBox) {
         // Auto-fetch default chain if not loaded yet
         if (!rawChainData.chain || rawChainData.chain.length === 0) {
             fetchOptionChain();
+        }
+    });
+    // Auto-load stored transactions when switching to the tab
+    let txnsLoaded = false;
+    tabBtnTransactions.addEventListener('click', () => {
+        switchTab(tabBtnTransactions, tabContentTransactions);
+        if (!txnsLoaded) {
+            txnsLoaded = true;
+            fetchTransactions();
         }
     });
 }
@@ -140,3 +151,8 @@ document.getElementById('btn-reset-filters')?.addEventListener('click', () => {
 // --- BOX SPREAD SCANNER ---
 // =====================================================================================
 document.getElementById('btn-fetch-boxes')?.addEventListener('click', fetchSPXBoxes);
+
+// =====================================================================================
+// --- TRANSACTIONS ---
+// =====================================================================================
+document.getElementById('btn-sync-transactions')?.addEventListener('click', syncTransactions);

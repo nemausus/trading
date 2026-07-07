@@ -2,13 +2,13 @@ import datetime
 import logging
 import requests
 
+from constants import SCHWAB_REQUEST_TIMEOUT, SCHWAB_TZ
+
 # ---------------------------------------------------------------------------
 # Module-level constants
 # ---------------------------------------------------------------------------
 
 OPTION_MULTIPLIER = 100
-SCHWAB_REQUEST_TIMEOUT = (5, 30)
-SCHWAB_TZ = datetime.timezone(-datetime.timedelta(hours=7, minutes=30))
 
 # Instruction abbreviations shared by fetch_active_orders and callers
 INS_MAP = {
@@ -18,6 +18,9 @@ INS_MAP = {
     'SELL_TO_CLOSE': 'STC',
     'GOOD_TILL_CANCEL': 'GTC',
 }
+
+# Rounding unit for SPX box spread notional (boxes are sized in $10k increments).
+_SPX_BOX_ROUNDING = 10_000.0
 
 # Position fields to copy onto merged orders
 _ORDER_POSITION_FIELDS = ('quantity', 'cost/share', 'value/share',
@@ -65,7 +68,8 @@ def to_iso_datetime_str(d: str | None) -> str:
     try:
         dt = datetime.datetime.strptime(d, '%Y-%m-%d').replace(tzinfo=SCHWAB_TZ)
         return dt.isoformat()
-    except Exception:
+    except Exception as exc:
+        logging.warning("Could not parse date '%s', defaulting to now: %s", d, exc)
         return datetime.datetime.now(SCHWAB_TZ).isoformat()
 
 
@@ -256,6 +260,14 @@ def _parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) 
     return contracts
 
 
+def _validate_range(name: str, value, *, lo, hi, typ) -> None:
+    """Raise ValueError if *value* is not an instance of *typ* within [lo, hi]."""
+    if not isinstance(value, typ) or not (lo <= value <= hi):
+        raise ValueError(
+            f"Invalid {name}: {value}. Must be a {typ.__name__} between {lo} and {hi}."
+        )
+
+
 def _validate_chain_params(symbol: str, min_dte: int | None, max_dte: int | None,
                             min_delta: float | None, max_delta: float | None) -> None:
     """Validate DTE, Delta, and symbol parameters, raising ValueError for malicious or out-of-bounds values."""
@@ -263,24 +275,16 @@ def _validate_chain_params(symbol: str, min_dte: int | None, max_dte: int | None
         raise ValueError(f"Invalid symbol: '{symbol}'. Must be an alphanumeric ticker up to 10 characters.")
 
     if min_dte is not None:
-        if not isinstance(min_dte, int) or min_dte < 0 or min_dte > 1000:
-            raise ValueError(f"Invalid min_dte: {min_dte}. Must be an integer between 0 and 1000.")
-
+        _validate_range('min_dte', min_dte, lo=0, hi=1000, typ=int)
     if max_dte is not None:
-        if not isinstance(max_dte, int) or max_dte < 0 or max_dte > 1000:
-            raise ValueError(f"Invalid max_dte: {max_dte}. Must be an integer between 0 and 1000.")
-
+        _validate_range('max_dte', max_dte, lo=0, hi=1000, typ=int)
     if min_dte is not None and max_dte is not None and min_dte > max_dte:
         raise ValueError(f"min_dte ({min_dte}) cannot be greater than max_dte ({max_dte}).")
 
     if min_delta is not None:
-        if not isinstance(min_delta, (int, float)) or min_delta < -1.0 or min_delta > 1.0:
-            raise ValueError(f"Invalid min_delta: {min_delta}. Must be a float between -1.0 and 1.0.")
-
+        _validate_range('min_delta', min_delta, lo=-1.0, hi=1.0, typ=(int, float))
     if max_delta is not None:
-        if not isinstance(max_delta, (int, float)) or max_delta < -1.0 or max_delta > 1.0:
-            raise ValueError(f"Invalid max_delta: {max_delta}. Must be a float between -1.0 and 1.0.")
-
+        _validate_range('max_delta', max_delta, lo=-1.0, hi=1.0, typ=(int, float))
     if min_delta is not None and max_delta is not None and min_delta > max_delta:
         raise ValueError(f"min_delta ({min_delta}) cannot be greater than max_delta ({max_delta}).")
 
@@ -463,6 +467,29 @@ def fetch_spx_boxes(access_token: str, from_date: str | None, to_date: str | Non
 
 
 # ---------------------------------------------------------------------------
+# Network helpers — accounts
+# ---------------------------------------------------------------------------
+
+SCHWAB_TRADER_BASE_URL = "https://api.schwabapi.com/trader/v1"
+
+
+def fetch_accounts_raw(access_token: str) -> list:
+    """Fetch raw account data (with positions) from the Schwab Trader API."""
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json",
+    }
+    response = requests.get(
+        f"{SCHWAB_TRADER_BASE_URL}/accounts",
+        headers=headers,
+        params={"fields": "positions"},
+        timeout=SCHWAB_REQUEST_TIMEOUT,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+# ---------------------------------------------------------------------------
 # Private computation helpers
 # ---------------------------------------------------------------------------
 
@@ -520,8 +547,16 @@ def _group_spx(spx_positions: list, acc_num: str) -> tuple[list, float]:
         g['P/L']         += pos['P/L']
 
     grouped = list(groups.values())
-    box_loan = sum(round(g['cost'] / 10000.0) * 10000.0 for g in grouped)
+    box_loan = sum(
+        round(g['cost'] / _SPX_BOX_ROUNDING) * _SPX_BOX_ROUNDING for g in grouped
+    )
     return grouped, box_loan
+
+
+def _is_short_put(pos: dict) -> bool:
+    """Return True if *pos* is a short put position (negative qty, put contract)."""
+    symbol = pos['symbol']
+    return pos['quantity'] < 0 and len(symbol) > 12 and symbol[12] == 'P'
 
 
 def _enrich_positions(positions: list) -> float:
@@ -540,8 +575,8 @@ def _enrich_positions(positions: list) -> float:
             try:
                 opt = OptionSymbol.parse_symbol(symbol)
                 pos['dte'] = opt.dte()
-                # CSP: short puts only (qty < 0, char at index 12 == 'P')
-                if pos['quantity'] < 0 and len(symbol) > 12 and symbol[12] == 'P':
+                # CSP: short puts only
+                if _is_short_put(pos):
                     csp += float(opt.strike_price) * pos['quantity'] * 100.0
             except Exception as e:
                 logging.error("Error enriching option %s: %s", symbol, e)
@@ -609,6 +644,20 @@ def _enrich_quotes(positions: list, quotes: dict) -> None:
                     pos['mpr'] = (time_value * 3000.0) / dte / up
             except Exception as e:
                 logging.error("Error calculating MPR for %s: %s", symbol, e)
+
+
+def _merge_orders(active_orders: list, pos_index: dict) -> list:
+    """Merge active orders with their corresponding position data."""
+    merged = []
+    for order in active_orders:
+        pos = pos_index.get((order['accountNumber'], order['symbol']), {})
+        merged.append({
+            'accountNumber': order['accountNumber'],
+            'symbol':        order['symbol'],
+            'order':         f"{order['type']} {int(order['quantity'])} @ {order['price']}",
+            **{f: pos.get(f) for f in _ORDER_POSITION_FIELDS},
+        })
+    return merged
 
 
 # ---------------------------------------------------------------------------
@@ -686,15 +735,7 @@ def process_accounts_data(accounts_json: list, access_token: str) -> dict:
     # --- Active orders merged with positions ---
     pos_index = {(p['accountNumber'], p['symbol']): p for p in global_positions}
     active_orders = fetch_active_orders(access_token, account_hashes)
-    merged_orders = []
-    for order in active_orders:
-        pos = pos_index.get((order['accountNumber'], order['symbol']), {})
-        merged_orders.append({
-            'accountNumber': order['accountNumber'],
-            'symbol':        order['symbol'],
-            'order':         f"{order['type']} {int(order['quantity'])} @ {order['price']}",
-            **{f: pos.get(f) for f in _ORDER_POSITION_FIELDS},
-        })
+    merged_orders = _merge_orders(active_orders, pos_index)
 
     global_positions.sort(key=lambda x: (x['accountNumber'], x['dte'], x['symbol']))
 

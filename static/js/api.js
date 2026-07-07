@@ -1,5 +1,5 @@
 import { auth } from './auth.js';
-import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionChainTable } from './ui.js';
+import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionChainTable, renderTransactions } from './ui.js';
 
 export let rawChainData = { underlying: {}, chain: [] };
 
@@ -242,5 +242,78 @@ export async function fetchSPXBoxes() {
             fetchBtn.disabled = false;
             fetchBtn.innerText = "Find Boxes";
         }
+    }
+}
+
+// =====================================================================================
+// --- TRANSACTIONS ---
+// =====================================================================================
+
+export async function fetchTransactions() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const container = document.getElementById('transactions-container');
+    container.innerHTML = `<div class="no-data-msg"><p>Loading stored transactions...</p></div>`;
+
+    try {
+        const token = await user.getIdToken();
+        const response = await fetch('/api/schwab/transactions', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            renderTransactions(data.transactions || []);
+        } else {
+            const errMsg = data.error || 'Failed to load transactions';
+            container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
+        }
+    } catch (error) {
+        console.error('Failed to fetch transactions:', error);
+        container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Network Error: ${error.message}</p></div>`;
+    }
+}
+
+export async function syncTransactions() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const syncBtn = document.getElementById('btn-sync-transactions');
+    const statusSpan = document.getElementById('txn-sync-status');
+
+    syncBtn.disabled = true;
+    syncBtn.innerText = 'Syncing...';
+    statusSpan.textContent = '';
+    statusSpan.className = 'txn-sync-status';
+
+    try {
+        const token = await user.getIdToken();
+        const response = await fetch('/api/schwab/sync_transactions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            const msg = data.new_count > 0
+                ? `✓ ${data.new_count} new transaction${data.new_count !== 1 ? 's' : ''} synced`
+                : '✓ Already up to date';
+            statusSpan.textContent = msg;
+            statusSpan.className = 'txn-sync-status txn-sync-ok';
+            // Refresh the table after a successful sync
+            await fetchTransactions();
+        } else {
+            const errMsg = data.error || 'Sync failed';
+            statusSpan.textContent = `✗ ${errMsg}`;
+            statusSpan.className = 'txn-sync-status txn-sync-err';
+        }
+    } catch (error) {
+        console.error('Sync transactions failed:', error);
+        statusSpan.textContent = `✗ Network error`;
+        statusSpan.className = 'txn-sync-status txn-sync-err';
+    } finally {
+        syncBtn.disabled = false;
+        syncBtn.innerText = '↻ Sync';
     }
 }
