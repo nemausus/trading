@@ -155,8 +155,7 @@ export function renderPositions(positions) {
                     </div>
                     ${hasOptionsMetrics ? `
                     <div class="mobile-split-row options-row">
-                        <div class="split-col col-dte">DTE: ${dteDisplay}</div>
-                        <div class="split-col col-delta" style="text-align: right;">&Delta;: ${deltaDisplay}</div>
+                        <div class="split-col col-dte">DTE: ${dteDisplay} | &Delta;: ${deltaDisplay}</div>
                         <div class="split-col col-mpr" style="text-align: right;">MPR: ${mprDisplay}</div>
                     </div>
                     ` : ''}

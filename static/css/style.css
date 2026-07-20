@@ -956,10 +956,6 @@ tr:hover td {
     }
 
     .split-col:nth-child(2) {
-        text-align: center !important;
-    }
-
-    .split-col:nth-child(3) {
         text-align: right !important;
     }
 
