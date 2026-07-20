@@ -130,17 +130,39 @@ export function renderPositions(positions) {
 
         return groupHeaderHtml + `
             <tr>
-                <td data-label="Symbol"><span class="${symbolBadgeClass}">${pos.symbol}</span></td>
-                <td data-label="Qty" style="text-align: right;">${pos.quantity}</td>
-                <td data-label="Cost/Share" style="text-align: right;">${formatCurrency(pos['cost/share'])}</td>
-                <td data-label="Mark" style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
-                <td data-label="Cost Basis" style="text-align: right;">${formatCurrency(pos.cost)}</td>
-                <td data-label="Market Value" style="text-align: right;">${formatCurrency(pos.marketValue)}</td>
-                <td data-label="P/L" style="text-align: right;" class="${pl.cssClass}">${pl.sign}${pl.valDisplay} <span class="mobile-only-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></td>
-                <td data-label="P/L%" style="text-align: right;" class="desktop-only-pl-pct ${plPercent.cssClass}">${plPercent.sign}${plPercent.valDisplay}</td>
-                <td data-label="DTE" class="${optMetricsClass}" style="text-align: center;">${dteDisplay}</td>
-                <td data-label="Delta" class="${optMetricsClass}" style="text-align: center;">${deltaDisplay}</td>
-                <td data-label="MPR" class="${optMetricsClass}" style="text-align: center;">${mprDisplay}</td>
+                <!-- Desktop Columns (hidden on mobile) -->
+                <td class="desktop-only-col" data-label="Symbol"><span class="${symbolBadgeClass}">${pos.symbol}</span></td>
+                <td class="desktop-only-col" style="text-align: right;">${pos.quantity}</td>
+                <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['cost/share'])}</td>
+                <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
+                <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.cost)}</td>
+                <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.marketValue)}</td>
+                <td class="desktop-only-col" style="text-align: right;" class="${pl.cssClass}">${pl.sign}${pl.valDisplay}</td>
+                <td class="desktop-only-col" style="text-align: right;" class="${plPercent.cssClass}">${plPercent.sign}${plPercent.valDisplay}</td>
+                <td class="desktop-only-col" style="text-align: center;">${dteDisplay}</td>
+                <td class="desktop-only-col" style="text-align: center;">${deltaDisplay}</td>
+                <td class="desktop-only-col" style="text-align: center;">${mprDisplay}</td>
+
+                <!-- Mobile Only Combined Row Layout (hidden on desktop) -->
+                <td class="mobile-only-card-col" colspan="11">
+                    <div class="mobile-split-row header-row">
+                        <div class="split-col col-symbol"><span class="${symbolBadgeClass}">${pos.symbol}</span></div>
+                        <div class="split-col col-mktval" style="text-align: right; font-weight: 750;">${formatCurrency(pos.marketValue)}</div>
+                        <div class="split-col col-pl ${pl.cssClass}" style="text-align: right; font-weight: 700;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
+                    </div>
+                    <div class="mobile-split-row details-row">
+                        <div class="split-col col-qty">Qty: ${pos.quantity}</div>
+                        <div class="split-col col-cost" style="text-align: right;">Cost: ${formatCurrency(pos.cost)}</div>
+                        <div class="split-col col-prices" style="text-align: right;">${formatCurrency(pos['value/share'])} / ${formatCurrency(pos['cost/share'])}</div>
+                    </div>
+                    ${hasOptionsMetrics ? `
+                    <div class="mobile-split-row options-row">
+                        <div class="split-col col-dte">DTE: ${dteDisplay}</div>
+                        <div class="split-col col-delta" style="text-align: right;">&Delta;: ${deltaDisplay}</div>
+                        <div class="split-col col-mpr" style="text-align: right;">MPR: ${mprDisplay}</div>
+                    </div>
+                    ` : ''}
+                </td>
             </tr>
         `;
     }).join('');
@@ -198,16 +220,38 @@ export function renderOrders(orders) {
 
         return `
             <tr>
-                <td data-label="Symbol"><span class="${symbolBadgeClass}">${ord.symbol}</span></td>
-                <td data-label="Order"><strong style="color:var(--accent-blue)">${ord.order}</strong></td>
-                <td data-label="Pos Qty" style="text-align: right;">${qtyDisplay}</td>
-                <td data-label="Pos Cost/Shr" style="text-align: right;">${costShareDisplay}</td>
-                <td data-label="Pos Mark" style="text-align: right;">${valShareDisplay}</td>
-                <td data-label="Pos P/L" style="text-align: right;" class="${pl.cssClass}">${pl.sign}${pl.valDisplay} <span class="mobile-only-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></td>
-                <td data-label="Pos P/L%" style="text-align: right;" class="desktop-only-pl-pct ${plPercent.cssClass}">${plPercent.sign}${plPercent.valDisplay}</td>
-                <td data-label="DTE" class="${optMetricsClass}" style="text-align: center;">${dteDisplay}</td>
-                <td data-label="Delta" class="${optMetricsClass}" style="text-align: center;">${deltaDisplay}</td>
-                <td data-label="MPR" class="${optMetricsClass}" style="text-align: center;">${mprDisplay}</td>
+                <!-- Desktop Columns (hidden on mobile) -->
+                <td class="desktop-only-col" data-label="Symbol"><span class="${symbolBadgeClass}">${ord.symbol}</span></td>
+                <td class="desktop-only-col"><strong style="color:var(--accent-blue)">${ord.order}</strong></td>
+                <td class="desktop-only-col" style="text-align: right;">${qtyDisplay}</td>
+                <td class="desktop-only-col" style="text-align: right;">${costShareDisplay}</td>
+                <td class="desktop-only-col" style="text-align: right;">${valShareDisplay}</td>
+                <td class="desktop-only-col" style="text-align: right;" class="${pl.cssClass}">${pl.sign}${pl.valDisplay}</td>
+                <td class="desktop-only-col" style="text-align: right;" class="${plPercent.cssClass}">${plPercent.sign}${plPercent.valDisplay}</td>
+                <td class="desktop-only-col" style="text-align: center;">${dteDisplay}</td>
+                <td class="desktop-only-col" style="text-align: center;">${deltaDisplay}</td>
+                <td class="desktop-only-col" style="text-align: center;">${mprDisplay}</td>
+
+                <!-- Mobile Only Combined Row Layout (hidden on desktop) -->
+                <td class="mobile-only-card-col" colspan="10">
+                    <div class="mobile-split-row header-row">
+                        <div class="split-col col-symbol"><span class="${symbolBadgeClass}">${ord.symbol}</span></div>
+                        <div class="split-col col-order" style="text-align: right; font-weight: 700;"><strong style="color:var(--accent-blue)">${ord.order}</strong></div>
+                        <div class="split-col col-pl ${pl.cssClass}" style="text-align: right; font-weight: 700;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
+                    </div>
+                    <div class="mobile-split-row details-row">
+                        <div class="split-col col-qty">Qty: ${qtyDisplay}</div>
+                        <div class="split-col col-cost" style="text-align: right;">Mark: ${valShareDisplay}</div>
+                        <div class="split-col col-prices" style="text-align: right;">Cost: ${costShareDisplay}</div>
+                    </div>
+                    ${hasOptionsMetrics ? `
+                    <div class="mobile-split-row options-row">
+                        <div class="split-col col-dte">DTE: ${dteDisplay}</div>
+                        <div class="split-col col-delta" style="text-align: right;">&Delta;: ${deltaDisplay}</div>
+                        <div class="split-col col-mpr" style="text-align: right;">MPR: ${mprDisplay}</div>
+                    </div>
+                    ` : ''}
+                </td>
             </tr>
         `;
     }).join('');
