@@ -407,6 +407,10 @@ tr:hover td {
     font-weight: 600;
 }
 
+.mobile-only-pl-pct {
+    display: none;
+}
+
 .badge-underlying {
     background-color: var(--bg-tertiary);
     color: var(--text-primary);
@@ -735,9 +739,10 @@ tr:hover td {
     }
 
     .header-left {
-        justify-content: space-between;
+        flex-direction: column;
+        align-items: flex-start;
         width: 100%;
-        gap: 12px;
+        gap: 10px;
     }
 
     .header-logo {
@@ -745,13 +750,23 @@ tr:hover td {
     }
 
     .header-nav {
-        flex: 1;
-        justify-content: flex-end;
+        width: 100%;
+        overflow-x: auto;
+        display: flex;
+        justify-content: flex-start;
+        padding: 4px;
+        scrollbar-width: none; /* Firefox */
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .header-nav::-webkit-scrollbar {
+        display: none; /* Safari and Chrome */
     }
 
     .nav-tab {
-        padding: 5px 12px;
+        padding: 6px 12px;
         font-size: 0.82rem;
+        flex-shrink: 0;
     }
 
     .header-right {
@@ -835,6 +850,170 @@ tr:hover td {
     th, td {
         padding: 10px 8px;
         font-size: 0.8rem;
+    }
+
+    /* Transform Positions & Working Orders tables into cards on mobile */
+    #positions-container .table-responsive,
+    #orders-container .table-responsive {
+        border: none;
+        overflow-x: visible;
+    }
+
+    #positions-container table,
+    #orders-container table {
+        border-collapse: separate;
+        border-spacing: 0 8px;
+        width: 100%;
+        background: transparent;
+    }
+
+    #positions-container thead,
+    #orders-container thead {
+        display: block;
+        margin-bottom: 8px;
+    }
+
+    #positions-container thead tr,
+    #orders-container thead tr {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 8px 12px;
+        gap: 6px 10px;
+    }
+
+    #positions-container thead th,
+    #orders-container thead th {
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: 0;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-align: left !important;
+    }
+
+    #positions-container thead th:first-child,
+    #orders-container thead th:first-child {
+        grid-column: 1 / -1;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 4px;
+        font-size: 0.75rem;
+        color: var(--text-primary);
+    }
+
+    #positions-container tbody,
+    #orders-container tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    #positions-container tr:not(.group-header-row),
+    #orders-container tr:not(.group-header-row) {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 10px 12px;
+        box-shadow: var(--shadow-sm);
+        gap: 8px 10px;
+        margin-bottom: 0;
+        transition: background-color 0.2s;
+    }
+
+    #positions-container tr:not(.group-header-row):hover,
+    #orders-container tr:not(.group-header-row):hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    #positions-container tr:not(.group-header-row):hover td,
+    #orders-container tr:not(.group-header-row):hover td {
+        background-color: transparent !important;
+    }
+
+    /* Keep group header rows full-width */
+    #positions-container tr.group-header-row,
+    #orders-container tr.group-header-row {
+        display: block;
+        background: transparent;
+        border: none;
+        padding: 0;
+        box-shadow: none;
+        margin: 6px 0 0 0;
+    }
+
+    #positions-container tr.group-header-row td,
+    #orders-container tr.group-header-row td {
+        display: block;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-weight: 700;
+        color: var(--text-primary);
+        font-size: 0.8rem;
+        text-align: left !important;
+    }
+
+    #positions-container tr:not(.group-header-row) td,
+    #orders-container tr:not(.group-header-row) td {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: 0;
+        border: none;
+        text-align: left !important;
+        font-size: 0.8rem;
+    }
+
+    /* Symbol block formatting (spans full-width of card header) */
+    #positions-container tr:not(.group-header-row) td[data-label="Symbol"],
+    #orders-container tr:not(.group-header-row) td[data-label="Symbol"] {
+        grid-column: 1 / -1;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 6px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    /* Highlight badge only, no label for Symbol */
+    #positions-container tr:not(.group-header-row) td[data-label="Symbol"]::before,
+    #orders-container tr:not(.group-header-row) td[data-label="Symbol"]::before {
+        display: none !important;
+    }
+
+    /* Hide cell-level labels on mobile as we now have a top header guide */
+    #positions-container tr:not(.group-header-row) td::before,
+    #orders-container tr:not(.group-header-row) td::before {
+        display: none !important;
+    }
+
+    .mobile-only-pl-pct {
+        display: inline !important;
+        font-size: 0.72rem;
+        font-weight: 500;
+        margin-left: 2px;
+        opacity: 0.85;
+    }
+
+    .desktop-only-pl-pct {
+        display: none !important;
+    }
+
+    .hide-if-empty {
+        display: none !important;
     }
 }
 

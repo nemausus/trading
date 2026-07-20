@@ -107,6 +107,9 @@ export function renderPositions(positions) {
         const deltaDisplay = pos.delta !== 0 ? formatNumber(pos.delta, 2) : '-';
         const mprDisplay = pos.mpr !== 0 ? formatPercent(pos.mpr) : '-';
 
+        const hasOptionsMetrics = (pos.dte >= 0) || (pos.delta !== 0) || (pos.mpr !== 0);
+        const optMetricsClass = hasOptionsMetrics ? '' : 'hide-if-empty';
+
         let groupHeaderHtml = '';
         if (grouped) {
             const underlying = baseUnderlying(pos.symbol);
@@ -127,17 +130,17 @@ export function renderPositions(positions) {
 
         return groupHeaderHtml + `
             <tr>
-                <td><span class="${symbolBadgeClass}">${pos.symbol}</span></td>
-                <td style="text-align: right;">${pos.quantity}</td>
-                <td style="text-align: right;">${formatCurrency(pos['cost/share'])}</td>
-                <td style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
-                <td style="text-align: right;">${formatCurrency(pos.cost)}</td>
-                <td style="text-align: right;">${formatCurrency(pos.marketValue)}</td>
-                <td style="text-align: right;" class="${pl.cssClass}">${pl.sign}${pl.valDisplay}</td>
-                <td style="text-align: right;" class="${plPercent.cssClass}">${plPercent.sign}${plPercent.valDisplay}</td>
-                <td style="text-align: center;">${dteDisplay}</td>
-                <td style="text-align: center;">${deltaDisplay}</td>
-                <td style="text-align: center;">${mprDisplay}</td>
+                <td data-label="Symbol"><span class="${symbolBadgeClass}">${pos.symbol}</span></td>
+                <td data-label="Qty" style="text-align: right;">${pos.quantity}</td>
+                <td data-label="Cost/Share" style="text-align: right;">${formatCurrency(pos['cost/share'])}</td>
+                <td data-label="Mark" style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
+                <td data-label="Cost Basis" style="text-align: right;">${formatCurrency(pos.cost)}</td>
+                <td data-label="Market Value" style="text-align: right;">${formatCurrency(pos.marketValue)}</td>
+                <td data-label="P/L" style="text-align: right;" class="${pl.cssClass}">${pl.sign}${pl.valDisplay} <span class="mobile-only-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></td>
+                <td data-label="P/L%" style="text-align: right;" class="desktop-only-pl-pct ${plPercent.cssClass}">${plPercent.sign}${plPercent.valDisplay}</td>
+                <td data-label="DTE" class="${optMetricsClass}" style="text-align: center;">${dteDisplay}</td>
+                <td data-label="Delta" class="${optMetricsClass}" style="text-align: center;">${deltaDisplay}</td>
+                <td data-label="MPR" class="${optMetricsClass}" style="text-align: center;">${mprDisplay}</td>
             </tr>
         `;
     }).join('');
@@ -154,7 +157,7 @@ export function renderPositions(positions) {
                         <th style="text-align: right;">Cost Basis</th>
                         <th style="text-align: right;">Market Value</th>
                         <th style="text-align: right;">P/L</th>
-                        <th style="text-align: right;">P/L%</th>
+                        <th class="desktop-only-pl-pct" style="text-align: right;">P/L%</th>
                         <th style="text-align: center;">DTE</th>
                         <th style="text-align: center;">Delta</th>
                         <th style="text-align: center;">MPR</th>
@@ -190,18 +193,21 @@ export function renderOrders(orders) {
         const deltaDisplay = ord.delta ? formatNumber(ord.delta, 2) : '-';
         const mprDisplay = ord.mpr ? formatPercent(ord.mpr) : '-';
 
+        const hasOptionsMetrics = (ord.dte >= 0) || (!!ord.delta) || (!!ord.mpr);
+        const optMetricsClass = hasOptionsMetrics ? '' : 'hide-if-empty';
+
         return `
             <tr>
-                <td><span class="${symbolBadgeClass}">${ord.symbol}</span></td>
-                <td><strong style="color:var(--accent-blue)">${ord.order}</strong></td>
-                <td style="text-align: right;">${qtyDisplay}</td>
-                <td style="text-align: right;">${costShareDisplay}</td>
-                <td style="text-align: right;">${valShareDisplay}</td>
-                <td style="text-align: right;" class="${pl.cssClass}">${pl.sign}${pl.valDisplay}</td>
-                <td style="text-align: right;" class="${plPercent.cssClass}">${plPercent.sign}${plPercent.valDisplay}</td>
-                <td style="text-align: center;">${dteDisplay}</td>
-                <td style="text-align: center;">${deltaDisplay}</td>
-                <td style="text-align: center;">${mprDisplay}</td>
+                <td data-label="Symbol"><span class="${symbolBadgeClass}">${ord.symbol}</span></td>
+                <td data-label="Order"><strong style="color:var(--accent-blue)">${ord.order}</strong></td>
+                <td data-label="Pos Qty" style="text-align: right;">${qtyDisplay}</td>
+                <td data-label="Pos Cost/Shr" style="text-align: right;">${costShareDisplay}</td>
+                <td data-label="Pos Mark" style="text-align: right;">${valShareDisplay}</td>
+                <td data-label="Pos P/L" style="text-align: right;" class="${pl.cssClass}">${pl.sign}${pl.valDisplay} <span class="mobile-only-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></td>
+                <td data-label="Pos P/L%" style="text-align: right;" class="desktop-only-pl-pct ${plPercent.cssClass}">${plPercent.sign}${plPercent.valDisplay}</td>
+                <td data-label="DTE" class="${optMetricsClass}" style="text-align: center;">${dteDisplay}</td>
+                <td data-label="Delta" class="${optMetricsClass}" style="text-align: center;">${deltaDisplay}</td>
+                <td data-label="MPR" class="${optMetricsClass}" style="text-align: center;">${mprDisplay}</td>
             </tr>
         `;
     }).join('');
@@ -217,7 +223,7 @@ export function renderOrders(orders) {
                         <th style="text-align: right;">Pos Cost/Shr</th>
                         <th style="text-align: right;">Pos Mark</th>
                         <th style="text-align: right;">Pos P/L</th>
-                        <th style="text-align: right;">Pos P/L%</th>
+                        <th class="desktop-only-pl-pct" style="text-align: right;">Pos P/L%</th>
                         <th style="text-align: center;">DTE</th>
                         <th style="text-align: center;">Delta</th>
                         <th style="text-align: center;">MPR</th>
