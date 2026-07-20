@@ -1,7 +1,8 @@
-__pycache__/
+*-service-account*.json
+*.key
+*credentials*.json
 .env
 .env*
+.idea/
 .venv/
-*-service-account*.json
-*credentials*.json
-*.key
+__pycache__/

@@ -1,6 +1,6 @@
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './auth.js';
 import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData } from './api.js';
-import { showView, clearDashboard, renderPositions, renderOptions, lastPositions } from './ui.js';
+import { showView, clearDashboard, renderPositions, lastPositions } from './ui.js';
 
 // Parse URL params on load
 const urlParams = new URLSearchParams(window.location.search);
@@ -59,36 +59,27 @@ document.getElementById('btn-group-underlying').addEventListener('click', () => 
     if (lastPositions.length > 0) renderPositions(lastPositions);
 });
 
-document.getElementById('btn-group-options').addEventListener('click', () => {
-    const btn = document.getElementById('btn-group-options');
-    const isGrouped = btn.dataset.grouped === 'true';
-    btn.dataset.grouped = String(!isGrouped);
-    btn.classList.toggle('active', !isGrouped);
-    if (lastPositions.length > 0) renderOptions(lastPositions);
-});
+
 
 
 // =====================================================================================
 // --- HEADER TAB NAVIGATION ---
 // =====================================================================================
 const tabBtnPortfolio = document.getElementById('tab-btn-portfolio');
-const tabBtnOptions = document.getElementById('tab-btn-options');
 const tabBtnChain = document.getElementById('tab-btn-chain');
 const tabBtnBox = document.getElementById('tab-btn-box');
 const tabBtnTransactions = document.getElementById('tab-btn-transactions');
 const tabContentPortfolio = document.getElementById('tab-content-portfolio');
-const tabContentOptions = document.getElementById('tab-content-options');
 const tabContentChain = document.getElementById('tab-content-chain');
 const tabContentBox = document.getElementById('tab-content-box');
 const tabContentTransactions = document.getElementById('tab-content-transactions');
 
-const allTabBtns = [tabBtnPortfolio, tabBtnOptions, tabBtnChain, tabBtnBox, tabBtnTransactions];
-const allTabContents = [tabContentPortfolio, tabContentOptions, tabContentChain, tabContentBox, tabContentTransactions];
+const allTabBtns = [tabBtnPortfolio, tabBtnChain, tabBtnBox, tabBtnTransactions];
+const allTabContents = [tabContentPortfolio, tabContentChain, tabContentBox, tabContentTransactions];
 
 // Map of hash fragment -> { btn, content } for each tab
 const TAB_MAP = {
     portfolio:    { btn: tabBtnPortfolio,    content: tabContentPortfolio },
-    options:      { btn: tabBtnOptions,      content: tabContentOptions },
     chain:        { btn: tabBtnChain,        content: tabContentChain },
     box:          { btn: tabBtnBox,          content: tabContentBox },
     transactions: { btn: tabBtnTransactions, content: tabContentTransactions },
@@ -110,11 +101,11 @@ function switchTab(activeBtn, activeContent, tabKey) {
 /**
  * Navigate to a tab identified by its hash key (e.g. 'chain').
  * Triggers any side-effects (auto-fetch chain, load transactions).
- * Falls back to 'options' if the key is unknown.
+ * Falls back to 'portfolio' if the key is unknown.
  */
 function navigateToTab(tabKey) {
-    const entry = TAB_MAP[tabKey] || TAB_MAP['options'];
-    switchTab(entry.btn, entry.content, tabKey in TAB_MAP ? tabKey : 'options');
+    const entry = TAB_MAP[tabKey] || TAB_MAP['portfolio'];
+    switchTab(entry.btn, entry.content, tabKey in TAB_MAP ? tabKey : 'portfolio');
 
     if (tabKey === 'chain') {
         if (!rawChainData.chain || rawChainData.chain.length === 0) {
@@ -131,18 +122,17 @@ function navigateToTab(tabKey) {
 // Read initial hash (e.g. when the user pastes a URL with /#chain)
 function applyHashNavigation() {
     const hash = window.location.hash.replace('#', '');
-    navigateToTab(hash || 'options');
+    navigateToTab(hash || 'portfolio');
 }
 
 // Update tab when the user navigates with the browser back/forward buttons
 window.addEventListener('hashchange', () => {
     const hash = window.location.hash.replace('#', '');
-    navigateToTab(hash || 'options');
+    navigateToTab(hash || 'portfolio');
 });
 
-if (tabBtnPortfolio && tabBtnOptions && tabBtnChain && tabBtnBox && tabBtnTransactions) {
+if (tabBtnPortfolio && tabBtnChain && tabBtnBox && tabBtnTransactions) {
     tabBtnPortfolio.addEventListener('click',    () => navigateToTab('portfolio'));
-    tabBtnOptions.addEventListener('click',      () => navigateToTab('options'));
     tabBtnChain.addEventListener('click',        () => navigateToTab('chain'));
     tabBtnBox.addEventListener('click',          () => navigateToTab('box'));
     tabBtnTransactions.addEventListener('click', () => navigateToTab('transactions'));
