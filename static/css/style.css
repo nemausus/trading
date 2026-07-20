@@ -891,16 +891,15 @@ tr:hover td {
     #orders-container tbody {
         display: flex;
         flex-direction: column;
-        gap: 8px;
     }
 
     #positions-container tr:not(.group-header-row),
     #orders-container tr:not(.group-header-row) {
         display: block;
         background: var(--bg-secondary);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 10px 12px;
+        border-bottom: 1px solid var(--border-color);
+        border-radius: 2px;
+        padding: 5px 5px;
         box-shadow: var(--shadow-sm);
         margin-bottom: 0;
         transition: background-color 0.2s;
@@ -965,8 +964,7 @@ tr:hover td {
     }
 
     .split-col.col-symbol {
-        font-size: 0.92rem;
-        font-weight: 700;
+        font-size: 0.80rem;
     }
 
     .split-col.col-qty,

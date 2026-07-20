@@ -146,13 +146,11 @@ export function renderPositions(positions) {
                 <!-- Mobile Only Combined Row Layout (hidden on desktop) -->
                 <td class="mobile-only-card-col" colspan="11">
                     <div class="mobile-split-row header-row">
-                        <div class="split-col col-symbol"><span class="${symbolBadgeClass}">${pos.symbol}</span></div>
-                        <div class="split-col col-mktval" style="text-align: right; font-weight: 750;">${formatCurrency(pos.marketValue)}</div>
+                        <div class="split-col col-symbol"><span>${pos.quantity} x ${pos.symbol}</span></div>
                         <div class="split-col col-pl ${pl.cssClass}" style="text-align: right; font-weight: 700;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
                     </div>
                     <div class="mobile-split-row details-row">
-                        <div class="split-col col-qty">Qty: ${pos.quantity}</div>
-                        <div class="split-col col-cost" style="text-align: right;">Cost: ${formatCurrency(pos.cost)}</div>
+                        <div class="split-col col-cost"">${formatCurrency(pos.marketValue)} / ${formatCurrency(pos.cost)}</div>
                         <div class="split-col col-prices" style="text-align: right;">${formatCurrency(pos['value/share'])} / ${formatCurrency(pos['cost/share'])}</div>
                     </div>
                     ${hasOptionsMetrics ? `
