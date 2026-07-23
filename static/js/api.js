@@ -1,5 +1,5 @@
 import { auth } from './auth.js';
-import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionChainTable, renderTransactions } from './ui.js';
+import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionChainTable, renderTransactions, renderRealized } from './ui.js';
 
 export let rawChainData = { underlying: {}, chain: [] };
 
@@ -317,3 +317,63 @@ export async function syncTransactions() {
         syncBtn.innerText = '↻ Sync';
     }
 }
+
+export let allRealized = [];
+
+export async function fetchRealized() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const container = document.getElementById('realized-container');
+    container.innerHTML = `<div class="no-data-msg"><p>Loading realized transactions...</p></div>`;
+
+    try {
+        const token = await user.getIdToken();
+        const response = await fetch('/api/schwab/realized', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            allRealized = data.realized_transactions || [];
+            // Apply default filters
+            const symbolInput = document.getElementById('realized-symbol');
+            const minDateInput = document.getElementById('realized-min-date');
+
+            // Default minDate is 1st January of current year
+            const currentYear = new Date().getFullYear();
+            const defaultMinDate = `${currentYear}-01-01`;
+            if (minDateInput && !minDateInput.value) {
+                minDateInput.value = defaultMinDate;
+            }
+
+            const symbolVal = symbolInput ? symbolInput.value.trim().toUpperCase() : 'ALL';
+            const minDateVal = minDateInput ? minDateInput.value : defaultMinDate;
+
+            applyRealizedFilters(symbolVal, minDateVal);
+        } else {
+            const errMsg = data.error || 'Failed to load realized transactions';
+            container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
+        }
+    } catch (error) {
+        console.error('Failed to fetch realized transactions:', error);
+        container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Network Error: ${error.message}</p></div>`;
+    }
+}
+
+export function applyRealizedFilters(symbol, minDate) {
+    let filtered = allRealized;
+
+    // Filter by symbol if not "ALL" and not empty
+    if (symbol && symbol !== 'ALL') {
+        filtered = filtered.filter(r => r.symbol && r.symbol.toUpperCase().includes(symbol));
+    }
+
+    // Filter by min sell/close date
+    if (minDate) {
+        filtered = filtered.filter(r => r.sell_date && r.sell_date >= minDate);
+    }
+
+    renderRealized(filtered);
+}
+

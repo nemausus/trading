@@ -1,5 +1,5 @@
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './auth.js';
-import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData } from './api.js';
+import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData, fetchRealized, applyRealizedFilters } from './api.js';
 import { showView, clearDashboard, renderPositions, lastPositions } from './ui.js';
 
 // Parse URL params on load
@@ -69,13 +69,15 @@ const tabBtnPortfolio = document.getElementById('tab-btn-portfolio');
 const tabBtnChain = document.getElementById('tab-btn-chain');
 const tabBtnBox = document.getElementById('tab-btn-box');
 const tabBtnTransactions = document.getElementById('tab-btn-transactions');
+const tabBtnRealized = document.getElementById('tab-btn-realized');
 const tabContentPortfolio = document.getElementById('tab-content-portfolio');
 const tabContentChain = document.getElementById('tab-content-chain');
 const tabContentBox = document.getElementById('tab-content-box');
 const tabContentTransactions = document.getElementById('tab-content-transactions');
+const tabContentRealized = document.getElementById('tab-content-realized');
 
-const allTabBtns = [tabBtnPortfolio, tabBtnChain, tabBtnBox, tabBtnTransactions];
-const allTabContents = [tabContentPortfolio, tabContentChain, tabContentBox, tabContentTransactions];
+const allTabBtns = [tabBtnPortfolio, tabBtnChain, tabBtnBox, tabBtnTransactions, tabBtnRealized];
+const allTabContents = [tabContentPortfolio, tabContentChain, tabContentBox, tabContentTransactions, tabContentRealized];
 
 // Map of hash fragment -> { btn, content } for each tab
 const TAB_MAP = {
@@ -83,15 +85,17 @@ const TAB_MAP = {
     chain:        { btn: tabBtnChain,        content: tabContentChain },
     box:          { btn: tabBtnBox,          content: tabContentBox },
     transactions: { btn: tabBtnTransactions, content: tabContentTransactions },
+    realized:     { btn: tabBtnRealized,     content: tabContentRealized },
 };
 
 let txnsLoaded = false;
+let realizedLoaded = false;
 
 function switchTab(activeBtn, activeContent, tabKey) {
     allTabBtns.forEach(b => b && b.classList.remove('active'));
     allTabContents.forEach(c => c && c.classList.remove('active-tab-content'));
-    activeBtn.classList.add('active');
-    activeContent.classList.add('active-tab-content');
+    if (activeBtn) activeBtn.classList.add('active');
+    if (activeContent) activeContent.classList.add('active-tab-content');
     // Keep URL in sync (pushState so back/forward works)
     if (tabKey && window.location.hash !== '#' + tabKey) {
         history.pushState({ tab: tabKey }, '', '#' + tabKey);
@@ -111,6 +115,11 @@ function navigateToTab(tabKey) {
         if (!txnsLoaded) {
             txnsLoaded = true;
             fetchTransactions();
+        }
+    } else if (tabKey === 'realized') {
+        if (!realizedLoaded) {
+            realizedLoaded = true;
+            fetchRealized();
         }
     }
 }
@@ -133,6 +142,10 @@ if (tabBtnPortfolio && tabBtnChain && tabBtnBox && tabBtnTransactions) {
     tabBtnBox.addEventListener('click',          () => navigateToTab('box'));
     tabBtnTransactions.addEventListener('click', () => navigateToTab('transactions'));
 }
+if (tabBtnRealized) {
+    tabBtnRealized.addEventListener('click', () => navigateToTab('realized'));
+}
+
 
 // =====================================================================================
 // --- OPTION CHAIN EXPLORER ---
@@ -171,3 +184,33 @@ document.getElementById('btn-fetch-boxes')?.addEventListener('click', fetchSPXBo
 // --- TRANSACTIONS ---
 // =====================================================================================
 document.getElementById('btn-sync-transactions')?.addEventListener('click', syncTransactions);
+
+// =====================================================================================
+// --- REALIZED GAIN/LOSS ---
+// =====================================================================================
+const handleRealizedFilter = () => {
+    const symbolInput = document.getElementById('realized-symbol');
+    const minDateInput = document.getElementById('realized-min-date');
+    const symbolVal = symbolInput ? symbolInput.value.trim().toUpperCase() : 'ALL';
+    const minDateVal = minDateInput ? minDateInput.value : '';
+    applyRealizedFilters(symbolVal, minDateVal);
+};
+
+document.getElementById('btn-filter-realized')?.addEventListener('click', handleRealizedFilter);
+document.getElementById('realized-symbol')?.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') handleRealizedFilter();
+});
+document.getElementById('realized-min-date')?.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') handleRealizedFilter();
+});
+
+document.getElementById('btn-reset-realized')?.addEventListener('click', () => {
+    const symbolInput = document.getElementById('realized-symbol');
+    const minDateInput = document.getElementById('realized-min-date');
+    if (symbolInput) symbolInput.value = 'ALL';
+    const currentYear = new Date().getFullYear();
+    const defaultMinDate = `${currentYear}-01-01`;
+    if (minDateInput) minDateInput.value = defaultMinDate;
+    applyRealizedFilters('ALL', defaultMinDate);
+});
+

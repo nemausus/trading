@@ -43,6 +43,7 @@
                         <button id="tab-btn-chain" class="nav-tab">Chains</button>
                         <button id="tab-btn-box" class="nav-tab">Box</button>
                         <button id="tab-btn-transactions" class="nav-tab">Txns</button>
+                        <button id="tab-btn-realized" class="nav-tab">Realized</button>
                     </nav>
                 </div>
                 <div class="header-right">
@@ -269,6 +270,45 @@
                     </div>
                 </div>
             </div>
+
+            <!-- TAB 6: REALIZED GAIN/LOSS CONTENT -->
+            <div id="tab-content-realized" class="tab-content">
+                <div class="section-card">
+                    <div class="section-header-row" style="margin-bottom: 16px;">
+                        <h3>Realized Gain / Loss</h3>
+                    </div>
+
+                    <div class="chain-filter-bar">
+                        <div class="filter-group">
+                            <label for="realized-symbol">Symbol Filter</label>
+                            <input type="text" id="realized-symbol" value="ALL" placeholder="e.g. AAPL or ALL" style="text-transform: uppercase;">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="realized-min-date">Min Sell Date</label>
+                            <input type="date" id="realized-min-date">
+                        </div>
+
+                        <div class="filter-actions">
+                            <button id="btn-filter-realized" class="btn-action-refresh">Apply Filters</button>
+                            <button id="btn-reset-realized" class="btn-toggle">Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pivot Table container -->
+                <div id="realized-pivot-container"></div>
+
+                <!-- Realized Table -->
+                <div class="section-card">
+                    <div id="realized-container">
+                        <div class="no-data-msg">
+                            <p>Loading realized transactions...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
 
         </main>
 

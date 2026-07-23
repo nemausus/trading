@@ -567,3 +567,171 @@ export function renderTransactions(transactions) {
     `;
 }
 
+export function renderRealized(realizedList) {
+    const container = document.getElementById('realized-container');
+    const pivotContainer = document.getElementById('realized-pivot-container');
+
+    if (!realizedList || realizedList.length === 0) {
+        container.innerHTML = `<div class="no-data-msg"><p>No realized transactions match the criteria.</p></div>`;
+        if (pivotContainer) pivotContainer.innerHTML = '';
+        return;
+    }
+
+
+    // Render 2D monthly P/L by Symbol pivot grid
+    if (pivotContainer) {
+        const monthsSet = new Set();
+        const symbolsSet = new Set();
+
+        realizedList.forEach(r => {
+            if (r.sell_date) {
+                const m = r.sell_date.slice(0, 7); // "YYYY-MM"
+                monthsSet.add(m);
+            } else {
+                monthsSet.add('Unknown');
+            }
+            if (r.symbol) {
+                const baseSym = r.symbol === 'MARGIN INTEREST' ? 'MARGIN INTEREST' : baseUnderlying(r.symbol);
+                symbolsSet.add(baseSym);
+            }
+        });
+
+        const months = Array.from(monthsSet).sort();
+        const symbols = Array.from(symbolsSet).sort();
+
+        // Map of symbol -> month -> P/L sum
+        const pivotData = {};
+        symbols.forEach(sym => {
+            pivotData[sym] = {};
+            months.forEach(m => {
+                pivotData[sym][m] = 0;
+            });
+        });
+
+        // Row totals and column totals
+        const symbolTotals = {};
+        symbols.forEach(sym => { symbolTotals[sym] = 0; });
+        const monthTotals = {};
+        months.forEach(m => { monthTotals[m] = 0; });
+        let grandTotal = 0;
+
+        realizedList.forEach(r => {
+            const sym = r.symbol === 'MARGIN INTEREST' ? 'MARGIN INTEREST' : baseUnderlying(r.symbol || '');
+            const m = r.sell_date ? r.sell_date.slice(0, 7) : 'Unknown';
+            const pl = r['P/L'] || 0;
+
+            if (pivotData[sym] && pivotData[sym][m] !== undefined) {
+                pivotData[sym][m] += pl;
+                symbolTotals[sym] += pl;
+                monthTotals[m] += pl;
+                grandTotal += pl;
+            }
+        });
+
+
+        const headerCols = symbols.map(sym => `<th style="text-align:right;">${sym}</th>`).join('');
+
+        const rows = months.map(m => {
+            const cells = symbols.map(sym => {
+                const val = pivotData[sym][m];
+                const cls = val > 0 ? 'val-positive' : (val < 0 ? 'val-negative' : '');
+                const displayVal = val !== 0 ? formatCurrency(val) : '—';
+                return `<td style="text-align:right;" class="${cls}">${displayVal}</td>`;
+            }).join('');
+
+            const mTotal = monthTotals[m];
+            const mTotalCls = mTotal > 0 ? 'val-positive' : (mTotal < 0 ? 'val-negative' : '');
+            const mTotalDisplay = mTotal !== 0 ? formatCurrency(mTotal) : '—';
+
+            return `
+                <tr>
+                    <td style="font-weight:600;">${m}</td>
+                    ${cells}
+                    <td style="text-align:right; font-weight:600;" class="${mTotalCls}">${mTotalDisplay}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const totalCells = symbols.map(sym => {
+            const val = symbolTotals[sym];
+            const cls = val > 0 ? 'val-positive' : (val < 0 ? 'val-negative' : '');
+            const displayVal = val !== 0 ? formatCurrency(val) : '—';
+            return `<td style="text-align:right; font-weight:600;" class="${cls}">${displayVal}</td>`;
+        }).join('');
+
+        const grandTotalCls = grandTotal > 0 ? 'val-positive' : (grandTotal < 0 ? 'val-negative' : '');
+        const grandTotalDisplay = grandTotal !== 0 ? formatCurrency(grandTotal) : '—';
+
+        pivotContainer.innerHTML = `
+            <div class="section-card" style="margin-bottom: 20px;">
+                <h3 style="margin-bottom: 12px;">Monthly P/L by Symbol</h3>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                ${headerCols}
+                                <th style="text-align:right;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                        <tfoot>
+                            <tr style="border-top: 2px solid var(--border-color); font-weight:600;">
+                                <td>Total</td>
+                                ${totalCells}
+                                <td style="text-align:right; font-weight:800;" class="${grandTotalCls}">${grandTotalDisplay}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        `;
+
+    }
+
+    let rowsHtml = realizedList.map(r => {
+        const symbol = r.symbol || '—';
+        const symbolBadgeClass = symbol.length > 4 ? 'badge-option' : 'badge-equity';
+        const pl = r['P/L'] || 0;
+        const plClass = pl >= 0 ? 'val-positive' : 'val-negative';
+        const plSign = pl >= 0 ? '+' : '';
+
+        return `
+            <tr>
+                <td style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.buy_date)}</td>
+                <td style="text-align:right;">${formatCurrency(r.buy_price)}</td>
+                <td style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.sell_date)}</td>
+                <td style="text-align:right;">${formatCurrency(r.sell_price)}</td>
+                <td><span class="${symbolBadgeClass}">${symbol}</span></td>
+                <td style="text-align:right;">${formatNumber(r.amount, 0)}</td>
+                <td style="text-align:right; font-weight:600;" class="${plClass}">${plSign}${formatCurrency(pl)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Open Date</th>
+                        <th style="text-align:right;">Open Price</th>
+                        <th>Close Date</th>
+                        <th style="text-align:right;">Close Price</th>
+                        <th>Symbol</th>
+                        <th style="text-align:right;">Qty</th>
+                        <th style="text-align:right;">Realized P/L</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+
+
