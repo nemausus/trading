@@ -107,11 +107,7 @@ function navigateToTab(tabKey) {
     const entry = TAB_MAP[tabKey] || TAB_MAP['portfolio'];
     switchTab(entry.btn, entry.content, tabKey in TAB_MAP ? tabKey : 'portfolio');
 
-    if (tabKey === 'chain') {
-        if (!rawChainData.chain || rawChainData.chain.length === 0) {
-            fetchOptionChain();
-        }
-    } else if (tabKey === 'transactions') {
+    if (tabKey === 'transactions') {
         if (!txnsLoaded) {
             txnsLoaded = true;
             fetchTransactions();
@@ -154,7 +150,6 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
         const input = document.getElementById('chain-symbol');
         if (input) {
             input.value = symbol;
-            fetchOptionChain();
         }
     });
 });
@@ -165,12 +160,6 @@ document.getElementById('btn-reset-filters')?.addEventListener('click', () => {
     document.getElementById('chain-max-dte').value = '60';
     document.getElementById('chain-min-delta').value = '0.15';
     document.getElementById('chain-max-delta').value = '0.30';
-    fetchOptionChain();
-});
-
-// Real-time server-side fetching on input change
-['chain-type', 'chain-min-dte', 'chain-max-dte', 'chain-min-delta', 'chain-max-delta'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', fetchOptionChain);
 });
 
 // =====================================================================================
