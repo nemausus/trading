@@ -723,6 +723,22 @@ tr:hover td {
     background-color: rgba(30, 41, 59, 0.25);
 }
 
+tr.row-call td {
+    background-color: rgba(16, 185, 129, 0.05) !important;
+}
+
+tr.row-call:hover td {
+    background-color: rgba(16, 185, 129, 0.12) !important;
+}
+
+tr.row-put td {
+    background-color: rgba(239, 68, 68, 0.05) !important;
+}
+
+tr.row-put:hover td {
+    background-color: rgba(239, 68, 68, 0.12) !important;
+}
+
 /* =====================================================================================
    MOBILE RESPONSIVE BREAKPOINTS (Tablet & Mobile Devices)
    ===================================================================================== */
