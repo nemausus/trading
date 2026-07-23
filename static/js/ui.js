@@ -342,7 +342,7 @@ export function renderOptionChainTable(contracts) {
             prevDte = opt.dte;
             dteGroupHeaderHtml = `
                 <tr class="dte-group-row">
-                    <td colspan="10">
+                    <td colspan="8">
                         <div class="dte-header-content">
                             <span class="dte-group-pill">${opt.dte} DTE</span>
                             <span class="dte-group-date">Expiration: <strong>${opt.expirationDate}</strong></span>
@@ -358,12 +358,10 @@ export function renderOptionChainTable(contracts) {
             <tr class="${rowBgClass}">
                 <td><span class="badge-option">${opt.symbol}</span></td>
                 <td style="text-align: right; font-weight: 700;">$${formatNumber(opt.strikePrice, 2)}</td>
-                <td style="text-align: right;">${formatCurrency(opt.bid)}</td>
-                <td style="text-align: right;">${formatCurrency(opt.ask)}</td>
                 <td style="text-align: right; font-weight: 600;">${formatCurrency(opt.mark)}</td>
                 <td style="text-align: center; font-weight: 600; color: var(--accent-blue);">${deltaDisplay}</td>
-                <td style="text-align: center;">${ivDisplay}</td>
                 <td style="text-align: center;" class="val-positive">${mprDisplay}</td>
+                <td style="text-align: center;">${ivDisplay}</td>
                 <td style="text-align: right;" class="${changeClass}">${changeSign}${formatNumber(changeVal, 2)}%</td>
                 <td style="text-align: right;" class="${beChangeClass}">${beChangeSign}${formatNumber(beChangeVal, 2)}%</td>
             </tr>
@@ -377,12 +375,10 @@ export function renderOptionChainTable(contracts) {
                     <tr>
                         <th>Symbol</th>
                         <th style="text-align: right;">Strike</th>
-                        <th style="text-align: right;">Bid</th>
-                        <th style="text-align: right;">Ask</th>
                         <th style="text-align: right;">Mark</th>
                         <th style="text-align: center;">Delta</th>
-                        <th style="text-align: center;">IV</th>
                         <th style="text-align: center;">MPR</th>
+                        <th style="text-align: center;">IV</th>
                         <th style="text-align: right;">Strike Δ%</th>
                         <th style="text-align: right;">Break-Even Δ%</th>
                     </tr>
