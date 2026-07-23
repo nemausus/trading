@@ -137,8 +137,8 @@ export function renderPositions(positions) {
                 <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
                 <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.cost)}</td>
                 <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.marketValue)}</td>
-                <td class="desktop-only-col" style="text-align: right;" class="${pl.cssClass}">${pl.sign}${pl.valDisplay}</td>
-                <td class="desktop-only-col" style="text-align: right;" class="${plPercent.cssClass}">${plPercent.sign}${plPercent.valDisplay}</td>
+                <td class="desktop-only-col ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay}</td>
+                <td class="desktop-only-col ${plPercent.cssClass}" style="text-align: right;">${plPercent.sign}${plPercent.valDisplay}</td>
                 <td class="desktop-only-col" style="text-align: center;">${dteDisplay}</td>
                 <td class="desktop-only-col" style="text-align: center;">${deltaDisplay}</td>
                 <td class="desktop-only-col" style="text-align: center;">${mprDisplay}</td>
@@ -223,8 +223,8 @@ export function renderOrders(orders) {
                 <td class="desktop-only-col" style="text-align: right;">${qtyDisplay}</td>
                 <td class="desktop-only-col" style="text-align: right;">${costShareDisplay}</td>
                 <td class="desktop-only-col" style="text-align: right;">${valShareDisplay}</td>
-                <td class="desktop-only-col" style="text-align: right;" class="${pl.cssClass}">${pl.sign}${pl.valDisplay}</td>
-                <td class="desktop-only-col" style="text-align: right;" class="${plPercent.cssClass}">${plPercent.sign}${plPercent.valDisplay}</td>
+                <td class="desktop-only-col ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay}</td>
+                <td class="desktop-only-col ${plPercent.cssClass}" style="text-align: right;">${plPercent.sign}${plPercent.valDisplay}</td>
                 <td class="desktop-only-col" style="text-align: center;">${dteDisplay}</td>
                 <td class="desktop-only-col" style="text-align: center;">${deltaDisplay}</td>
                 <td class="desktop-only-col" style="text-align: center;">${mprDisplay}</td>
@@ -520,10 +520,9 @@ export function renderTransactions(transactions) {
             : '—';
         const amountDisplay = amount != null ? formatNumber(amount, 0) : '—';
 
-        const netClass = (txn.netAmount || 0) >= 0 ? 'val-positive' : 'val-negative';
-        const netSign = (txn.netAmount || 0) >= 0 ? '+' : '';
+        const netPL = getPLFormatting(txn.netAmount || 0);
 
-        const symbolBadgeClass = symbol.length > 4 ? 'badge-option' : 'badge-equity';
+        const symbolBadgeClass = getSymbolBadgeClass(symbol);
 
         return `
             <tr>
@@ -534,7 +533,7 @@ export function renderTransactions(transactions) {
                 <td class="${_effectClass(posEffect)}" style="text-align:center; font-size:0.8rem; font-weight:600;">${posEffect || '—'}</td>
                 <td style="text-align:right;">${amountDisplay}</td>
                 <td style="text-align:right;">${priceDisplay}</td>
-                <td style="text-align:right; font-weight:600;" class="${netClass}">${netSign}${formatCurrency(txn.netAmount)}</td>
+                <td style="text-align:right; font-weight:600;" class="${netPL.cssClass}">${netPL.sign}${netPL.valDisplay}</td>
             </tr>
         `;
     }).join('');
@@ -688,10 +687,8 @@ export function renderRealized(realizedList) {
 
     let rowsHtml = realizedList.map(r => {
         const symbol = r.symbol || '—';
-        const symbolBadgeClass = symbol.length > 4 ? 'badge-option' : 'badge-equity';
-        const pl = r['P/L'] || 0;
-        const plClass = pl >= 0 ? 'val-positive' : 'val-negative';
-        const plSign = pl >= 0 ? '+' : '';
+        const symbolBadgeClass = getSymbolBadgeClass(symbol);
+        const plFormat = getPLFormatting(r['P/L'] || 0);
 
         return `
             <tr>
@@ -701,7 +698,7 @@ export function renderRealized(realizedList) {
                 <td style="text-align:right;">${formatCurrency(r.sell_price)}</td>
                 <td><span class="${symbolBadgeClass}">${symbol}</span></td>
                 <td style="text-align:right;">${formatNumber(r.amount, 0)}</td>
-                <td style="text-align:right; font-weight:600;" class="${plClass}">${plSign}${formatCurrency(pl)}</td>
+                <td style="text-align:right; font-weight:600;" class="${plFormat.cssClass}">${plFormat.sign}${plFormat.valDisplay}</td>
             </tr>
         `;
     }).join('');
