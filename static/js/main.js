@@ -49,14 +49,40 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
     }
 });
 
-document.getElementById('btn-refresh-portfolio').addEventListener('click', fetchSchwabPortfolio);
+let currentTabKey = 'portfolio';
 
-document.getElementById('btn-group-underlying').addEventListener('click', () => {
-    const btn = document.getElementById('btn-group-underlying');
-    const isGrouped = btn.dataset.grouped === 'true';
-    btn.dataset.grouped = String(!isGrouped);
-    btn.classList.toggle('active', !isGrouped);
-    if (lastPositions.length > 0) renderPositions(lastPositions);
+document.getElementById('btn-refresh-data')?.addEventListener('click', () => {
+    switch (currentTabKey) {
+        case 'portfolio':
+            fetchSchwabPortfolio();
+            break;
+        case 'chain':
+            fetchOptionChain();
+            break;
+        case 'box':
+            fetchSPXBoxes();
+            break;
+        case 'transactions':
+            syncTransactions();
+            break;
+        case 'realized':
+            fetchRealized();
+            break;
+        default:
+            fetchSchwabPortfolio();
+            break;
+    }
+});
+
+document.getElementById('btn-toggle-compact-mobile')?.addEventListener('click', () => {
+    const btn = document.getElementById('btn-toggle-compact-mobile');
+    const container = document.getElementById('positions-container');
+    if (!btn || !container) return;
+
+    const isCompact = btn.dataset.compact === 'true';
+    btn.dataset.compact = String(!isCompact);
+    btn.classList.toggle('active', !isCompact);
+    container.classList.toggle('compact-mobile-view', !isCompact);
 });
 
 
@@ -108,15 +134,16 @@ function switchTab(activeBtn, activeContent, tabKey) {
  * Falls back to 'portfolio' if the key is unknown.
  */
 function navigateToTab(tabKey) {
-    const entry = TAB_MAP[tabKey] || TAB_MAP['portfolio'];
-    switchTab(entry.btn, entry.content, tabKey in TAB_MAP ? tabKey : 'portfolio');
+    currentTabKey = tabKey in TAB_MAP ? tabKey : 'portfolio';
+    const entry = TAB_MAP[currentTabKey];
+    switchTab(entry.btn, entry.content, currentTabKey);
 
-    if (tabKey === 'transactions') {
+    if (currentTabKey === 'transactions') {
         if (!txnsLoaded) {
             txnsLoaded = true;
             fetchTransactions();
         }
-    } else if (tabKey === 'realized') {
+    } else if (currentTabKey === 'realized') {
         if (!realizedLoaded) {
             realizedLoaded = true;
             fetchRealized();

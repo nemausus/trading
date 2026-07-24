@@ -34,160 +34,212 @@ export function clearDashboard() {
 
 export function renderDashboard(data) {
     lastPositions = data.positions || [];
-    renderSummaries(data.summaries || []);
-    renderPositions(lastPositions);
+    renderUnifiedAccounts(data.summaries || [], lastPositions);
     renderOrders(data.orders || []);
-
 }
 
 export function renderSummaries(summaries) {
-    const container = document.getElementById('summaries-container');
-    if (!summaries || summaries.length === 0) {
-        container.innerHTML = `
-            <div class="summary-card" style="grid-column: 1 / -1; text-align: center;">
-                <h4>Accounts Summary</h4>
-                <div class="summary-value" style="font-size: 1.2rem; color: var(--text-secondary);">No accounts found.</div>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = summaries.map(sum => {
-        const todoItems = sum.Todo ? sum.Todo.split(',').map(s => s.trim()) : [];
-        const todoPillsHtml = todoItems.length > 0
-            ? `<div class="todo-list-pills">${todoItems.map(item => `<span class="todo-pill">${item}</span>`).join('')}</div>`
-            : `<div class="summary-subtext" style="color: var(--accent-green); font-weight:600; margin-top: 8px;">Covered / Complete</div>`;
-
-        let riskClass = "risk-low";
-        if (sum.Risk < 90) riskClass = "risk-high";
-        else if (sum.Risk < 95) riskClass = "risk-med";
-
-        return `
-            <div class="summary-card">
-                <h4>Account ${sum.accountNumber}</h4>
-                <div class="summary-value">${formatCurrency(sum.Net)}</div>
-                <div class="summary-subtext">Cash: <strong>${formatCurrency(sum.Cash)}</strong></div>
-                <div class="summary-subtext" style="margin-top: 4px;">
-                    Total Loan: <strong>${formatCurrency(sum['Total Loan'])}</strong>
-                    <span style="font-size:0.75rem; color:var(--text-secondary); display:block;">
-                        (Margin: ${formatCurrency(sum.Margin)} | Box: ${formatCurrency(sum.BOX)} | CSP: ${formatCurrency(sum.CSP)})
-                    </span>
-                </div>
-                <div class="summary-subtext" style="margin-top: 4px;">
-                    Risk Factor: <strong class="${riskClass}">${formatPercent(sum.Risk)}</strong>
-                </div>
-                <div class="summary-subtext" style="margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 8px;">
-                    <strong>Action Items (Uncovered Longs):</strong>
-                    ${todoPillsHtml}
-                </div>
-            </div>
-        `;
-    }).join('');
+    renderUnifiedAccounts(summaries, lastPositions);
 }
 
 export function renderPositions(positions) {
+    lastPositions = positions || [];
+    renderUnifiedAccounts([], lastPositions);
+}
+
+export function renderUnifiedAccounts(summaries = [], positions = []) {
     const container = document.getElementById('positions-container');
-    if (!positions || positions.length === 0) {
+    if (!container) return;
+
+    if ((!summaries || summaries.length === 0) && (!positions || positions.length === 0)) {
+        container.innerHTML = `<div class="no-data-msg"><p>No open positions or account data found in Schwab accounts.</p></div>`;
+        return;
+    }
+
+    const summaryMap = {};
+    (summaries || []).forEach(s => {
+        if (s && s.accountNumber) {
+            summaryMap[String(s.accountNumber)] = s;
+        }
+    });
+
+    const accountPositionsMap = {};
+    (positions || []).forEach(p => {
+        if (p && p.accountNumber) {
+            const acc = String(p.accountNumber);
+            if (!accountPositionsMap[acc]) accountPositionsMap[acc] = [];
+            accountPositionsMap[acc].push(p);
+        }
+    });
+
+    const allAccNums = Array.from(new Set([
+        ...Object.keys(summaryMap),
+        ...Object.keys(accountPositionsMap)
+    ])).sort();
+
+    if (allAccNums.length === 0) {
         container.innerHTML = `<div class="no-data-msg"><p>No open positions found in Schwab accounts.</p></div>`;
         return;
     }
 
-    const grouped = document.getElementById('btn-group-underlying')?.dataset.grouped === 'true';
-    const displayPositions = grouped ? sortPositionsGrouped(positions) : positions;
+    let html = '';
 
-    let prevUnderlying = null;
-    let prevAccount = null;
+    allAccNums.forEach(accNum => {
+        const sum = summaryMap[accNum];
+        const rawAccPositions = accountPositionsMap[accNum] || [];
+        const accPositions = sortPositionsGrouped(rawAccPositions);
 
-    let rowsHtml = displayPositions.map(pos => {
-        const symbolBadgeClass = getSymbolBadgeClass(pos.symbol);
-        const pl = getPLFormatting(pos['P/L']);
-        const plPercent = getPLPercentFormatting(pos['P/L%']);
+        // Render Summary Header Bar for this account card
+        let summaryBarHtml = '';
+        if (sum) {
+            const todoItems = sum.Todo ? sum.Todo.split(',').map(s => s.trim()) : [];
+            const todoPillsHtml = todoItems.length > 0
+                ? `<div class="todo-list-pills" style="margin-top: 0; display: inline-flex;">${todoItems.map(item => `<span class="todo-pill">${item}</span>`).join('')}</div>`
+                : `<span style="color: var(--accent-green); font-weight:600; font-size:0.78rem;">Covered / Complete</span>`;
 
-        const dteDisplay = pos.dte >= 0 ? pos.dte : '-';
-        const deltaDisplay = pos.delta !== 0 ? formatNumber(pos.delta, 2) : '-';
-        const mprDisplay = pos.mpr !== 0 ? formatPercent(pos.mpr) : '-';
+            let riskClass = "risk-low";
+            if (sum.Risk < 90) riskClass = "risk-high";
+            else if (sum.Risk < 95) riskClass = "risk-med";
 
-        const hasOptionsMetrics = (pos.dte >= 0) || (pos.delta !== 0) || (pos.mpr !== 0);
-        const optMetricsClass = hasOptionsMetrics ? '' : 'hide-if-empty';
-
-        let groupHeaderHtml = '';
-        if (grouped) {
-            const underlying = baseUnderlying(pos.symbol);
-            if (underlying !== prevUnderlying || pos.accountNumber !== prevAccount) {
-                const colCount = 11;
-                groupHeaderHtml = `<tr class="group-header-row"><td colspan="${colCount}">${pos.accountNumber} &mdash; ${underlying}</td></tr>`;
-                prevUnderlying = underlying;
-                prevAccount = pos.accountNumber;
-            }
+            summaryBarHtml = `
+                <div class="account-summary-bar" style="padding: 10px 16px; background-color: var(--bg-tertiary); border-bottom: 1px solid var(--border-color);">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.84rem;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <strong style="font-size: 0.98rem; color: var(--accent-blue);">Account ${sum.accountNumber}</strong>
+                            <span style="font-size: 0.98rem; font-weight: 700; color: var(--text-primary);">Net: ${formatCurrency(sum.Net)}</span>
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px;">
+                            <span>Cash: <strong>${formatCurrency(sum.Cash)}</strong></span>
+                            <span>Loan: <strong>${formatCurrency(sum['Total Loan'])}</strong> <span style="font-size:0.75rem; color:var(--text-secondary);">(Margin: ${formatCurrency(sum.Margin)} | Box: ${formatCurrency(sum.BOX)} | CSP: ${formatCurrency(sum.CSP)})</span></span>
+                            <span>Risk: <strong class="${riskClass}">${formatPercent(sum.Risk)}</strong></span>
+                            <div style="display: inline-flex; align-items: center; gap: 6px;">
+                                <span style="color: var(--text-secondary); font-weight: 600; font-size: 0.78rem;">Action:</span>
+                                ${todoPillsHtml}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
         } else {
-            if (pos.accountNumber !== prevAccount) {
-                const colCount = 11;
-                groupHeaderHtml = `<tr class="group-header-row"><td colspan="${colCount}">Account: ${pos.accountNumber}</td></tr>`;
-                prevAccount = pos.accountNumber;
-                prevUnderlying = null;
-            }
+            summaryBarHtml = `
+                <div class="account-summary-bar" style="padding: 10px 16px; background-color: var(--bg-tertiary); border-bottom: 1px solid var(--border-color);">
+                    <strong style="font-size: 0.98rem; color: var(--accent-blue);">Account ${accNum}</strong>
+                </div>
+            `;
         }
 
-        return groupHeaderHtml + `
-            <tr>
-                <!-- Desktop Columns (hidden on mobile) -->
-                <td class="desktop-only-col" data-label="Symbol"><span class="${symbolBadgeClass}">${pos.symbol}</span></td>
-                <td class="desktop-only-col" style="text-align: right;">${pos.quantity}</td>
-                <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['cost/share'])}</td>
-                <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
-                <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.cost)}</td>
-                <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.marketValue)}</td>
-                <td class="desktop-only-col ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay}</td>
-                <td class="desktop-only-col ${plPercent.cssClass}" style="text-align: right;">${plPercent.sign}${plPercent.valDisplay}</td>
-                <td class="desktop-only-col" style="text-align: center;">${dteDisplay}</td>
-                <td class="desktop-only-col" style="text-align: center;">${deltaDisplay}</td>
-                <td class="desktop-only-col" style="text-align: center;">${mprDisplay}</td>
+        // Render Positions Table / Cards for this account
+        let tableHtml = '';
+        if (accPositions.length === 0) {
+            tableHtml = `<div class="no-data-msg" style="padding: 16px;"><p>No open positions in this account.</p></div>`;
+        } else {
+            tableHtml = `
+                <div class="table-responsive" style="padding: 12px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th style="text-align: right;">Qty</th>
+                                <th style="text-align: right;">Cost/Share</th>
+                                <th style="text-align: right;">Mark</th>
+                                <th style="text-align: right;">Cost Basis</th>
+                                <th style="text-align: right;">Market Value</th>
+                                <th style="text-align: right;">P/L</th>
+                                <th class="desktop-only-pl-pct" style="text-align: right;">P/L%</th>
+                                <th style="text-align: center;">DTE</th>
+                                <th style="text-align: center;">Delta</th>
+                                <th style="text-align: center;">MPR</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
 
-                <!-- Mobile Only Combined Row Layout (hidden on desktop) -->
-                <td class="mobile-only-card-col" colspan="11">
-                    <div class="mobile-split-row header-row">
-                        <div class="split-col col-symbol"><span>${pos.quantity} x ${pos.symbol}</span></div>
-                        <div class="split-col col-pl ${pl.cssClass}" style="text-align: right; font-weight: 700;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
-                    </div>
-                    <div class="mobile-split-row details-row">
-                        <div class="split-col col-cost"">${formatCurrency(pos.marketValue)} / ${formatCurrency(pos.cost)}</div>
-                        <div class="split-col col-prices" style="text-align: right;">${formatCurrency(pos['value/share'])} / ${formatCurrency(pos['cost/share'])}</div>
-                    </div>
-                    ${hasOptionsMetrics ? `
-                    <div class="mobile-split-row options-row">
-                        <div class="split-col col-dte">DTE: ${dteDisplay} | &Delta;: ${deltaDisplay}</div>
-                        <div class="split-col col-mpr" style="text-align: right;">MPR: ${mprDisplay}</div>
-                    </div>
-                    ` : ''}
-                </td>
-            </tr>
-        `;
-    }).join('');
+            let prevUnderlying = null;
+            let currentGroupIndex = 0;
 
-    container.innerHTML = `
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Symbol</th>
-                        <th style="text-align: right;">Qty</th>
-                        <th style="text-align: right;">Cost/Share</th>
-                        <th style="text-align: right;">Mark</th>
-                        <th style="text-align: right;">Cost Basis</th>
-                        <th style="text-align: right;">Market Value</th>
-                        <th style="text-align: right;">P/L</th>
-                        <th class="desktop-only-pl-pct" style="text-align: right;">P/L%</th>
-                        <th style="text-align: center;">DTE</th>
-                        <th style="text-align: center;">Delta</th>
-                        <th style="text-align: center;">MPR</th>
+            accPositions.forEach((pos, index) => {
+                const underlying = baseUnderlying(pos.symbol);
+
+                if (underlying !== prevUnderlying) {
+                    currentGroupIndex++;
+                    prevUnderlying = underlying;
+                }
+
+                const groupBgClass = (currentGroupIndex % 2 === 0) ? 'group-bg-even' : 'group-bg-odd';
+                const isGroupStart = (index === 0 || baseUnderlying(accPositions[index - 1].symbol) !== underlying);
+                const groupStartClass = isGroupStart ? 'group-start-row' : '';
+                const isGroupEnd = (index === accPositions.length - 1 || baseUnderlying(accPositions[index + 1].symbol) !== underlying);
+                const groupEndClass = isGroupEnd ? 'group-end-row' : '';
+
+                const symbolBadgeClass = getSymbolBadgeClass(pos.symbol);
+                const pl = getPLFormatting(pos['P/L']);
+                const plPercent = getPLPercentFormatting(pos['P/L%']);
+
+                const dteDisplay = pos.dte >= 0 ? pos.dte : '-';
+                const deltaDisplay = pos.delta !== 0 ? formatNumber(pos.delta, 2) : '-';
+                const mprDisplay = pos.mpr !== 0 ? formatPercent(pos.mpr) : '-';
+                const hasOptionsMetrics = (pos.dte >= 0) || (pos.delta !== 0) || (pos.mpr !== 0);
+
+                let spacerHtml = '';
+                if (index > 0 && isGroupStart) {
+                    spacerHtml = `<tr class="group-spacer-row"><td colspan="11"></td></tr>`;
+                }
+
+                tableHtml += spacerHtml + `
+                    <tr class="${groupBgClass} ${groupStartClass} ${groupEndClass}">
+                        <!-- Desktop Columns -->
+                        <td class="desktop-only-col" data-label="Symbol"><span class="${symbolBadgeClass}">${pos.symbol}</span></td>
+                        <td class="desktop-only-col" style="text-align: right;">${pos.quantity}</td>
+                        <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['cost/share'])}</td>
+                        <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
+                        <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.cost)}</td>
+                        <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.marketValue)}</td>
+                        <td class="desktop-only-col ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay}</td>
+                        <td class="desktop-only-col ${plPercent.cssClass}" style="text-align: right;">${plPercent.sign}${plPercent.valDisplay}</td>
+                        <td class="desktop-only-col" style="text-align: center;">${dteDisplay}</td>
+                        <td class="desktop-only-col" style="text-align: center;">${deltaDisplay}</td>
+                        <td class="desktop-only-col" style="text-align: center;">${mprDisplay}</td>
+
+                        <!-- Mobile Only Combined Row Layout -->
+                        <td class="mobile-only-card-col" colspan="11">
+                            <div class="mobile-split-row header-row">
+                                <div class="split-col col-symbol"><span>${pos.quantity} x ${pos.symbol}</span></div>
+                                <div class="split-col col-pl ${pl.cssClass}" style="text-align: right; font-weight: 700;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
+                            </div>
+                            <div class="mobile-split-row details-row">
+                                <div class="split-col col-cost">${formatCurrency(pos.marketValue)} / ${formatCurrency(pos.cost)}</div>
+                                <div class="split-col col-prices" style="text-align: right;">${formatCurrency(pos['value/share'])} / ${formatCurrency(pos['cost/share'])}</div>
+                            </div>
+                            ${hasOptionsMetrics ? `
+                            <div class="mobile-split-row options-row">
+                                <div class="split-col col-dte">DTE: ${dteDisplay} | &Delta;: ${deltaDisplay}</div>
+                                <div class="split-col col-mpr" style="text-align: right;">MPR: ${mprDisplay}</div>
+                            </div>
+                            ` : ''}
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-                    ${rowsHtml}
-                </tbody>
-            </table>
-        </div>
-    `;
+                `;
+            });
+
+            tableHtml += `</tbody></table></div>`;
+        }
+
+        html += `
+            <div class="section-card account-card" style="margin-bottom: 20px; padding: 0; overflow: hidden; border-radius: 8px;">
+                ${summaryBarHtml}
+                ${tableHtml}
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+    if (tableOpen) {
+        html += `</tbody></table></div></div>`;
+    }
+
+    container.innerHTML = html;
 }
 
 

@@ -3,6 +3,18 @@ import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionCh
 
 export let rawChainData = { underlying: {}, chain: [] };
 
+export function setRefreshBtnLoading(loading) {
+    const btn = document.getElementById('btn-refresh-data');
+    if (!btn) return;
+    if (loading) {
+        btn.disabled = true;
+        btn.innerText = "Refreshing...";
+    } else {
+        btn.disabled = false;
+        btn.innerText = "↻ Refresh";
+    }
+}
+
 export async function checkSchwabStatus() {
     const user = auth.currentUser;
     if (!user) return;
@@ -10,7 +22,7 @@ export async function checkSchwabStatus() {
     const statusPill = document.getElementById('schwab-status-pill');
     const statusText = document.getElementById('schwab-status-text');
     const actionsDiv = document.getElementById('schwab-actions');
-    const refreshBtn = document.getElementById('btn-refresh-portfolio');
+    const refreshBtn = document.getElementById('btn-refresh-data');
 
     statusText.innerText = "Checking...";
     statusPill.className = "status-pill disconnected";
@@ -25,7 +37,7 @@ export async function checkSchwabStatus() {
         if (data.connected) {
             statusText.innerText = "Connected";
             statusPill.className = "status-pill connected";
-            refreshBtn.style.display = "inline-block";
+            if (refreshBtn) refreshBtn.style.display = "inline-block";
 
             actionsDiv.innerHTML = `
                 <button id="btn-disconnect" class="btn-header btn-disconnect">Disconnect</button>
@@ -96,12 +108,10 @@ export async function fetchSchwabPortfolio() {
     const user = auth.currentUser;
     if (!user) return;
 
-    const refreshBtn = document.getElementById('btn-refresh-portfolio');
     const positionsContainer = document.getElementById('positions-container');
     const ordersContainer = document.getElementById('orders-container');
 
-    refreshBtn.disabled = true;
-    refreshBtn.innerText = "Refreshing...";
+    setRefreshBtnLoading(true);
 
     positionsContainer.innerHTML = `<div class="no-data-msg"><p>Retrieving latest portfolio positions and market quotes...</p></div>`;
     ordersContainer.innerHTML = `<div class="no-data-msg"><p>Retrieving working orders...</p></div>`;
@@ -125,8 +135,7 @@ export async function fetchSchwabPortfolio() {
         positionsContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Network Error: ${error.message}</p></div>`;
         ordersContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Network Error: ${error.message}</p></div>`;
     } finally {
-        refreshBtn.disabled = false;
-        refreshBtn.innerText = "Refresh Data";
+        setRefreshBtnLoading(false);
     }
 }
 
@@ -154,6 +163,7 @@ export async function fetchOptionChain() {
         fetchBtn.disabled = true;
         fetchBtn.innerText = "Fetching...";
     }
+    setRefreshBtnLoading(true);
 
     chainContainer.innerHTML = `<div class="no-data-msg"><p>Fetching options chain for ${symbol}...</p></div>`;
 
@@ -191,6 +201,7 @@ export async function fetchOptionChain() {
             fetchBtn.disabled = false;
             fetchBtn.innerText = "Fetch Chain";
         }
+        setRefreshBtnLoading(false);
     }
 }
 
@@ -212,6 +223,8 @@ export async function fetchSPXBoxes() {
         fetchBtn.disabled = true;
         fetchBtn.innerText = "Scanning...";
     }
+    setRefreshBtnLoading(true);
+
     boxContainer.innerHTML = `<div class="no-data-msg"><p>Scanning SPX options chain for box spread opportunities...</p></div>`;
 
     try {
@@ -242,6 +255,7 @@ export async function fetchSPXBoxes() {
             fetchBtn.disabled = false;
             fetchBtn.innerText = "Find Boxes";
         }
+        setRefreshBtnLoading(false);
     }
 }
 
@@ -255,6 +269,7 @@ export async function fetchTransactions() {
 
     const container = document.getElementById('transactions-container');
     container.innerHTML = `<div class="no-data-msg"><p>Loading stored transactions...</p></div>`;
+    setRefreshBtnLoading(true);
 
     try {
         const token = await user.getIdToken();
@@ -272,6 +287,8 @@ export async function fetchTransactions() {
     } catch (error) {
         console.error('Failed to fetch transactions:', error);
         container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Network Error: ${error.message}</p></div>`;
+    } finally {
+        setRefreshBtnLoading(false);
     }
 }
 
@@ -282,10 +299,15 @@ export async function syncTransactions() {
     const syncBtn = document.getElementById('btn-sync-transactions');
     const statusSpan = document.getElementById('txn-sync-status');
 
-    syncBtn.disabled = true;
-    syncBtn.innerText = 'Syncing...';
-    statusSpan.textContent = '';
-    statusSpan.className = 'txn-sync-status';
+    if (syncBtn) {
+        syncBtn.disabled = true;
+        syncBtn.innerText = 'Syncing...';
+    }
+    if (statusSpan) {
+        statusSpan.textContent = '';
+        statusSpan.className = 'txn-sync-status';
+    }
+    setRefreshBtnLoading(true);
 
     try {
         const token = await user.getIdToken();
@@ -299,22 +321,31 @@ export async function syncTransactions() {
             const msg = data.new_count > 0
                 ? `✓ ${data.new_count} new transaction${data.new_count !== 1 ? 's' : ''} synced`
                 : '✓ Already up to date';
-            statusSpan.textContent = msg;
-            statusSpan.className = 'txn-sync-status txn-sync-ok';
+            if (statusSpan) {
+                statusSpan.textContent = msg;
+                statusSpan.className = 'txn-sync-status txn-sync-ok';
+            }
             // Refresh the table after a successful sync
             await fetchTransactions();
         } else {
             const errMsg = data.error || 'Sync failed';
-            statusSpan.textContent = `✗ ${errMsg}`;
-            statusSpan.className = 'txn-sync-status txn-sync-err';
+            if (statusSpan) {
+                statusSpan.textContent = `✗ ${errMsg}`;
+                statusSpan.className = 'txn-sync-status txn-sync-err';
+            }
         }
     } catch (error) {
         console.error('Sync transactions failed:', error);
-        statusSpan.textContent = `✗ Network error`;
-        statusSpan.className = 'txn-sync-status txn-sync-err';
+        if (statusSpan) {
+            statusSpan.textContent = `✗ Network error`;
+            statusSpan.className = 'txn-sync-status txn-sync-err';
+        }
     } finally {
-        syncBtn.disabled = false;
-        syncBtn.innerText = '↻ Sync';
+        if (syncBtn) {
+            syncBtn.disabled = false;
+            syncBtn.innerText = '↻ Sync';
+        }
+        setRefreshBtnLoading(false);
     }
 }
 
@@ -326,6 +357,7 @@ export async function fetchRealized() {
 
     const container = document.getElementById('realized-container');
     container.innerHTML = `<div class="no-data-msg"><p>Loading realized transactions...</p></div>`;
+    setRefreshBtnLoading(true);
 
     try {
         const token = await user.getIdToken();
@@ -358,6 +390,8 @@ export async function fetchRealized() {
     } catch (error) {
         console.error('Failed to fetch realized transactions:', error);
         container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Network Error: ${error.message}</p></div>`;
+    } finally {
+        setRefreshBtnLoading(false);
     }
 }
 

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Covered Calls Portfolio Manager</title>
+    <title>Portfolio Manager</title>
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +12,7 @@
     <!-- Custom Style Sheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
+
 <body>
 
     <!-- LOADING VIEW -->
@@ -37,7 +39,6 @@
         <header class="app-header">
             <div class="header-container">
                 <div class="header-left">
-                    <div class="header-logo">Portfolio</div>
                     <nav class="header-nav">
                         <button id="tab-btn-portfolio" class="nav-tab active">Portfolio</button>
                         <button id="tab-btn-realized" class="nav-tab">Realized</button>
@@ -48,6 +49,9 @@
                 </div>
                 <div class="header-right">
                     <span class="user-email" id="user-display-email"></span>
+
+                    <!-- Schwab Refresh Data Button -->
+                    <button id="btn-refresh-data" class="btn-header btn-action-refresh" style="display: none;">↻ Refresh</button>
 
                     <!-- Schwab Status Pill -->
                     <span id="schwab-status-pill" class="status-pill disconnected">
@@ -68,29 +72,19 @@
 
             <!-- TAB 1: PORTFOLIO CONTENT -->
             <div id="tab-content-portfolio" class="tab-content active-tab-content">
-                <!-- ACCOUNTS SUMMARY CONTAINER -->
-                <div id="summaries-container" class="summary-grid">
-                    <!-- Dynamically populated summaries -->
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+                    <button id="btn-toggle-compact-mobile" class="btn-toggle" data-compact="false"
+                        title="Toggle minimized position view on mobile">
+                        <span class="toggle-icon">⊞</span> Compact Mobile
+                    </button>
                 </div>
 
-                <!-- POSITIONS CONTAINER -->
-                <div class="section-card">
-                    <div class="section-header-row">
-                        <h3>Account Positions</h3>
-                        <div style="display:flex; align-items:center; gap: 10px;">
-                            <button id="btn-group-underlying" class="btn-toggle active" data-grouped="true" title="Group positions by underlying symbol">
-                                <span class="toggle-icon">⊞</span> Group by Underlying
-                            </button>
-                            <button id="btn-refresh-portfolio" class="btn-action-refresh" style="display: none;">Refresh Data</button>
-                        </div>
-                    </div>
-
-                    <div id="positions-container">
-                        <div class="no-data-msg">
-                            <p>No portfolio data retrieved yet.</p>
-                        </div>
+                <div id="positions-container">
+                    <div class="no-data-msg">
+                        <p>No portfolio data retrieved yet.</p>
                     </div>
                 </div>
+            </div>
 
                 <!-- ACTIVE ORDERS CONTAINER -->
                 <div class="section-card">
@@ -111,7 +105,8 @@
                 <div class="section-card">
                     <div class="section-header-row" style="margin-bottom: 16px;">
                         <div class="quick-presets">
-                            <span style="font-size: 0.8rem; color: var(--text-secondary); margin-right: 4px;">Presets:</span>
+                            <span
+                                style="font-size: 0.8rem; color: var(--text-secondary); margin-right: 4px;">Presets:</span>
                             <button class="preset-btn" data-symbol="AAPL">AAPL</button>
                             <button class="preset-btn" data-symbol="AMZN">AMZN</button>
                             <button class="preset-btn" data-symbol="GOOG">GOOG</button>
@@ -128,7 +123,8 @@
                     <div class="chain-filter-bar">
                         <div class="filter-group">
                             <label for="chain-symbol">Symbol</label>
-                            <input type="text" id="chain-symbol" value="AAPL" placeholder="e.g. AAPL" style="text-transform: uppercase;">
+                            <input type="text" id="chain-symbol" value="AAPL" placeholder="e.g. AAPL"
+                                style="text-transform: uppercase;">
                         </div>
 
                         <div class="filter-group">
@@ -264,7 +260,8 @@
                 <div class="section-card">
                     <div id="transactions-container">
                         <div class="no-data-msg">
-                            <p>No transactions loaded yet. Click <strong>Sync</strong> to fetch from Schwab, or switch to this tab to load stored records.</p>
+                            <p>No transactions loaded yet. Click <strong>Sync</strong> to fetch from Schwab, or switch
+                                to this tab to load stored records.</p>
                         </div>
                     </div>
                 </div>
@@ -280,7 +277,8 @@
                     <div class="chain-filter-bar">
                         <div class="filter-group">
                             <label for="realized-symbol">Symbol Filter</label>
-                            <input type="text" id="realized-symbol" value="ALL" placeholder="e.g. AAPL or ALL" style="text-transform: uppercase;">
+                            <input type="text" id="realized-symbol" value="ALL" placeholder="e.g. AAPL or ALL"
+                                style="text-transform: uppercase;">
                         </div>
 
                         <div class="filter-group">
@@ -316,4 +314,5 @@
     <!-- Firebase SDKs and main.js -->
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
+
 </html>
