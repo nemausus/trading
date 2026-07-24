@@ -109,12 +109,12 @@ export async function fetchSchwabPortfolio() {
     if (!user) return;
 
     const positionsContainer = document.getElementById('positions-container');
-    const ordersContainer = document.getElementById('orders-container');
 
     setRefreshBtnLoading(true);
 
-    positionsContainer.innerHTML = `<div class="no-data-msg"><p>Retrieving latest portfolio positions and market quotes...</p></div>`;
-    ordersContainer.innerHTML = `<div class="no-data-msg"><p>Retrieving working orders...</p></div>`;
+    if (positionsContainer) {
+        positionsContainer.innerHTML = `<div class="no-data-msg"><p>Retrieving latest portfolio positions and market quotes...</p></div>`;
+    }
 
     try {
         const token = await user.getIdToken();
@@ -127,13 +127,15 @@ export async function fetchSchwabPortfolio() {
             renderDashboard(data);
         } else {
             const errMsg = data.error || 'Failed to fetch account portfolio';
-            positionsContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
-            ordersContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
+            if (positionsContainer) {
+                positionsContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
+            }
         }
     } catch (error) {
         console.error("Failed to fetch Schwab portfolio:", error);
-        positionsContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Network Error: ${error.message}</p></div>`;
-        ordersContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Network Error: ${error.message}</p></div>`;
+        if (positionsContainer) {
+            positionsContainer.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Network Error: ${error.message}</p></div>`;
+        }
     } finally {
         setRefreshBtnLoading(false);
     }

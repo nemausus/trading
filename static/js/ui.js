@@ -14,17 +14,24 @@ export function showView(viewId) {
 }
 
 export function clearDashboard() {
-    document.getElementById('summaries-container').innerHTML = "";
-    document.getElementById('positions-container').innerHTML = `
-        <div class="no-data-msg">
-            <p>Connect your Schwab account to retrieve positions.</p>
-        </div>
-    `;
-    document.getElementById('orders-container').innerHTML = `
-        <div class="no-data-msg">
-            <p>Connect your Schwab account to retrieve working orders.</p>
-        </div>
-    `;
+    const posContainer = document.getElementById('positions-container');
+    if (posContainer) {
+        posContainer.innerHTML = `
+            <div class="no-data-msg">
+                <p>Connect your Schwab account to retrieve positions.</p>
+            </div>
+        `;
+    }
+
+    const summariesContainer = document.getElementById('summaries-container');
+    if (summariesContainer) {
+        summariesContainer.innerHTML = '';
+    }
+
+    const ordersContainer = document.getElementById('orders-container');
+    if (ordersContainer) {
+        ordersContainer.innerHTML = '';
+    }
 
     const boxContainer = document.getElementById('box-container');
     if (boxContainer) {
@@ -35,7 +42,6 @@ export function clearDashboard() {
 export function renderDashboard(data) {
     lastPositions = data.positions || [];
     renderUnifiedAccounts(data.summaries || [], lastPositions);
-    renderOrders(data.orders || []);
 }
 
 export function renderSummaries(summaries) {
@@ -267,100 +273,7 @@ export function renderUnifiedAccounts(summaries = [], positions = []) {
     container.innerHTML = html;
 }
 
-    if (tableOpen) {
-        html += `</tbody></table></div></div>`;
-    }
 
-    container.innerHTML = html;
-}
-
-
-
-export function renderOrders(orders) {
-    const container = document.getElementById('orders-container');
-    if (!orders || orders.length === 0) {
-        container.innerHTML = `<div class="no-data-msg"><p>No active working orders found.</p></div>`;
-        return;
-    }
-
-    let rowsHtml = orders.map(ord => {
-        const symbolBadgeClass = getSymbolBadgeClass(ord.symbol);
-
-        const pl = getPLFormatting(ord['P/L']);
-        const plPercent = getPLPercentFormatting(ord['P/L%']);
-
-        const qtyDisplay = ord.quantity !== null && ord.quantity !== undefined ? ord.quantity : '-';
-        const costShareDisplay = ord['cost/share'] ? formatCurrency(ord['cost/share']) : '-';
-        const valShareDisplay = ord['value/share'] ? formatCurrency(ord['value/share']) : '-';
-        const dteDisplay = ord.dte >= 0 ? ord.dte : '-';
-        const deltaDisplay = ord.delta ? formatNumber(ord.delta, 2) : '-';
-        const mprDisplay = ord.mpr ? formatPercent(ord.mpr) : '-';
-
-        const hasOptionsMetrics = (ord.dte >= 0) || (!!ord.delta) || (!!ord.mpr);
-        const optMetricsClass = hasOptionsMetrics ? '' : 'hide-if-empty';
-
-        return `
-            <tr>
-                <!-- Desktop Columns (hidden on mobile) -->
-                <td class="desktop-only-col" data-label="Symbol"><span class="${symbolBadgeClass}">${ord.symbol}</span></td>
-                <td class="desktop-only-col"><strong style="color:var(--accent-blue)">${ord.order}</strong></td>
-                <td class="desktop-only-col" style="text-align: right;">${qtyDisplay}</td>
-                <td class="desktop-only-col" style="text-align: right;">${costShareDisplay}</td>
-                <td class="desktop-only-col" style="text-align: right;">${valShareDisplay}</td>
-                <td class="desktop-only-col ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay}</td>
-                <td class="desktop-only-col ${plPercent.cssClass}" style="text-align: right;">${plPercent.sign}${plPercent.valDisplay}</td>
-                <td class="desktop-only-col" style="text-align: center;">${dteDisplay}</td>
-                <td class="desktop-only-col" style="text-align: center;">${deltaDisplay}</td>
-                <td class="desktop-only-col" style="text-align: center;">${mprDisplay}</td>
-
-                <!-- Mobile Only Combined Row Layout (hidden on desktop) -->
-                <td class="mobile-only-card-col" colspan="10">
-                    <div class="mobile-split-row header-row">
-                        <div class="split-col col-symbol"><span class="${symbolBadgeClass}">${ord.symbol}</span></div>
-                        <div class="split-col col-order" style="text-align: right; font-weight: 700;"><strong style="color:var(--accent-blue)">${ord.order}</strong></div>
-                        <div class="split-col col-pl ${pl.cssClass}" style="text-align: right; font-weight: 700;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
-                    </div>
-                    <div class="mobile-split-row details-row">
-                        <div class="split-col col-qty">Qty: ${qtyDisplay}</div>
-                        <div class="split-col col-cost" style="text-align: right;">Mark: ${valShareDisplay}</div>
-                        <div class="split-col col-prices" style="text-align: right;">Cost: ${costShareDisplay}</div>
-                    </div>
-                    ${hasOptionsMetrics ? `
-                    <div class="mobile-split-row options-row">
-                        <div class="split-col col-dte">DTE: ${dteDisplay}</div>
-                        <div class="split-col col-delta" style="text-align: right;">&Delta;: ${deltaDisplay}</div>
-                        <div class="split-col col-mpr" style="text-align: right;">MPR: ${mprDisplay}</div>
-                    </div>
-                    ` : ''}
-                </td>
-            </tr>
-        `;
-    }).join('');
-
-    container.innerHTML = `
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Symbol</th>
-                        <th>Order</th>
-                        <th style="text-align: right;">Pos Qty</th>
-                        <th style="text-align: right;">Pos Cost/Shr</th>
-                        <th style="text-align: right;">Pos Mark</th>
-                        <th style="text-align: right;">Pos P/L</th>
-                        <th class="desktop-only-pl-pct" style="text-align: right;">Pos P/L%</th>
-                        <th style="text-align: center;">DTE</th>
-                        <th style="text-align: center;">Delta</th>
-                        <th style="text-align: center;">MPR</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rowsHtml}
-                </tbody>
-            </table>
-        </div>
-    `;
-}
 
 export function renderUnderlyingBanner(underlying, totalContracts, matchingCount) {
     const container = document.getElementById('chain-underlying-container');
