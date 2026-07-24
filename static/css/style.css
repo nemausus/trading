@@ -1231,3 +1231,9 @@ tr.group-end-row td.desktop-only-col:last-of-type {
 #positions-container.compact-mobile-view tr:not(.group-header-row):not(.group-spacer-row) {
     padding: 4px 8px !important;
 }
+
+/* Inline Pending Order Rows */
+tr.pending-order-row td {
+    border-top: 1px dashed rgba(245, 158, 11, 0.3) !important;
+    background-color: rgba(245, 158, 11, 0.05) !important;
+}

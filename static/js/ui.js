@@ -185,6 +185,36 @@ export function renderUnifiedAccounts(summaries = [], positions = []) {
                     spacerHtml = `<tr class="group-spacer-row"><td colspan="11"></td></tr>`;
                 }
 
+                let pendingOrdersDesktopHtml = '';
+                let pendingOrdersMobileHtml = '';
+
+                if (pos.pending_orders && pos.pending_orders.length > 0) {
+                    pos.pending_orders.forEach(ord => {
+                        const ordType = ord.type || 'ORDER';
+                        const ordPrice = ord.price ? formatCurrency(ord.price) : 'MKT';
+                        const ordStatus = ord.status || 'WORKING';
+
+                        pendingOrdersDesktopHtml += `
+                            <tr class="${groupBgClass} pending-order-row">
+                                <td class="desktop-only-col" style="padding-left: 16px;"><span class="badge-pending-order" style="font-size: 0.72rem; padding: 2px 6px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border-radius: 4px; font-weight: 600;">⚡ Order</span></td>
+                                <td class="desktop-only-col" style="text-align: right; color: #fbbf24; font-weight: 600;">${ord.quantity}</td>
+                                <td class="desktop-only-col" colspan="5" style="text-align: left; color: #fbbf24; font-weight: 500;">
+                                    <strong>${ordType}</strong> @ ${ordPrice} <span style="font-size:0.75rem; opacity:0.8;">(${ord.orderType || ''} ${ord.duration || ''})</span>
+                                </td>
+                                <td class="desktop-only-col" style="text-align: right;"><span style="font-size: 0.72rem; padding: 2px 6px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border-radius: 4px; font-weight: 600;">${ordStatus}</span></td>
+                                <td class="desktop-only-col" colspan="3"></td>
+                            </tr>
+                        `;
+
+                        pendingOrdersMobileHtml += `
+                            <div class="mobile-split-row pending-order-row" style="border-top: 1px dashed rgba(245, 158, 11, 0.4); margin-top: 6px; padding-top: 4px; color: #fbbf24; font-size: 0.78rem;">
+                                <div class="split-col"><span>⚡ <strong>Order:</strong> ${ordType} ${ord.quantity} @ ${ordPrice}</span></div>
+                                <div class="split-col" style="text-align: right;"><span style="font-size: 0.7rem; padding: 2px 6px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border-radius: 4px; font-weight: 600;">${ordStatus}</span></div>
+                            </div>
+                        `;
+                    });
+                }
+
                 tableHtml += spacerHtml + `
                     <tr class="${groupBgClass} ${groupStartClass} ${groupEndClass}">
                         <!-- Desktop Columns -->
@@ -216,8 +246,10 @@ export function renderUnifiedAccounts(summaries = [], positions = []) {
                                 <div class="split-col col-mpr" style="text-align: right;">MPR: ${mprDisplay}</div>
                             </div>
                             ` : ''}
+                            ${pendingOrdersMobileHtml}
                         </td>
                     </tr>
+                    ${pendingOrdersDesktopHtml}
                 `;
             });
 

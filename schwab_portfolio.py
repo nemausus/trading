@@ -728,11 +728,41 @@ def process_accounts_data(accounts_json: list, access_token: str) -> dict:
     quotes = fetch_quotes(access_token, unique_symbols)
     _enrich_quotes(global_positions, quotes)
 
-    # --- Active orders merged with positions ---
+    # --- Active orders attached directly to positions ---
     pos_index = {(p['accountNumber'], p['symbol']): p for p in global_positions}
-    active_orders = fetch_active_orders(access_token, account_hashes)
-    merged_orders = _merge_orders(active_orders, pos_index)
+    for p in global_positions:
+        p['pending_orders'] = []
 
+    active_orders = fetch_active_orders(access_token, account_hashes)
+    for order in active_orders:
+        acc = order.get('accountNumber')
+        sym = order.get('symbol')
+        if not acc or not sym:
+            continue
+        key = (acc, sym)
+        if key in pos_index:
+            pos_index[key]['pending_orders'].append(order)
+        else:
+            virtual_pos = {
+                'accountNumber': acc,
+                'symbol': sym,
+                'assetType': 'OPTION' if len(sym) > 12 else 'EQUITY',
+                'quantity': 0,
+                'cost/share': 0.0,
+                'value/share': 0.0,
+                'marketValue': 0.0,
+                'P/L': 0.0,
+                'cost': 0.0,
+                'dte': -1,
+                'delta': 0.0,
+                'mpr': 0.0,
+                'pending_orders': [order],
+                'isPendingOnly': True
+            }
+            global_positions.append(virtual_pos)
+            pos_index[key] = virtual_pos
+
+    merged_orders = _merge_orders(active_orders, pos_index)
     global_positions.sort(key=lambda x: (x['accountNumber'], x['dte'], x['symbol']))
 
     return {
