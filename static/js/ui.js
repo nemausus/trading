@@ -5,6 +5,7 @@ import {
 } from './utils.js';
 
 export let lastPositions = [];
+export let lastOrders = [];
 
 export function showView(viewId) {
     document.querySelectorAll('.view').forEach(view => {
@@ -41,23 +42,64 @@ export function clearDashboard() {
 
 export function renderDashboard(data) {
     lastPositions = data.positions || [];
-    renderUnifiedAccounts(data.summaries || [], lastPositions);
+    lastOrders = data.orders || [];
+    renderUnifiedAccounts(data.summaries || [], lastPositions, lastOrders);
 }
 
 export function renderSummaries(summaries) {
-    renderUnifiedAccounts(summaries, lastPositions);
+    renderUnifiedAccounts(summaries, lastPositions, lastOrders);
 }
 
 export function renderPositions(positions) {
     lastPositions = positions || [];
-    renderUnifiedAccounts([], lastPositions);
+    renderUnifiedAccounts([], lastPositions, lastOrders);
 }
 
-export function renderUnifiedAccounts(summaries = [], positions = []) {
+export function renderUnifiedAccounts(summaries = [], positions = [], orders = []) {
     const container = document.getElementById('positions-container');
     if (!container) return;
 
-    if ((!summaries || summaries.length === 0) && (!positions || positions.length === 0)) {
+    // Attach active orders to positions (creating virtual pending-only positions if non-held symbol)
+    const mergedPositions = (positions || []).map(p => ({
+        ...p,
+        pending_orders: []
+    }));
+
+    const posIndex = {};
+    mergedPositions.forEach(p => {
+        posIndex[`${p.accountNumber}_${p.symbol}`] = p;
+    });
+
+    (orders || []).forEach(ord => {
+        const acc = ord.accountNumber;
+        const sym = ord.symbol;
+        if (!acc || !sym) return;
+        const key = `${acc}_${sym}`;
+        if (posIndex[key]) {
+            posIndex[key].pending_orders.push(ord);
+        } else {
+            const virtualPos = {
+                accountNumber: acc,
+                symbol: sym,
+                quantity: 0,
+                'cost/share': 0,
+                'value/share': 0,
+                marketValue: 0,
+                'P/L': 0,
+                'P/L%': 0,
+                cost: 0,
+                dte: -1,
+                delta: 0,
+                mpr: 0,
+                pending_orders: [ord],
+                isPendingOnly: true
+            };
+            mergedPositions.push(virtualPos);
+            posIndex[key] = virtualPos;
+        }
+    });
+
+    if ((!summaries || summaries.length === 0) && mergedPositions.length === 0) {
         container.innerHTML = `<div class="no-data-msg"><p>No open positions or account data found in Schwab accounts.</p></div>`;
         return;
     }
@@ -70,7 +112,7 @@ export function renderUnifiedAccounts(summaries = [], positions = []) {
     });
 
     const accountPositionsMap = {};
-    (positions || []).forEach(p => {
+    mergedPositions.forEach(p => {
         if (p && p.accountNumber) {
             const acc = String(p.accountNumber);
             if (!accountPositionsMap[acc]) accountPositionsMap[acc] = [];
@@ -175,7 +217,6 @@ export function renderUnifiedAccounts(summaries = [], positions = []) {
                 const isGroupStart = (index === 0 || baseUnderlying(accPositions[index - 1].symbol) !== underlying);
                 const groupStartClass = isGroupStart ? 'group-start-row' : '';
                 const isGroupEnd = (index === accPositions.length - 1 || baseUnderlying(accPositions[index + 1].symbol) !== underlying);
-                const groupEndClass = isGroupEnd ? 'group-end-row' : '';
 
                 const symbolBadgeClass = getSymbolBadgeClass(pos.symbol);
                 const pl = getPLFormatting(pos['P/L']);
@@ -186,6 +227,8 @@ export function renderUnifiedAccounts(summaries = [], positions = []) {
                 const mprDisplay = pos.mpr !== 0 ? formatPercent(pos.mpr) : '-';
                 const hasOptionsMetrics = (pos.dte >= 0) || (pos.delta !== 0) || (pos.mpr !== 0);
 
+                const groupEndClass = isGroupEnd ? 'group-end-row' : '';
+
                 let spacerHtml = '';
                 if (index > 0 && isGroupStart) {
                     spacerHtml = `<tr class="group-spacer-row"><td colspan="11"></td></tr>`;
@@ -195,27 +238,30 @@ export function renderUnifiedAccounts(summaries = [], positions = []) {
                 let pendingOrdersMobileHtml = '';
 
                 if (pos.pending_orders && pos.pending_orders.length > 0) {
-                    pos.pending_orders.forEach(ord => {
+                    pos.pending_orders.forEach((ord, ordIdx) => {
+                        const isLastOrder = (ordIdx === pos.pending_orders.length - 1);
+                        const orderRowGroupEndClass = (isGroupEnd && isLastOrder) ? 'group-end-row' : '';
+
                         const ordType = ord.type || 'ORDER';
                         const ordPrice = ord.price ? formatCurrency(ord.price) : 'MKT';
                         const ordStatus = ord.status || 'WORKING';
 
                         pendingOrdersDesktopHtml += `
-                            <tr class="${groupBgClass} pending-order-row">
-                                <td class="desktop-only-col" style="padding-left: 16px;"><span class="badge-pending-order" style="font-size: 0.72rem; padding: 2px 6px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border-radius: 4px; font-weight: 600;">⚡ Order</span></td>
-                                <td class="desktop-only-col" style="text-align: right; color: #fbbf24; font-weight: 600;">${ord.quantity}</td>
-                                <td class="desktop-only-col" colspan="5" style="text-align: left; color: #fbbf24; font-weight: 500;">
-                                    <strong>${ordType}</strong> @ ${ordPrice} <span style="font-size:0.75rem; opacity:0.8;">(${ord.orderType || ''} ${ord.duration || ''})</span>
+                            <tr class="${groupBgClass} pending-order-row ${orderRowGroupEndClass}" style="font-size: 0.78rem;">
+                                <td class="desktop-only-col" style="padding-left: 16px;"><span class="badge-pending-order" style="font-size: 0.7rem; padding: 1px 6px; background: rgba(148, 163, 184, 0.12); color: var(--text-secondary); border-radius: 4px; font-weight: 500;">⚡ Order</span></td>
+                                <td class="desktop-only-col" style="text-align: right; color: var(--text-secondary); font-weight: 400;">${ord.quantity}</td>
+                                <td class="desktop-only-col" colspan="5" style="text-align: left; color: var(--text-secondary); font-weight: 400;">
+                                    <span>${ordType}</span> @ ${ordPrice} <span style="font-size:0.73rem; opacity:0.75;">(${ord.orderType || ''} ${ord.duration || ''})</span>
                                 </td>
-                                <td class="desktop-only-col" style="text-align: right;"><span style="font-size: 0.72rem; padding: 2px 6px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border-radius: 4px; font-weight: 600;">${ordStatus}</span></td>
+                                <td class="desktop-only-col" style="text-align: right;"><span style="font-size: 0.7rem; padding: 1px 6px; background: rgba(245, 158, 11, 0.12); color: #d97706; border-radius: 4px; font-weight: 500;">${ordStatus}</span></td>
                                 <td class="desktop-only-col" colspan="3"></td>
                             </tr>
                         `;
 
                         pendingOrdersMobileHtml += `
-                            <div class="mobile-split-row pending-order-row" style="border-top: 1px dashed rgba(245, 158, 11, 0.4); margin-top: 6px; padding-top: 4px; color: #fbbf24; font-size: 0.78rem;">
-                                <div class="split-col"><span>⚡ <strong>Order:</strong> ${ordType} ${ord.quantity} @ ${ordPrice}</span></div>
-                                <div class="split-col" style="text-align: right;"><span style="font-size: 0.7rem; padding: 2px 6px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border-radius: 4px; font-weight: 600;">${ordStatus}</span></div>
+                            <div class="mobile-split-row pending-order-row" style="border-top: 1px dashed rgba(148, 163, 184, 0.25); margin-top: 5px; padding-top: 4px; padding-bottom: 2px; color: var(--text-secondary); font-size: 0.76rem;">
+                                <div class="split-col"><span>⚡ Order: ${ordType} ${ord.quantity} @ ${ordPrice}</span></div>
+                                <div class="split-col" style="text-align: right;"><span style="font-size: 0.68rem; padding: 1px 5px; background: rgba(245, 158, 11, 0.12); color: #d97706; border-radius: 4px; font-weight: 500;">${ordStatus}</span></div>
                             </div>
                         `;
                     });

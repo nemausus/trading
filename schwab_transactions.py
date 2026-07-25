@@ -13,13 +13,12 @@ Flow:
          users/{uid}/accounts/{accountHash}/transactions/{activityId}
 """
 
-import firestore_db
 import datetime
 import logging
 import requests
 
 import firestore_db
-from constants import SCHWAB_REQUEST_TIMEOUT, SCHWAB_TZ
+from constants import SCHWAB_REQUEST_TIMEOUT, SCHWAB_TZ, get_primary_account_hash
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +134,7 @@ def sync_transactions(uid: str, access_token: str) -> dict:
             account_hash (str)  -- resolved account hash (or error key)
     """
     # -- Step 1: resolve account hash ----------------------------------------
-    account_hash = firestore_db.get_primary_account_hash()
+    account_hash = get_primary_account_hash()
     if not account_hash:
         return {
             "error": "Could not resolve primary account hash from Schwab.",

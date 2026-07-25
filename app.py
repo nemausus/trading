@@ -12,6 +12,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 import firestore_db
+from constants import get_primary_account_hash
 from schwab_auth import SchwabAuthManager
 import schwab_portfolio
 import schwab_transactions
@@ -296,10 +297,11 @@ def schwab_sync_transactions(decoded_token, access_token):
 def schwab_get_transactions(decoded_token):
     uid = decoded_token['uid']
 
-    # Auto-discover the primary account hash from Firestore (no Schwab call needed)
-    account_hash = firestore_db.get_primary_account_hash()
+    # Auto-discover the primary account hash from constants (no Schwab call needed)
+    account_hash = get_primary_account_hash()
     if not account_hash:
-        return jsonify({'transactions': [], 'account_hash': None})
+        app.logger.error("No primary account hash found for user %s", uid)
+        return jsonify({'error': 'No primary account hash found'}), 400
 
     limit = request.args.get('limit', default=100, type=int)
     limit = min(limit, 100)  # cap to prevent abuse
@@ -318,10 +320,11 @@ def schwab_get_transactions(decoded_token):
 def schwab_get_realized(decoded_token):
     uid = decoded_token['uid']
 
-    # Auto-discover the primary account hash from Firestore (no Schwab call needed)
-    account_hash = firestore_db.get_primary_account_hash()
+    # Auto-discover the primary account hash from constants (no Schwab call needed)
+    account_hash = get_primary_account_hash()
     if not account_hash:
-        return jsonify({'realized_transactions': [], 'account_hash': None})
+        app.logger.error("No primary account hash found for user %s", uid)
+        return jsonify({'error': 'No primary account hash found'}), 400
 
     limit = request.args.get('limit', default=1000, type=int)
     limit = min(limit, 1000)  # cap to prevent abuse

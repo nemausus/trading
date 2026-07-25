@@ -121,19 +121,6 @@ def get_transactions(
     return results
 
 
-def get_primary_account_hash() -> str | None:
-    """
-    Returns the primary account hash from environment variables.
-    """
-    return os.environ.get('IND_ACCOUNT')
-
-def get_secondary_account_hash() -> str | None:
-    """
-    Returns the secondary account hash from environment variables.
-    """
-    return os.environ.get('IRA_ACCOUNT')
-
-
 def get_latest_transaction_time(uid: str, account_hash: str) -> str | None:
     """
     Returns the ``time`` field of the most recently stored transaction for the

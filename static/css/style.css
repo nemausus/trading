@@ -914,6 +914,10 @@ tr.row-put:hover td {
         display: none !important;
     }
 
+    #positions-container tr.pending-order-row {
+        display: none !important;
+    }
+
     .mobile-only-card-col {
         display: block !important;
         width: 100% !important;
@@ -1234,6 +1238,6 @@ tr.group-end-row td.desktop-only-col:last-of-type {
 
 /* Inline Pending Order Rows */
 tr.pending-order-row td {
-    border-top: 1px dashed rgba(245, 158, 11, 0.3) !important;
-    background-color: rgba(245, 158, 11, 0.05) !important;
+    border-top: 1px dashed rgba(148, 163, 184, 0.25) !important;
+    background-color: rgba(148, 163, 184, 0.04) !important;
 }

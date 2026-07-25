@@ -1,3 +1,4 @@
+from constants import get_account_hash
 import datetime
 import logging
 import requests
@@ -21,10 +22,6 @@ INS_MAP = {
 
 # Rounding unit for SPX box spread notional (boxes are sized in $10k increments).
 _SPX_BOX_ROUNDING = 10_000.0
-
-# Position fields to copy onto merged orders
-_ORDER_POSITION_FIELDS = ('quantity', 'cost/share', 'value/share',
-                          'P/L', 'P/L%', 'dte', 'delta', 'mpr')
 
 # Tickers excluded from the uncovered-long (Todo) list
 _TODO_EXCLUDE = frozenset(('QQQM', 'VTI', 'SNOW', 'SPX'))
@@ -153,7 +150,7 @@ def fetch_quotes(access_token: str, symbols: list) -> dict:
     return quotes
 
 
-def fetch_active_orders(access_token: str, account_hashes: list) -> list:
+def fetch_active_orders(access_token: str, account_nums: list) -> list:
     """Fetch open (no closeTime) orders for every account in *account_hashes*."""
     headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
     from_date = to_iso_datetime_str(
@@ -161,7 +158,8 @@ def fetch_active_orders(access_token: str, account_hashes: list) -> list:
     )
     active_orders: list = []
 
-    for acc_hash in account_hashes:
+    for acc_num in account_nums:
+        acc_hash = get_account_hash(acc_num)
         try:
             res = requests.get(
                 f"https://api.schwabapi.com/trader/v1/accounts/{acc_hash}/orders",
@@ -171,6 +169,7 @@ def fetch_active_orders(access_token: str, account_hashes: list) -> list:
                 timeout=SCHWAB_REQUEST_TIMEOUT,
             )
             if res.status_code != 200:
+                logging.error("Error fetching orders for account %s: %s %s", acc_num, res.status_code, res.text)
                 continue
             orders_data = res.json()
             if not isinstance(orders_data, list):
@@ -186,7 +185,7 @@ def fetch_active_orders(access_token: str, account_hashes: list) -> list:
 
                 for leg in order.get('orderLegCollection', []):
                     active_orders.append({
-                        'accountNumber': acc_hash,
+                        'accountNumber': acc_num,
                         'symbol':    leg.get('instrument', {}).get('symbol'),
                         'type':      INS_MAP.get(leg.get('instruction'), leg.get('instruction')),
                         'quantity':  leg.get('quantity'),
@@ -196,7 +195,7 @@ def fetch_active_orders(access_token: str, account_hashes: list) -> list:
                         'orderType': order_type,
                     })
         except Exception as e:
-            logging.error("Error fetching orders for account %s: %s", acc_hash, e)
+            logging.error("Error fetching orders for account %s: %s", acc_num, e)
 
     return active_orders
 
@@ -642,18 +641,7 @@ def _enrich_quotes(positions: list, quotes: dict) -> None:
                 logging.error("Error calculating MPR for %s: %s", symbol, e)
 
 
-def _merge_orders(active_orders: list, pos_index: dict) -> list:
-    """Merge active orders with their corresponding position data."""
-    merged = []
-    for order in active_orders:
-        pos = pos_index.get((order['accountNumber'], order['symbol']), {})
-        merged.append({
-            'accountNumber': order['accountNumber'],
-            'symbol':        order['symbol'],
-            'order':         f"{order['type']} {int(order['quantity'])} @ {order['price']}",
-            **{f: pos.get(f) for f in _ORDER_POSITION_FIELDS},
-        })
-    return merged
+
 
 
 # ---------------------------------------------------------------------------
@@ -667,15 +655,14 @@ def process_accounts_data(accounts_json: list, access_token: str) -> dict:
     """
     global_positions: list = []
     account_summaries: list = []
-    account_hashes: list = []
+    account_nums: list = []
 
     for account in accounts_json:
         sec = account.get('securitiesAccount', {})
         acc_num = sec.get('accountNumber')
         if not acc_num:
             continue
-
-        account_hashes.append(acc_num)
+        account_nums.append(acc_num)
 
         # --- Parse raw positions ---
         parsed = [p for p in
@@ -728,45 +715,12 @@ def process_accounts_data(accounts_json: list, access_token: str) -> dict:
     quotes = fetch_quotes(access_token, unique_symbols)
     _enrich_quotes(global_positions, quotes)
 
-    # --- Active orders attached directly to positions ---
-    pos_index = {(p['accountNumber'], p['symbol']): p for p in global_positions}
-    for p in global_positions:
-        p['pending_orders'] = []
-
-    active_orders = fetch_active_orders(access_token, account_hashes)
-    for order in active_orders:
-        acc = order.get('accountNumber')
-        sym = order.get('symbol')
-        if not acc or not sym:
-            continue
-        key = (acc, sym)
-        if key in pos_index:
-            pos_index[key]['pending_orders'].append(order)
-        else:
-            virtual_pos = {
-                'accountNumber': acc,
-                'symbol': sym,
-                'assetType': 'OPTION' if len(sym) > 12 else 'EQUITY',
-                'quantity': 0,
-                'cost/share': 0.0,
-                'value/share': 0.0,
-                'marketValue': 0.0,
-                'P/L': 0.0,
-                'cost': 0.0,
-                'dte': -1,
-                'delta': 0.0,
-                'mpr': 0.0,
-                'pending_orders': [order],
-                'isPendingOnly': True
-            }
-            global_positions.append(virtual_pos)
-            pos_index[key] = virtual_pos
-
-    merged_orders = _merge_orders(active_orders, pos_index)
+    # --- Active orders ---
+    active_orders = fetch_active_orders(access_token, account_nums)
     global_positions.sort(key=lambda x: (x['accountNumber'], x['dte'], x['symbol']))
 
     return {
         'positions': global_positions,
         'summaries': account_summaries,
-        'orders':    merged_orders,
+        'orders':    active_orders,
     }
