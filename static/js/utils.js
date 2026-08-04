@@ -56,5 +56,5 @@ export function getPLPercentFormatting(plPercent) {
 }
 
 export function getSymbolBadgeClass(symbol) {
-    return symbol.length > 4 ? 'badge-option' : 'badge-underlying';
+    return 'symbol-text';
 }

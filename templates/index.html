@@ -48,8 +48,6 @@
                     </nav>
                 </div>
                 <div class="header-right">
-                    <span class="user-email" id="user-display-email"></span>
-
                     <!-- Schwab Refresh Data Button -->
                     <button id="btn-refresh-data" class="btn-header btn-action-refresh" style="display: none;">↻ Refresh</button>
 
@@ -72,7 +70,8 @@
 
             <!-- TAB 1: PORTFOLIO CONTENT -->
             <div id="tab-content-portfolio" class="tab-content active-tab-content">
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+                <div class="section-header-row" style="margin-bottom: 12px; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1.25rem;">Positions Overview</h3>
                     <button id="btn-toggle-compact-mobile" class="btn-toggle" data-compact="false"
                         title="Toggle minimized position view on mobile">
                         <span class="toggle-icon">⊞</span> Compact Mobile
@@ -86,7 +85,46 @@
                 </div>
             </div>
 
-            <!-- TAB 2: OPTION CHAINS CONTENT -->
+            <!-- TAB 2: REALIZED GAIN/LOSS CONTENT -->
+            <div id="tab-content-realized" class="tab-content">
+                <div class="section-card">
+                    <div class="section-header-row" style="margin-bottom: 16px;">
+                        <h3>Realized Gain / Loss</h3>
+                    </div>
+
+                    <div class="chain-filter-bar">
+                        <div class="filter-group">
+                            <label for="realized-symbol">Symbol Filter</label>
+                            <input type="text" id="realized-symbol" value="ALL" placeholder="e.g. AAPL or ALL"
+                                style="text-transform: uppercase;">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="realized-min-date">Min Sell Date</label>
+                            <input type="date" id="realized-min-date">
+                        </div>
+
+                        <div class="filter-actions">
+                            <button id="btn-filter-realized" class="btn-action-refresh">Apply Filters</button>
+                            <button id="btn-reset-realized" class="btn-toggle">Reset Filters</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pivot Table container -->
+                <div id="realized-pivot-container"></div>
+
+                <!-- Realized Table -->
+                <div class="section-card">
+                    <div id="realized-container">
+                        <div class="no-data-msg">
+                            <p>Loading realized transactions...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: OPTION CHAINS CONTENT -->
             <div id="tab-content-chain" class="tab-content">
                 <div class="section-card">
                     <div class="section-header-row" style="margin-bottom: 16px;">
@@ -162,54 +200,7 @@
                 </div>
             </div>
 
-            <!-- TAB 4: BOX SPREADS CONTENT -->
-            <div id="tab-content-box" class="tab-content">
-                <div class="section-card">
-                    <div class="section-header-row" style="margin-bottom: 16px;">
-                        <h3>SPX Box Spread Scanner</h3>
-                    </div>
-
-                    <div class="chain-filter-bar">
-                        <div class="filter-group">
-                            <label for="box-from-date">From Date</label>
-                            <input type="date" id="box-from-date">
-                        </div>
-
-                        <div class="filter-group">
-                            <label for="box-to-date">To Date</label>
-                            <input type="date" id="box-to-date">
-                        </div>
-
-                        <div class="filter-group">
-                            <label for="box-sizes">Box Size</label>
-                            <select id="box-sizes">
-                                <option value="">All (100, 200, 500, 1000)</option>
-                                <option value="100">100</option>
-                                <option value="200">200</option>
-                                <option value="500">500</option>
-                                <option value="1000">1000</option>
-                                <option value="100,200">100 &amp; 200</option>
-                                <option value="500,1000">500 &amp; 1000</option>
-                            </select>
-                        </div>
-
-                        <div class="filter-actions">
-                            <button id="btn-fetch-boxes" class="btn-action-refresh">Find Boxes</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- BOX RESULTS TABLE -->
-                <div class="section-card">
-                    <div id="box-container">
-                        <div class="no-data-msg">
-                            <p>Select a date range and click "Find Boxes" to scan for SPX box spread opportunities.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB 5: TRANSACTIONS CONTENT -->
+            <!-- TAB 4: TRANSACTIONS CONTENT -->
             <div id="tab-content-transactions" class="tab-content">
                 <div class="section-card">
                     <div class="section-header-row">
@@ -253,40 +244,48 @@
                 </div>
             </div>
 
-            <!-- TAB 6: REALIZED GAIN/LOSS CONTENT -->
-            <div id="tab-content-realized" class="tab-content">
+            <!-- TAB 5: BOX SPREADS CONTENT -->
+            <div id="tab-content-box" class="tab-content">
                 <div class="section-card">
                     <div class="section-header-row" style="margin-bottom: 16px;">
-                        <h3>Realized Gain / Loss</h3>
+                        <h3>SPX Box Spread Scanner</h3>
                     </div>
 
                     <div class="chain-filter-bar">
                         <div class="filter-group">
-                            <label for="realized-symbol">Symbol Filter</label>
-                            <input type="text" id="realized-symbol" value="ALL" placeholder="e.g. AAPL or ALL"
-                                style="text-transform: uppercase;">
+                            <label for="box-from-date">From Date</label>
+                            <input type="date" id="box-from-date">
                         </div>
 
                         <div class="filter-group">
-                            <label for="realized-min-date">Min Sell Date</label>
-                            <input type="date" id="realized-min-date">
+                            <label for="box-to-date">To Date</label>
+                            <input type="date" id="box-to-date">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="box-sizes">Box Size</label>
+                            <select id="box-sizes">
+                                <option value="">All (100, 200, 500, 1000)</option>
+                                <option value="100">100</option>
+                                <option value="200">200</option>
+                                <option value="500">500</option>
+                                <option value="1000">1000</option>
+                                <option value="100,200">100 &amp; 200</option>
+                                <option value="500,1000">500 &amp; 1000</option>
+                            </select>
                         </div>
 
                         <div class="filter-actions">
-                            <button id="btn-filter-realized" class="btn-action-refresh">Apply Filters</button>
-                            <button id="btn-reset-realized" class="btn-toggle">Clear</button>
+                            <button id="btn-fetch-boxes" class="btn-action-refresh">Find Boxes</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Pivot Table container -->
-                <div id="realized-pivot-container"></div>
-
-                <!-- Realized Table -->
+                <!-- BOX RESULTS TABLE -->
                 <div class="section-card">
-                    <div id="realized-container">
+                    <div id="box-container">
                         <div class="no-data-msg">
-                            <p>Loading realized transactions...</p>
+                            <p>Select a date range and click "Find Boxes" to scan for SPX box spread opportunities.</p>
                         </div>
                     </div>
                 </div>

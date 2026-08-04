@@ -17,7 +17,6 @@ if (schwabResult === 'success') {
 // Auth Observer
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        document.getElementById('user-display-email').innerText = user.email;
         showView('view-main');
         checkSchwabStatus();
         // Navigate to the tab indicated by the URL hash (or default)

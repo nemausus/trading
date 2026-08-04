@@ -24,19 +24,29 @@ export function clearDashboard() {
         `;
     }
 
-    const summariesContainer = document.getElementById('summaries-container');
-    if (summariesContainer) {
-        summariesContainer.innerHTML = '';
-    }
-
-    const ordersContainer = document.getElementById('orders-container');
-    if (ordersContainer) {
-        ordersContainer.innerHTML = '';
+    const chainContainer = document.getElementById('chain-container');
+    if (chainContainer) {
+        chainContainer.innerHTML = `<div class="no-data-msg"><p>Enter a symbol and click "Fetch Chain" to retrieve option contracts.</p></div>`;
     }
 
     const boxContainer = document.getElementById('box-container');
     if (boxContainer) {
         boxContainer.innerHTML = `<div class="no-data-msg"><p>Select a date range and click "Find Boxes" to scan for SPX box spread opportunities.</p></div>`;
+    }
+
+    const txnContainer = document.getElementById('transactions-container');
+    if (txnContainer) {
+        txnContainer.innerHTML = `<div class="no-data-msg"><p>No transactions stored yet. Click <strong>Sync</strong> to fetch from Schwab.</p></div>`;
+    }
+
+    const realizedContainer = document.getElementById('realized-container');
+    if (realizedContainer) {
+        realizedContainer.innerHTML = `<div class="no-data-msg"><p>Loading realized transactions...</p></div>`;
+    }
+
+    const realizedPivot = document.getElementById('realized-pivot-container');
+    if (realizedPivot) {
+        realizedPivot.innerHTML = '';
     }
 }
 
@@ -182,21 +192,21 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
             tableHtml = `<div class="no-data-msg" style="padding: 16px;"><p>No open positions in this account.</p></div>`;
         } else {
             tableHtml = `
-                <div class="table-responsive" style="padding: 12px;">
+                <div class="table-responsive">
                     <table>
                         <thead>
                             <tr>
                                 <th>Symbol</th>
-                                <th style="text-align: right;">Qty</th>
-                                <th style="text-align: right;">Cost/Share</th>
-                                <th style="text-align: right;">Mark</th>
-                                <th style="text-align: right;">Cost Basis</th>
-                                <th style="text-align: right;">Market Value</th>
-                                <th style="text-align: right;">P/L</th>
-                                <th class="desktop-only-pl-pct" style="text-align: right;">P/L%</th>
-                                <th style="text-align: center;">DTE</th>
-                                <th style="text-align: center;">Delta</th>
-                                <th style="text-align: center;">MPR</th>
+                                <th class="text-right">Qty</th>
+                                <th class="text-right">Cost/Share</th>
+                                <th class="text-right">Mark</th>
+                                <th class="text-right">Cost Basis</th>
+                                <th class="text-right">Market Value</th>
+                                <th class="text-right">P/L</th>
+                                <th class="desktop-only-pl-pct text-right">P/L%</th>
+                                <th class="text-center">DTE</th>
+                                <th class="text-center">Delta</th>
+                                <th class="text-center">MPR</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -364,7 +374,7 @@ export function renderOptionChainTable(contracts) {
     let prevDte = null;
     let dteGroupIndex = 0;
 
-    let rowsHtml = contracts.map(opt => {
+    let rowsHtml = contracts.map((opt, index) => {
         const deltaDisplay = opt.delta !== 0 ? formatNumber(opt.delta, 2) : '-';
         const ivDisplay = opt.volatility ? formatNumber(opt.volatility, 1) + '%' : '-';
         const mprDisplay = opt.mpr ? formatPercent(opt.mpr) : '-';
@@ -377,8 +387,9 @@ export function renderOptionChainTable(contracts) {
         const beChangeClass = beChangeVal >= 0 ? 'val-positive' : 'val-negative';
         const beChangeSign = beChangeVal >= 0 ? '+' : '';
 
+        const isNewGroup = opt.dte !== prevDte;
         let dteGroupHeaderHtml = '';
-        if (opt.dte !== prevDte) {
+        if (isNewGroup) {
             if (prevDte !== null) {
                 dteGroupIndex++;
             }
@@ -395,8 +406,14 @@ export function renderOptionChainTable(contracts) {
             `;
         }
 
+        const isGroupStart = isNewGroup;
+        const isGroupEnd = (index === contracts.length - 1 || contracts[index + 1].dte !== opt.dte);
+        const groupStartClass = isGroupStart ? 'group-start-row' : '';
+        const groupEndClass = isGroupEnd ? 'group-end-row' : '';
+
         const rowBgClass = (dteGroupIndex % 2 === 0) ? 'dte-bg-group-0' : 'dte-bg-group-1';
         const contractTypeClass = opt.contractType === 'CALL' ? 'row-call' : 'row-put';
+        const contractTypeBadge = opt.contractType === 'CALL' ? '<span class="badge-call">CALL</span>' : '<span class="badge-put">PUT</span>';
 
         return dteGroupHeaderHtml + `
             <tr class="${rowBgClass} ${contractTypeClass}">
@@ -416,13 +433,13 @@ export function renderOptionChainTable(contracts) {
             <table>
                 <thead>
                     <tr>
-                        <th style="text-align: right;">Strike</th>
-                        <th style="text-align: right;">Mark</th>
-                        <th style="text-align: center;">Delta</th>
-                        <th style="text-align: center;">MPR</th>
-                        <th style="text-align: center;">Strike %</th>
-                        <th style="text-align: right;">BE %</th>
-                        <th style="text-align: right;">IV</th>
+                        <th class="text-right">Strike</th>
+                        <th class="text-right">Mark</th>
+                        <th class="text-center">Delta</th>
+                        <th class="text-center">MPR</th>
+                        <th class="text-center">Strike %</th>
+                        <th class="text-right">BE %</th>
+                        <th class="text-right">IV</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -442,25 +459,47 @@ export function renderBoxes(boxes) {
 
     let prevExpDate = null;
 
-    let rowsHtml = boxes.map(box => {
+    let rowsHtml = boxes.map((box, index) => {
         const rateClass = box.rate >= 5.5 ? 'val-positive' : (box.rate >= 4.5 ? '' : 'val-negative');
 
+        const isNewGroup = box.expirationDate !== prevExpDate;
         let expHeaderHtml = '';
-        if (box.expirationDate !== prevExpDate) {
+        if (isNewGroup) {
             prevExpDate = box.expirationDate;
-            expHeaderHtml = `<tr class="group-header-row"><td colspan="9">Expiration: ${box.expirationDate} &mdash; ${box.dte} DTE</td></tr>`;
+            expHeaderHtml = `<tr class="group-header-row"><td colspan="8">Expiration: <strong>${box.expirationDate}</strong> &mdash; <strong>${box.dte} DTE</strong></td></tr>`;
         }
 
+        const isGroupStart = isNewGroup;
+        const isGroupEnd = (index === boxes.length - 1 || boxes[index + 1].expirationDate !== box.expirationDate);
+        const groupStartClass = isGroupStart ? 'group-start-row' : '';
+        const groupEndClass = isGroupEnd ? 'group-end-row' : '';
+
         return expHeaderHtml + `
-            <tr>
-                <td style="text-align: center; font-weight: 600; color: var(--text-secondary);">${box.size}</td>
-                <td style="text-align: right; font-weight: 700;">$${formatNumber(box.btoPut, 0)}</td>
-                <td style="text-align: right; font-weight: 700;">$${formatNumber(box.stoPut, 0)}</td>
-                <td style="text-align: right; font-weight: 700;">$${formatNumber(box.stoCall, 0)}</td>
-                <td style="text-align: right; font-weight: 700;">$${formatNumber(box.btoCall, 0)}</td>
-                <td style="text-align: right; font-weight: 600;">$${formatNumber(box.netCredit, 2)}</td>
-                <td style="text-align: right;" class="${rateClass} font-weight: 700;">${formatNumber(box.rate, 2)}%</td>
-                <td style="text-align: right; color: var(--text-secondary);">${box.liquidity.toLocaleString()}</td>
+            <tr class="${groupStartClass} ${groupEndClass}">
+                <!-- Desktop Columns -->
+                <td class="desktop-only-col" style="text-align: center; font-weight: 600; color: var(--text-secondary);">${box.size}</td>
+                <td class="desktop-only-col" style="text-align: right; font-weight: 700;">$${formatNumber(box.btoPut, 0)}</td>
+                <td class="desktop-only-col" style="text-align: right; font-weight: 700;">$${formatNumber(box.stoPut, 0)}</td>
+                <td class="desktop-only-col" style="text-align: right; font-weight: 700;">$${formatNumber(box.stoCall, 0)}</td>
+                <td class="desktop-only-col" style="text-align: right; font-weight: 700;">$${formatNumber(box.btoCall, 0)}</td>
+                <td class="desktop-only-col" style="text-align: right; font-weight: 600;">$${formatNumber(box.netCredit, 2)}</td>
+                <td class="desktop-only-col" style="text-align: right;" class="${rateClass}">${formatNumber(box.rate, 2)}%</td>
+                <td class="desktop-only-col" style="text-align: right; color: var(--text-secondary);">${box.liquidity.toLocaleString()}</td>
+
+                <!-- Mobile Only Combined Row Layout -->
+                <td class="mobile-only-card-col" colspan="8">
+                    <div class="mobile-split-row header-row">
+                        <div class="split-col col-symbol"><span>Box Size ${box.size}</span></div>
+                        <div class="split-col" style="text-align: right; font-weight: 700;">Net Cr: $${formatNumber(box.netCredit, 2)} <span class="${rateClass}" style="margin-left: 4px;">(${formatNumber(box.rate, 2)}%)</span></div>
+                    </div>
+                    <div class="mobile-split-row details-row">
+                        <div class="split-col" style="color: var(--text-secondary);">Put: $${formatNumber(box.btoPut, 0)} / $${formatNumber(box.stoPut, 0)}</div>
+                        <div class="split-col" style="text-align: right; color: var(--text-secondary);">Call: $${formatNumber(box.stoCall, 0)} / $${formatNumber(box.btoCall, 0)}</div>
+                    </div>
+                    <div class="mobile-split-row options-row">
+                        <div class="split-col" style="color: var(--text-secondary); font-size: 0.72rem;">Liq: ${box.liquidity.toLocaleString()}</div>
+                    </div>
+                </td>
             </tr>
         `;
     }).join('');
@@ -470,14 +509,14 @@ export function renderBoxes(boxes) {
             <table>
                 <thead>
                     <tr>
-                        <th style="text-align: center;">Size</th>
-                        <th style="text-align: right;">BTO PUT</th>
-                        <th style="text-align: right;">STO PUT</th>
-                        <th style="text-align: right;">STO CALL</th>
-                        <th style="text-align: right;">BTO CALL</th>
-                        <th style="text-align: right;">Net Credit</th>
-                        <th style="text-align: right;">Ann. Rate</th>
-                        <th style="text-align: right;">Liquidity</th>
+                        <th class="text-center">Size</th>
+                        <th class="text-right">BTO PUT</th>
+                        <th class="text-right">STO PUT</th>
+                        <th class="text-right">STO CALL</th>
+                        <th class="text-right">BTO CALL</th>
+                        <th class="text-right">Net Credit</th>
+                        <th class="text-right">Ann. Rate</th>
+                        <th class="text-right">Liquidity</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -566,17 +605,37 @@ export function renderTransactions(transactions) {
         const netPL = getPLFormatting(txn.netAmount || 0);
 
         const symbolBadgeClass = getSymbolBadgeClass(symbol);
+        const displaySym = symbol !== 'CURRENCY_USD' ? symbol : '—';
+        const effectCls = _effectClass(posEffect);
+        const effectBadge = posEffect ? `<span style="font-size:0.7rem; padding:1px 5px; border-radius:4px; font-weight:600;" class="${effectCls}">${posEffect}</span>` : '';
 
         return `
             <tr>
-                <td style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(txn.time)}</td>
-                <td>${_typeBadge(txn.type)}</td>
-                <td><span class="${symbolBadgeClass}">${symbol !== 'CURRENCY_USD' ? symbol : '—'}</span></td>
-                <td style="font-size:0.75rem; color:var(--text-secondary); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${assetType}</td>
-                <td class="${_effectClass(posEffect)}" style="text-align:center; font-size:0.8rem; font-weight:600;">${posEffect || '—'}</td>
-                <td style="text-align:right;">${amountDisplay}</td>
-                <td style="text-align:right;">${priceDisplay}</td>
-                <td style="text-align:right; font-weight:600;" class="${netPL.cssClass}">${netPL.sign}${netPL.valDisplay}</td>
+                <!-- Desktop Columns -->
+                <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(txn.time)}</td>
+                <td class="desktop-only-col">${_typeBadge(txn.type)}</td>
+                <td class="desktop-only-col"><span class="${symbolBadgeClass}">${displaySym}</span></td>
+                <td class="desktop-only-col" style="font-size:0.75rem; color:var(--text-secondary); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${assetType}</td>
+                <td class="desktop-only-col ${effectCls}" style="text-align:center; font-size:0.8rem; font-weight:600;">${posEffect || '—'}</td>
+                <td class="desktop-only-col" style="text-align:right;">${amountDisplay}</td>
+                <td class="desktop-only-col" style="text-align:right;">${priceDisplay}</td>
+                <td class="desktop-only-col" style="text-align:right; font-weight:600;" class="${netPL.cssClass}">${netPL.sign}${netPL.valDisplay}</td>
+
+                <!-- Mobile Only Combined Row Layout -->
+                <td class="mobile-only-card-col" colspan="8">
+                    <div class="mobile-split-row header-row">
+                        <div class="split-col col-symbol" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                            <span class="${symbolBadgeClass}">${displaySym}</span>
+                            ${_typeBadge(txn.type)}
+                            ${effectBadge}
+                        </div>
+                        <div class="split-col ${netPL.cssClass}" style="text-align: right; font-weight: 700;">${netPL.sign}${netPL.valDisplay}</div>
+                    </div>
+                    <div class="mobile-split-row details-row">
+                        <div class="split-col" style="color: var(--text-secondary);">${_shortDate(txn.time)} &bull; ${assetType}</div>
+                        <div class="split-col" style="text-align: right; color: var(--text-secondary);">${amountDisplay !== '—' ? `${amountDisplay} @ ${priceDisplay}` : priceDisplay}</div>
+                    </div>
+                </td>
             </tr>
         `;
     }).join('');
@@ -590,10 +649,10 @@ export function renderTransactions(transactions) {
                         <th>Type</th>
                         <th>Symbol</th>
                         <th>Asset</th>
-                        <th style="text-align:center;">Effect</th>
-                        <th style="text-align:right;">Qty</th>
-                        <th style="text-align:right;">Price</th>
-                        <th style="text-align:right;">Net Amount</th>
+                        <th class="text-center">Effect</th>
+                        <th class="text-right">Qty</th>
+                        <th class="text-right">Price</th>
+                        <th class="text-right">Net Amount</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -735,13 +794,29 @@ export function renderRealized(realizedList) {
 
         return `
             <tr>
-                <td style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.buy_date)}</td>
-                <td style="text-align:right;">${formatCurrency(r.buy_price)}</td>
-                <td style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.sell_date)}</td>
-                <td style="text-align:right;">${formatCurrency(r.sell_price)}</td>
-                <td><span class="${symbolBadgeClass}">${symbol}</span></td>
-                <td style="text-align:right;">${formatNumber(r.amount, 0)}</td>
-                <td style="text-align:right; font-weight:600;" class="${plFormat.cssClass}">${plFormat.sign}${plFormat.valDisplay}</td>
+                <!-- Desktop Columns -->
+                <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.buy_date)}</td>
+                <td class="desktop-only-col" style="text-align:right;">${formatCurrency(r.buy_price)}</td>
+                <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.sell_date)}</td>
+                <td class="desktop-only-col" style="text-align:right;">${formatCurrency(r.sell_price)}</td>
+                <td class="desktop-only-col"><span class="${symbolBadgeClass}">${symbol}</span></td>
+                <td class="desktop-only-col" style="text-align:right;">${formatNumber(r.amount, 0)}</td>
+                <td class="desktop-only-col" style="text-align:right; font-weight:600;" class="${plFormat.cssClass}">${plFormat.sign}${plFormat.valDisplay}</td>
+
+                <!-- Mobile Only Combined Row Layout -->
+                <td class="mobile-only-card-col" colspan="7">
+                    <div class="mobile-split-row header-row">
+                        <div class="split-col col-symbol">
+                            <span class="${symbolBadgeClass}">${symbol}</span>
+                            <span style="color: var(--text-secondary); font-size:0.75rem; margin-left:6px;">Qty: ${formatNumber(r.amount, 0)}</span>
+                        </div>
+                        <div class="split-col ${plFormat.cssClass}" style="text-align: right; font-weight: 700;">${plFormat.sign}${plFormat.valDisplay}</div>
+                    </div>
+                    <div class="mobile-split-row details-row">
+                        <div class="split-col" style="color: var(--text-secondary);">Open: ${formatCurrency(r.buy_price)} <span style="font-size:0.72rem;">(${_shortDate(r.buy_date)})</span></div>
+                        <div class="split-col" style="text-align: right; color: var(--text-secondary);">Close: ${formatCurrency(r.sell_price)} <span style="font-size:0.72rem;">(${_shortDate(r.sell_date)})</span></div>
+                    </div>
+                </td>
             </tr>
         `;
     }).join('');
@@ -752,12 +827,12 @@ export function renderRealized(realizedList) {
                 <thead>
                     <tr>
                         <th>Open Date</th>
-                        <th style="text-align:right;">Open Price</th>
+                        <th class="text-right">Open Price</th>
                         <th>Close Date</th>
-                        <th style="text-align:right;">Close Price</th>
+                        <th class="text-right">Close Price</th>
                         <th>Symbol</th>
-                        <th style="text-align:right;">Qty</th>
-                        <th style="text-align:right;">Realized P/L</th>
+                        <th class="text-right">Qty</th>
+                        <th class="text-right">Realized P/L</th>
                     </tr>
                 </thead>
                 <tbody>
