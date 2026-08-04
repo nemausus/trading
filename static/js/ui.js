@@ -237,6 +237,12 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                 const mprDisplay = pos.mpr !== 0 ? formatPercent(pos.mpr) : '-';
                 const hasOptionsMetrics = (pos.dte >= 0) || (pos.delta !== 0) || (pos.mpr !== 0);
 
+                const dteCssClass = (pos.dte >= 0 && pos.dte < 14) ? 'val-negative' : '';
+                let deltaCssClass = '';
+                if (pos.delta !== undefined && pos.delta !== 0) {
+                    deltaCssClass = Math.abs(pos.delta) < 0.50 ? 'val-positive' : 'val-negative';
+                }
+
                 const groupEndClass = isGroupEnd ? 'group-end-row' : '';
 
                 let spacerHtml = '';
@@ -288,8 +294,8 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.marketValue)}</td>
                         <td class="desktop-only-col ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay}</td>
                         <td class="desktop-only-col ${plPercent.cssClass}" style="text-align: right;">${plPercent.sign}${plPercent.valDisplay}</td>
-                        <td class="desktop-only-col" style="text-align: center;">${dteDisplay}</td>
-                        <td class="desktop-only-col" style="text-align: center;">${deltaDisplay}</td>
+                        <td class="desktop-only-col ${dteCssClass}" style="text-align: center;">${dteDisplay}</td>
+                        <td class="desktop-only-col ${deltaCssClass}" style="text-align: center;">${deltaDisplay}</td>
                         <td class="desktop-only-col" style="text-align: center;">${mprDisplay}</td>
 
                         <!-- Mobile Only Combined Row Layout -->
@@ -304,7 +310,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                             </div>
                             ${hasOptionsMetrics ? `
                             <div class="mobile-split-row options-row">
-                                <div class="split-col col-dte">DTE: ${dteDisplay} | &Delta;: ${deltaDisplay}</div>
+                                <div class="split-col col-dte">DTE: <span class="${dteCssClass}">${dteDisplay}</span> | &Delta;: <span class="${deltaCssClass}">${deltaDisplay}</span></div>
                                 <div class="split-col col-mpr" style="text-align: right;">MPR: ${mprDisplay}</div>
                             </div>
                             ` : ''}
@@ -331,7 +337,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
 
 
 
-export function renderUnderlyingBanner(underlying, totalContracts, matchingCount) {
+export function renderUnderlyingBanner(underlying) {
     const container = document.getElementById('chain-underlying-container');
     if (!underlying || !underlying.symbol) {
         container.innerHTML = '';
@@ -343,8 +349,6 @@ export function renderUnderlyingBanner(underlying, totalContracts, matchingCount
     const changeSign = changeVal >= 0 ? '+' : '';
     const pctVal = underlying.percentChange || 0.0;
 
-    const totalStr = totalContracts ? `${matchingCount} / ${totalContracts}` : `${matchingCount}`;
-
     container.innerHTML = `
         <div class="underlying-banner">
             <div>
@@ -353,12 +357,6 @@ export function renderUnderlyingBanner(underlying, totalContracts, matchingCount
                 <span class="${changeClass}" style="margin-left: 8px; font-size: 1rem;">
                     ${changeSign}${formatNumber(changeVal)} (${changeSign}${formatNumber(pctVal, 2)}%)
                 </span>
-            </div>
-            <div class="underlying-stats">
-                <div class="underlying-stat">
-                    <span class="underlying-stat-label">Matching Contracts</span>
-                    <span class="underlying-stat-value" id="chain-contracts-count">${totalStr}</span>
-                </div>
             </div>
         </div>
     `;
@@ -581,9 +579,10 @@ export function renderTransactions(transactions) {
     // --- Populate stats bar ---
     if (statsBar) {
         const times = transactions.map(t => t.time).filter(Boolean).sort();
-        document.getElementById('txn-stat-count').textContent = transactions.length;
-        document.getElementById('txn-stat-earliest').textContent = _shortDate(times[0]);
-        document.getElementById('txn-stat-latest').textContent = _shortDate(times[times.length - 1]);
+        const earliestEl = document.getElementById('txn-stat-earliest');
+        const latestEl = document.getElementById('txn-stat-latest');
+        if (earliestEl) earliestEl.textContent = _shortDate(times[0]);
+        if (latestEl) latestEl.textContent = _shortDate(times[times.length - 1]);
         statsBar.style.display = 'flex';
     }
 

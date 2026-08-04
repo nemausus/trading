@@ -1110,33 +1110,45 @@ tr.row-put:hover td {
    TRANSACTIONS TAB
    ============================================================ */
 
-/* Stats bar */
-.txn-stats-bar {
+/* Compact Top control & stats bar */
+.txn-top-bar {
     display: flex;
-    gap: 32px;
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px solid var(--border-color);
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
 }
 
-.txn-stat {
+.txn-stats-inline {
     display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.txn-stat-label {
-    font-size: 0.72rem;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
     color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
 }
 
-.txn-stat-value {
-    font-size: 1rem;
-    font-weight: 700;
+.txn-stat-item {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.txn-stat-item span {
     color: var(--text-primary);
+    font-weight: 600;
+}
+
+.txn-stat-divider {
+    color: var(--border-color);
+    margin: 0 2px;
+}
+
+.txn-sync-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
 }
 
 /* Sync status inline message */
@@ -1245,16 +1257,6 @@ tr.group-start-row td.desktop-only-col:last-of-type,
 tr.group-end-row td:first-child,
 tr.group-end-row td.desktop-only-col:last-of-type {
     border-radius: 0 !important;
-}
-
-/* Compact Mobile View Toggle */
-#positions-container.compact-mobile-view .mobile-split-row.details-row,
-#positions-container.compact-mobile-view .mobile-split-row.options-row {
-    display: none !important;
-}
-
-#positions-container.compact-mobile-view tr:not(.group-header-row):not(.group-spacer-row) {
-    padding: 4px 8px !important;
 }
 
 /* Inline Pending Order Rows */

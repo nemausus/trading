@@ -51,11 +51,6 @@
                     <!-- Schwab Refresh Data Button -->
                     <button id="btn-refresh-data" class="btn-header btn-action-refresh" style="display: none;">↻ Refresh</button>
 
-                    <!-- Schwab Status Pill -->
-                    <span id="schwab-status-pill" class="status-pill disconnected">
-                        <span id="schwab-status-text">Disconnected</span>
-                    </span>
-
                     <!-- Schwab Action Button (Connect/Disconnect) -->
                     <div id="schwab-actions" style="display: inline-block;"></div>
 
@@ -70,14 +65,6 @@
 
             <!-- TAB 1: PORTFOLIO CONTENT -->
             <div id="tab-content-portfolio" class="tab-content active-tab-content">
-                <div class="section-header-row" style="margin-bottom: 12px; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0; font-size: 1.25rem;">Positions Overview</h3>
-                    <button id="btn-toggle-compact-mobile" class="btn-toggle" data-compact="false"
-                        title="Toggle minimized position view on mobile">
-                        <span class="toggle-icon">⊞</span> Compact Mobile
-                    </button>
-                </div>
-
                 <div id="positions-container">
                     <div class="no-data-msg">
                         <p>No portfolio data retrieved yet.</p>
@@ -203,38 +190,18 @@
             <!-- TAB 4: TRANSACTIONS CONTENT -->
             <div id="tab-content-transactions" class="tab-content">
                 <div class="section-card">
-                    <div class="section-header-row">
-                        <div>
-                            <h3>Transaction History</h3>
-                            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px;">
-                                Stored from Schwab &mdash; click <strong>Sync</strong> to pull latest.
-                            </p>
+                    <div class="txn-top-bar">
+                        <div id="txn-stats-bar" class="txn-stats-inline" style="display:none;">
+                            <span class="txn-stat-item">Earliest: <span id="txn-stat-earliest">—</span></span>
+                            <span class="txn-stat-divider">•</span>
+                            <span class="txn-stat-item">Latest: <span id="txn-stat-latest">—</span></span>
                         </div>
-                        <div style="display:flex; align-items:center; gap: 10px;">
+                        <div class="txn-sync-actions">
                             <span id="txn-sync-status" class="txn-sync-status"></span>
                             <button id="btn-sync-transactions" class="btn-action-refresh">&#8635; Sync</button>
                         </div>
                     </div>
 
-                    <!-- Summary stats bar -->
-                    <div id="txn-stats-bar" class="txn-stats-bar" style="display:none;">
-                        <div class="txn-stat">
-                            <span class="txn-stat-label">Total Stored</span>
-                            <span class="txn-stat-value" id="txn-stat-count">—</span>
-                        </div>
-                        <div class="txn-stat">
-                            <span class="txn-stat-label">Earliest</span>
-                            <span class="txn-stat-value" id="txn-stat-earliest">—</span>
-                        </div>
-                        <div class="txn-stat">
-                            <span class="txn-stat-label">Latest</span>
-                            <span class="txn-stat-value" id="txn-stat-latest">—</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Transaction Table -->
-                <div class="section-card">
                     <div id="transactions-container">
                         <div class="no-data-msg">
                             <p>No transactions loaded yet. Click <strong>Sync</strong> to fetch from Schwab, or switch

@@ -19,13 +19,8 @@ export async function checkSchwabStatus() {
     const user = auth.currentUser;
     if (!user) return;
 
-    const statusPill = document.getElementById('schwab-status-pill');
-    const statusText = document.getElementById('schwab-status-text');
     const actionsDiv = document.getElementById('schwab-actions');
     const refreshBtn = document.getElementById('btn-refresh-data');
-
-    statusText.innerText = "Checking...";
-    statusPill.className = "status-pill disconnected";
 
     try {
         const token = await user.getIdToken();
@@ -35,8 +30,6 @@ export async function checkSchwabStatus() {
         const data = await response.json();
 
         if (data.connected) {
-            statusText.innerText = "Connected";
-            statusPill.className = "status-pill connected";
             if (refreshBtn) refreshBtn.style.display = "inline-block";
 
             actionsDiv.innerHTML = `
@@ -46,21 +39,21 @@ export async function checkSchwabStatus() {
 
             fetchSchwabPortfolio();
         } else {
-            statusText.innerText = "Disconnected";
-            statusPill.className = "status-pill disconnected";
-            refreshBtn.style.display = "none";
+            if (refreshBtn) refreshBtn.style.display = "none";
 
             actionsDiv.innerHTML = `
-                <button id="btn-connect" class="btn-header btn-connect">Connect Schwab</button>
+                <button id="btn-connect" class="btn-header btn-connect">Connect</button>
             `;
             document.getElementById('btn-connect').addEventListener('click', connectSchwab);
             clearDashboard();
         }
     } catch (error) {
         console.error("Error checking Schwab status:", error);
-        statusText.innerText = "Error";
-        statusPill.className = "status-pill disconnected";
-        refreshBtn.style.display = "none";
+        if (refreshBtn) refreshBtn.style.display = "none";
+        actionsDiv.innerHTML = `
+            <button id="btn-connect" class="btn-header btn-connect">Connect</button>
+        `;
+        document.getElementById('btn-connect')?.addEventListener('click', connectSchwab);
     }
 }
 
@@ -188,7 +181,7 @@ export async function fetchOptionChain() {
 
         if (response.ok) {
             rawChainData = data;
-            renderUnderlyingBanner(data.underlying, data.totalContracts, data.chain ? data.chain.length : 0);
+            renderUnderlyingBanner(data.underlying);
             renderOptionChainTable(data.chain || []);
         } else {
             const errMsg = data.error || `Failed to fetch option chain for ${symbol}`;

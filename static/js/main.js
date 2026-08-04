@@ -73,17 +73,6 @@ document.getElementById('btn-refresh-data')?.addEventListener('click', () => {
     }
 });
 
-document.getElementById('btn-toggle-compact-mobile')?.addEventListener('click', () => {
-    const btn = document.getElementById('btn-toggle-compact-mobile');
-    const container = document.getElementById('positions-container');
-    if (!btn || !container) return;
-
-    const isCompact = btn.dataset.compact === 'true';
-    btn.dataset.compact = String(!isCompact);
-    btn.classList.toggle('active', !isCompact);
-    container.classList.toggle('compact-mobile-view', !isCompact);
-});
-
 
 
 
