@@ -426,8 +426,7 @@ tr:hover td {
 
 .symbol-text,
 .badge-underlying,
-.badge-option,
-td[data-label="Symbol"] {
+.badge-option {
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
@@ -436,6 +435,11 @@ td[data-label="Symbol"] {
     font-size: 0.88rem;
     color: var(--text-primary);
     font-family: inherit;
+}
+
+td[data-label="Symbol"] {
+    font-weight: 400 !important;
+    padding-left: 16px !important;
 }
 
 /* Empty UI placeholder */
@@ -1228,6 +1232,7 @@ tr.group-end-row td {
 
 #positions-container tr:not(.group-spacer-row) td:first-child {
     border-left: 1px solid var(--border-color) !important;
+    padding-left: 16px !important;
 }
 
 #positions-container tr:not(.group-spacer-row) td.desktop-only-col:last-of-type {
