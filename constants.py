@@ -18,6 +18,13 @@ SCHWAB_TZ: datetime.timezone = datetime.timezone(
     -datetime.timedelta(hours=7, minutes=30)
 )
 
+def _get_account_hash(env_var: str) -> str:
+    """Returns the account hash from environment variables."""
+    account_hash = os.environ.get(env_var)
+    if not account_hash:
+        raise EnvironmentError(f"{env_var} environment variable is not configured.")
+    return account_hash
+
 
 def get_primary_account_hash() -> str:
     """Return the primary account hash from environment variables.
@@ -25,21 +32,18 @@ def get_primary_account_hash() -> str:
     Raises:
         EnvironmentError: If the IND_ACCOUNT environment variable is not set.
     """
-    account_hash = os.environ.get('IND_ACCOUNT')
-    if not account_hash:
-        raise EnvironmentError("IND_ACCOUNT environment variable is not configured.")
-    return account_hash
+    return _get_account_hash('IND_ACCOUNT')
 
 
-def get_secondary_account_hash() -> str | None:
+def get_secondary_account_hash() -> str:
     """Returns the secondary account hash from environment variables."""
-    return os.environ.get('IRA_ACCOUNT')
+    return _get_account_hash('IRA_ACCOUNT')
 
 
-def get_account_hash(account_number: str) -> str | None:
+def get_account_hash(account_number: str) -> str:
     """Returns the account hash for a given account number."""
     if account_number.endswith('acc1'):
         return get_primary_account_hash()
     if account_number.endswith('acc2'):
         return get_secondary_account_hash()
-    return None
+    raise ValueError(f"Unknown account number: {account_number}")
