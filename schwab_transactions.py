@@ -19,6 +19,7 @@ import requests
 
 import firestore_db
 from constants import SCHWAB_REQUEST_TIMEOUT, SCHWAB_TZ, get_primary_account_hash
+from schwab_api import schwab_request
 
 logger = logging.getLogger(__name__)
 
@@ -94,9 +95,7 @@ def fetch_transactions_raw(
     }
 
     try:
-        resp = requests.get(url, headers=headers, params=params, timeout=SCHWAB_REQUEST_TIMEOUT)
-        resp.raise_for_status()
-        data = resp.json()
+        data = schwab_request("GET", url, headers=headers, params=params)
         if not isinstance(data, list):
             logger.error(
                 "Unexpected response shape from transactions API: %s", type(data)

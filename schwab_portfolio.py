@@ -4,6 +4,7 @@ import logging
 import requests
 
 from constants import SCHWAB_REQUEST_TIMEOUT, SCHWAB_TZ
+from schwab_api import schwab_request
 
 # ---------------------------------------------------------------------------
 # Module-level constants
@@ -134,16 +135,14 @@ def fetch_quotes(access_token: str, symbols: list) -> dict:
     for i in range(0, len(symbols), 200):
         chunk = ",".join(symbols[i:i + 200])
         try:
-            res = requests.get(
+            data = schwab_request(
+                "GET",
                 "https://api.schwabapi.com/marketdata/v1/quotes",
                 headers=headers,
                 params={'symbols': chunk},
-                timeout=SCHWAB_REQUEST_TIMEOUT,
             )
-            if res.status_code == 200:
-                quotes.update(res.json())
-            else:
-                logging.error("Error fetching quotes: %s %s", res.status_code, res.text)
+            if isinstance(data, dict):
+                quotes.update(data)
         except Exception as e:
             logging.error("Failed to fetch quotes: %s", e)
 
@@ -161,17 +160,13 @@ def fetch_active_orders(access_token: str, account_nums: list) -> list:
     for acc_num in account_nums:
         acc_hash = get_account_hash(acc_num)
         try:
-            res = requests.get(
+            orders_data = schwab_request(
+                "GET",
                 f"https://api.schwabapi.com/trader/v1/accounts/{acc_hash}/orders",
                 headers=headers,
                 params={'fromEnteredTime': from_date,
                         'toEnteredTime': datetime.datetime.now(SCHWAB_TZ).isoformat()},
-                timeout=SCHWAB_REQUEST_TIMEOUT,
             )
-            if res.status_code != 200:
-                logging.error("Error fetching orders for account %s: %s %s", acc_num, res.status_code, res.text)
-                continue
-            orders_data = res.json()
             if not isinstance(orders_data, list):
                 continue
 
@@ -258,8 +253,9 @@ def _parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) 
 def _validate_range(name: str, value, *, lo, hi, typ) -> None:
     """Raise ValueError if *value* is not an instance of *typ* within [lo, hi]."""
     if not isinstance(value, typ) or not (lo <= value <= hi):
+        typ_name = '/'.join(t.__name__ for t in typ) if isinstance(typ, tuple) else typ.__name__
         raise ValueError(
-            f"Invalid {name}: {value}. Must be a {typ.__name__} between {lo} and {hi}."
+            f"Invalid {name}: {value}. Must be a {typ_name} between {lo} and {hi}."
         )
 
 
@@ -289,11 +285,7 @@ def _fetch_chains(access_token: str, params: dict) -> dict | None:
     headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
     url = "https://api.schwabapi.com/marketdata/v1/chains"
     try:
-        res = requests.get(url, headers=headers, params=params, timeout=SCHWAB_REQUEST_TIMEOUT)
-        if res.status_code != 200:
-            logging.error("Error fetching chains: %s %s", res.status_code, res.text)
-            return None
-        return res.json()
+        return schwab_request("GET", url, headers=headers, params=params)
     except requests.exceptions.RequestException as e:
         logging.error("Network error fetching chains: %s", e)
         return None
@@ -474,14 +466,12 @@ def fetch_accounts_raw(access_token: str) -> list:
         "Authorization": f"Bearer {access_token}",
         "Accept": "application/json",
     }
-    response = requests.get(
+    return schwab_request(
+        "GET",
         f"{SCHWAB_TRADER_BASE_URL}/accounts",
         headers=headers,
         params={"fields": "positions"},
-        timeout=SCHWAB_REQUEST_TIMEOUT,
     )
-    response.raise_for_status()
-    return response.json()
 
 
 # ---------------------------------------------------------------------------
@@ -610,17 +600,19 @@ def _compute_todo(positions: list) -> dict[str, str]:
 
 
 def _enrich_quotes(positions: list, quotes: dict) -> None:
-    """Merge delta and MPR from *quotes* into *positions* in-place."""
+    """Merge delta, MPR, and markPercentChange from *quotes* into *positions* in-place."""
     for pos in positions:
         symbol = pos['symbol']
         pos['delta'] = 0.0
         pos['mpr']   = 0.0
+        pos['markPercentChange'] = 0.0
 
         quote_fields = quotes.get(symbol, {}).get('quote', {})
         if not quote_fields:
             continue
 
         pos['delta'] = quote_fields.get('delta', 0.0) or 0.0
+        pos['markPercentChange'] = float(quote_fields.get('markPercentChange', 0.0) or 0.0)
 
         if len(symbol) > 12:
             try:

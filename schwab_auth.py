@@ -8,6 +8,7 @@ from cryptography.fernet import Fernet
 
 import firestore_db
 from constants import SCHWAB_REQUEST_TIMEOUT
+from schwab_api import schwab_request
 
 class SchwabAuthManager:
     # Proactively refresh the access token this many seconds before it expires.
@@ -79,14 +80,12 @@ class SchwabAuthManager:
         }
 
         try:
-            response = requests.post(
+            return schwab_request(
+                "POST",
                 "https://api.schwabapi.com/v1/oauth/token",
                 headers=headers,
                 data=payload,
-                timeout=SCHWAB_REQUEST_TIMEOUT,
             )
-            response.raise_for_status()
-            return response.json()
         except Exception as e:
             logging.error("Error during Schwab token request: %s", e)
             if hasattr(e, 'response') and e.response is not None:

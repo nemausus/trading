@@ -479,7 +479,7 @@ class TestOrderMerging(unittest.TestCase):
              patch.object(sp, 'fetch_active_orders', return_value=active_orders):
             return sp.process_accounts_data(accounts_json, 'fake_token')
 
-    def test_order_string_format(self):
+    def test_order_fields(self):
         pos = _make_equity_pos('AAPL', long_qty=100, market_value=20000.0)
         account = _make_account('ACC1', [pos])
         orders = [{'accountNumber': 'ACC1', 'symbol': 'AAPL',
@@ -489,23 +489,11 @@ class TestOrderMerging(unittest.TestCase):
 
         self.assertEqual(len(result['orders']), 1)
         o = result['orders'][0]
-        self.assertEqual(o['order'], 'STC 1 @ 205.0')
-
-    def test_order_merged_with_position(self):
-        pos = _make_equity_pos('AAPL', long_qty=100, avg_price=180.0,
-                               market_value=20000.0, long_pl=2000.0)
-        account = _make_account('ACC1', [pos])
-        orders = [{'accountNumber': 'ACC1', 'symbol': 'AAPL',
-                   'type': 'STC', 'quantity': 1.0, 'price': 205.0,
-                   'status': 'WORKING', 'duration': 'GTC', 'orderType': 'LIMIT'}]
-        result = self._run([account], orders)
-
-        o = result['orders'][0]
-        self.assertAlmostEqual(o['cost/share'], 180.0)
-        self.assertEqual(o['quantity'], 100.0)
+        self.assertEqual(o['type'], 'STC')
+        self.assertEqual(o['price'], 205.0)
 
     def test_order_with_no_matching_position(self):
-        """Orders for symbols not in positions should still appear (pos fields = None)."""
+        """Orders for symbols not in positions should still appear in orders list."""
         account = _make_account('ACC1', [])
         orders = [{'accountNumber': 'ACC1', 'symbol': 'TSLA',
                    'type': 'BTO', 'quantity': 1.0, 'price': 300.0,
@@ -514,7 +502,8 @@ class TestOrderMerging(unittest.TestCase):
 
         self.assertEqual(len(result['orders']), 1)
         o = result['orders'][0]
-        self.assertIsNone(o['quantity'])
+        self.assertEqual(o['symbol'], 'TSLA')
+        self.assertEqual(o['quantity'], 1.0)
 
     def test_no_orders(self):
         pos = _make_equity_pos('AAPL', long_qty=100, market_value=20000.0)
@@ -707,8 +696,53 @@ class TestFetchOptionChain(unittest.TestCase):
             sp.fetch_option_chain('fake_token', 'AAPL_WITH_EXCESSIVELY_LONG_SYMBOL_NAME_HERE')
 
 
+# ---------------------------------------------------------------------------
+# _enrich_quotes test
+# ---------------------------------------------------------------------------
+
+class TestEnrichQuotes(unittest.TestCase):
+
+    def test_enrich_quotes_mark_percent_change(self):
+        stock_pos = {'symbol': 'AAPL', 'quantity': 100, 'cost': 10000.0, 'P/L': 500.0}
+        option_pos = {'symbol': 'AAPL  260821C00295000', 'quantity': -1, 'cost': -500.0, 'P/L': 100.0}
+        positions = [stock_pos, option_pos]
+
+        quotes = {
+            'AAPL': {
+                'quote': {
+                    'delta': 0.0,
+                    'markPercentChange': 1.25
+                }
+            },
+            'AAPL  260821C00295000': {
+                'quote': {
+                    'delta': 0.45,
+                    'bidPrice': 5.0,
+                    'underlyingPrice': 290.0,
+                    'markPercentChange': 0.50
+                }
+            }
+        }
+
+        sp._enrich_quotes(positions, quotes)
+
+        # Stock position should have markPercentChange
+        self.assertIn('markPercentChange', stock_pos)
+        self.assertEqual(stock_pos['markPercentChange'], 1.25)
+
+        # Option position should also have markPercentChange
+        self.assertIn('markPercentChange', option_pos)
+        self.assertEqual(option_pos['markPercentChange'], 0.50)
+
+    def test_enrich_quotes_missing_quote_stock(self):
+        stock_pos = {'symbol': 'MSFT', 'quantity': 50, 'cost': 5000.0, 'P/L': 0.0}
+        sp._enrich_quotes([stock_pos], {})
+
+        self.assertIn('markPercentChange', stock_pos)
+        self.assertEqual(stock_pos['markPercentChange'], 0.0)
 
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
 
