@@ -289,6 +289,39 @@ body {
     color: #dc2626;
 }
 
+/* Inline Action Badges for Position Rows */
+.badge-action-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 0;
+    vertical-align: middle;
+    letter-spacing: 0.02em;
+    line-height: 1.25;
+}
+
+.badge-action-inline.action-type-sto {
+    background: rgba(37, 99, 235, 0.12);
+    color: #2563eb;
+    border: 1px solid rgba(37, 99, 235, 0.25);
+}
+
+.badge-action-inline.action-type-btc {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.badge-action-inline.action-type-roll {
+    background: rgba(217, 119, 6, 0.12);
+    color: #d97706;
+    border: 1px solid rgba(217, 119, 6, 0.25);
+}
+
 .account-actions-section {
     padding: 12px 16px;
     border-bottom: 1px solid var(--border-color);
@@ -1082,6 +1115,26 @@ tr.row-put:hover td {
         border-top-right-radius: 0 !important;
     }
 
+    #positions-container tr.group-start-row:not(:first-child),
+    #box-container tr.group-start-row:not(:first-child) {
+        border-top: 2.5px solid var(--border-color) !important;
+    }
+
+    #positions-container tr.group-header-row + tr.group-start-row,
+    #box-container tr.group-header-row + tr.group-start-row {
+        border-top: 1px solid var(--border-color) !important;
+    }
+
+    #positions-container tr.group-bg-even,
+    #box-container tr.group-bg-even {
+        background-color: #ffffff !important;
+    }
+
+    #positions-container tr.group-bg-odd,
+    #box-container tr.group-bg-odd {
+        background-color: #f8fafc !important;
+    }
+
     #positions-container tr.group-end-row,
     #box-container tr.group-end-row {
         border-bottom: none !important;
@@ -1113,7 +1166,7 @@ tr.row-put:hover td {
     #box-container tr:not(.group-header-row):hover,
     #transactions-container tr:hover,
     #realized-container tr:hover {
-        background-color: #f8fafc;
+        background-color: #f1f5f9;
     }
 
     /* Keep group header rows full-width */

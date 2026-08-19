@@ -70,6 +70,45 @@ export function renderPositions(positions) {
     renderUnifiedAccounts([], lastPositions, lastOrders);
 }
 
+function getPositionActionFallback(pos, accPositions) {
+    if (pos.action) return pos.action;
+
+    const symbol = pos.symbol || '';
+    const qty = pos.quantity || 0;
+    const isOptionSymbol = symbol.length > 10 && symbol.includes(' ');
+
+    if (!isOptionSymbol && qty >= 100) {
+        const underlying = symbol;
+        const EXCLUDED = ['QQQM', 'VTI', 'SNOW', 'SPX'];
+        if (EXCLUDED.includes(underlying)) return '';
+
+        let shortCallQty = 0;
+        if (Array.isArray(accPositions)) {
+            accPositions.forEach(p => {
+                if (p.symbol && p.symbol.startsWith(underlying + ' ') && p.quantity < 0) {
+                    shortCallQty += Math.abs(p.quantity);
+                }
+            });
+        }
+        const coveredContracts = Math.floor(qty / 100);
+        const uncovered = coveredContracts - shortCallQty;
+        if (uncovered > 0) {
+            return `STO ${uncovered}x`;
+        }
+    } else if (isOptionSymbol && qty < 0) {
+        const plPct = pos['P/L%'] || 0;
+        const delta = pos.delta || 0;
+        const absQty = Math.abs(qty);
+        if (plPct >= 60.0 || (delta > 0.0 && delta < 0.10)) {
+            return `BTC ${absQty}x`;
+        }
+        if (delta > 0.50) {
+            return `ROLLOUT ${absQty}x`;
+        }
+    }
+    return '';
+}
+
 function parseActionItem(accNum, actionStr) {
     const match = actionStr.match(/^(STO|BTC|ROLLOUT)\s+(\d+x)\s+(.+?)\s+\((.+?)\)$/);
     if (match) {
@@ -335,6 +374,16 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                     deltaCssClass = Math.abs(pos.delta) < 0.50 ? 'val-positive' : 'val-negative';
                 }
 
+                const actionStr = pos.action || getPositionActionFallback(pos, accPositions);
+                let actionBadgeHtml = '';
+                if (actionStr) {
+                    let actionTypeClass = 'action-type-sto';
+                    if (actionStr.startsWith('BTC')) actionTypeClass = 'action-type-btc';
+                    else if (actionStr.startsWith('ROLL')) actionTypeClass = 'action-type-roll';
+                    const badgeLabel = actionStr.split(' ')[0];
+                    actionBadgeHtml = `<span class="badge-action-inline ${actionTypeClass}">${badgeLabel}</span>`;
+                }
+
                 const groupEndClass = isGroupEnd ? 'group-end-row' : '';
 
                 let spacerHtml = '';
@@ -378,7 +427,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                 tableHtml += spacerHtml + `
                     <tr class="${groupBgClass} ${groupStartClass} ${groupEndClass}">
                         <!-- Desktop Columns -->
-                        <td class="desktop-only-col" data-label="Symbol"><span class="${symbolBadgeClass}">${pos.symbol}</span></td>
+                        <td class="desktop-only-col" data-label="Symbol">${actionBadgeHtml} <span class="${symbolBadgeClass}">${pos.symbol}</span></td>
                         <td class="desktop-only-col" style="text-align: right;">${pos.quantity}</td>
                         <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['cost/share'])}</td>
                         <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
@@ -394,7 +443,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         <!-- Mobile Only Combined Row Layout -->
                         <td class="mobile-only-card-col" colspan="12">
                             <div class="mobile-split-row header-row">
-                                <div class="split-col col-symbol"><span>${pos.quantity} x ${pos.symbol}</span></div>
+                                <div class="split-col col-symbol">${actionBadgeHtml} <span>${pos.quantity} x ${pos.symbol}</span></div>
                                 <div class="split-col col-pl ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
                             </div>
                             <div class="mobile-split-row details-row">
@@ -417,12 +466,9 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
             tableHtml += `</tbody></table></div>`;
         }
 
-    const accountActionsHtml = sum ? renderAccountActionsHtml(sum) : '';
-
         html += `
             <div class="section-card account-card" style="margin-bottom: 20px; padding: 0; overflow: hidden; border-radius: 8px;">
                 ${summaryBarHtml}
-                ${accountActionsHtml}
                 ${tableHtml}
             </div>
         `;

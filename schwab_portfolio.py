@@ -593,9 +593,12 @@ def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]
             q_fields = q_data.get('quote', {}) if isinstance(q_data, dict) else {}
             underlying_mark_pct[sym] = float(q_fields.get('markPercentChange', 0.0) or 0.0)
 
+    for pos in positions:
+        pos['action'] = ''
+
+    # Dictionary to collect action strings per account
     actions_by_account: dict[str, list] = {}
 
-    # 1. Uncovered stocks/ETFs -> STO # x symbol (markPercentChange)
     net: dict[tuple, int] = {}
     for pos in positions:
         acc        = pos['accountNumber']
@@ -613,8 +616,14 @@ def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]
             pct = underlying_mark_pct.get(underlying, 0.0)
             pct_str = f"{pct:+.2f}%"
             actions_by_account.setdefault(acc, []).append(
-                f"STO {uncovered}x {underlying} ({pct_str})"
+                f"STO {underlying} ({pct_str})"
             )
+            for pos in positions:
+                if (pos['accountNumber'] == acc and
+                    not is_option(pos['symbol']) and
+                    _base_symbol(pos['symbol']) == underlying and
+                    pos['quantity'] > 0):
+                    pos['action'] = f"STO {underlying}"
 
     # 2. Sold call options rules: BTC (P/L% >= 60% or delta < 0.10) and ROLLOUT (delta > 0.50)
     for pos in positions:
@@ -630,18 +639,19 @@ def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]
             try:
                 opt = OptionSymbol.parse_symbol(symbol)
                 if opt.contract_type == 'C':
-                    close_qty = int(abs(qty))
 
                     # BTC rule: total gain >= 60% OR (0.0 < delta < 0.10)
                     if pl_pct >= 60.0 or (0.0 < delta < 0.10):
                         actions_by_account.setdefault(acc, []).append(
-                            f"BTC {close_qty}x {symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
+                            f"BTC {symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
                         )
+                        pos['action'] = f"BTC {symbol}"
 
                     if delta > 0.50:
                         actions_by_account.setdefault(acc, []).append(
-                            f"ROLLOUT {close_qty}x {symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
+                            f"ROLL {symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
                         )
+                        pos['action'] = f"ROLL {symbol}"
             except Exception as e:
                 logging.warning("Could not parse option symbol %s for action check: %s", symbol, e)
 
