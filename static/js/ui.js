@@ -289,6 +289,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
             if (sum.Risk < 90) riskClass = "risk-high";
             else if (sum.Risk < 95) riskClass = "risk-med";
 
+            const shortPLFormat = getPLFormatting(sum['Short P/L'] || 0);
             summaryBarHtml = `
                 <div class="account-summary-bar" style="padding: 10px 16px; background-color: var(--bg-tertiary); border-bottom: 1px solid var(--border-color);">
                     <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.84rem;">
@@ -297,6 +298,8 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                             <span style="font-size: 0.98rem; font-weight: 700; color: var(--text-primary);">Net: ${formatCurrency(sum.Net)}</span>
                         </div>
                         <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px;">
+                            <span>Short P/L: <strong class="${shortPLFormat.cssClass}">${shortPLFormat.sign}${shortPLFormat.valDisplay}</strong></span>
+                            <span>Short Val: <strong>${formatCurrency(sum['Short Value'])}</strong></span>
                             <span>Cash: <strong>${formatCurrency(sum.Cash)}</strong></span>
                             <span>Risk: <strong class="${riskClass}">${formatPercent(sum.Risk)}</strong></span>
                             <span>Loan: <strong>${formatCurrency(sum['Total Loan'])}</strong> <span style="font-size:0.75rem; color:var(--text-secondary);">(Margin: ${formatCurrency(sum.Margin)} | Box: ${formatCurrency(sum.BOX)} | CSP: ${formatCurrency(sum.CSP)})</span></span>
@@ -753,6 +756,7 @@ export function renderTransactions(transactions) {
         return `
             <tr>
                 <!-- Desktop Columns -->
+                <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${txn.accountNumber || '—'}</td>
                 <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(txn.time)}</td>
                 <td class="desktop-only-col">${_typeBadge(txn.type)}</td>
                 <td class="desktop-only-col"><span class="${symbolBadgeClass}">${displaySym}</span></td>
@@ -763,7 +767,7 @@ export function renderTransactions(transactions) {
                 <td class="desktop-only-col" style="text-align:right; font-weight:600;" class="${netPL.cssClass}">${netPL.sign}${netPL.valDisplay}</td>
 
                 <!-- Mobile Only Combined Row Layout -->
-                <td class="mobile-only-card-col" colspan="8">
+                <td class="mobile-only-card-col" colspan="9">
                     <div class="mobile-split-row header-row">
                         <div class="split-col col-symbol" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                             <span class="${symbolBadgeClass}">${displaySym}</span>
@@ -786,6 +790,7 @@ export function renderTransactions(transactions) {
             <table>
                 <thead>
                     <tr>
+                        <th>Account</th>
                         <th>Date</th>
                         <th>Type</th>
                         <th>Symbol</th>
