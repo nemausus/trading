@@ -269,21 +269,21 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         const ordStatus = ord.status || 'WORKING';
 
                         pendingOrdersDesktopHtml += `
-                            <tr class="${groupBgClass} pending-order-row ${orderRowGroupEndClass}" style="font-size: 0.78rem;">
-                                <td class="desktop-only-col" style="padding-left: 16px;"><span class="badge-pending-order" style="font-size: 0.7rem; padding: 1px 6px; background: rgba(148, 163, 184, 0.12); color: var(--text-secondary); border-radius: 4px; font-weight: 500;">⚡ Order</span></td>
-                                <td class="desktop-only-col" style="text-align: right; color: var(--text-secondary); font-weight: 400;">${ord.quantity}</td>
-                                <td class="desktop-only-col" colspan="6" style="text-align: left; color: var(--text-secondary); font-weight: 400;">
-                                    <span>${ordType}</span> @ ${ordPrice} <span style="font-size:0.73rem; opacity:0.75;">(${ord.orderType || ''} ${ord.duration || ''})</span>
+                            <tr class="${groupBgClass} pending-order-row ${orderRowGroupEndClass}">
+                                <td class="desktop-only-col" style="padding-left: 16px;"><span class="badge-pending-order" style="font-size: 0.75rem; padding: 1px 6px; background: rgba(148, 163, 184, 0.12); color: var(--text-secondary); border-radius: 4px; font-weight: 500;">⚡ Order</span></td>
+                                <td class="desktop-only-col" style="text-align: right; color: var(--text-secondary);">${ord.quantity}</td>
+                                <td class="desktop-only-col" colspan="6" style="text-align: left; color: var(--text-secondary);">
+                                    <span>${ordType}</span> @ ${ordPrice} <span style="font-size:0.8rem; opacity:0.85;">(${ord.orderType || ''} ${ord.duration || ''})</span>
                                 </td>
-                                <td class="desktop-only-col" style="text-align: right;"><span style="font-size: 0.7rem; padding: 1px 6px; background: rgba(245, 158, 11, 0.12); color: #d97706; border-radius: 4px; font-weight: 500;">${ordStatus}</span></td>
+                                <td class="desktop-only-col" style="text-align: right;"><span style="font-size: 0.75rem; padding: 1px 6px; background: rgba(217, 119, 6, 0.12); color: #d97706; border-radius: 4px; font-weight: 500;">${ordStatus}</span></td>
                                 <td class="desktop-only-col" colspan="3"></td>
                             </tr>
                         `;
 
                         pendingOrdersMobileHtml += `
-                            <div class="mobile-split-row pending-order-row" style="border-top: 1px dashed rgba(148, 163, 184, 0.25); margin-top: 5px; padding-top: 4px; padding-bottom: 2px; color: var(--text-secondary); font-size: 0.76rem;">
+                            <div class="mobile-split-row pending-order-row" style="border-top: 1px dashed rgba(148, 163, 184, 0.25); margin-top: 5px; padding-top: 4px; padding-bottom: 2px; color: var(--text-secondary); font-size: 0.82rem;">
                                 <div class="split-col"><span>⚡ Order: ${ordType} ${ord.quantity} @ ${ordPrice}</span></div>
-                                <div class="split-col" style="text-align: right;"><span style="font-size: 0.68rem; padding: 1px 5px; background: rgba(245, 158, 11, 0.12); color: #d97706; border-radius: 4px; font-weight: 500;">${ordStatus}</span></div>
+                                <div class="split-col" style="text-align: right;"><span style="font-size: 0.75rem; padding: 1px 5px; background: rgba(217, 119, 6, 0.12); color: #d97706; border-radius: 4px; font-weight: 500;">${ordStatus}</span></div>
                             </div>
                         `;
                     });
@@ -309,7 +309,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         <td class="mobile-only-card-col" colspan="12">
                             <div class="mobile-split-row header-row">
                                 <div class="split-col col-symbol"><span>${pos.quantity} x ${pos.symbol}</span></div>
-                                <div class="split-col col-pl ${pl.cssClass}" style="text-align: right; font-weight: 700;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
+                                <div class="split-col col-pl ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
                             </div>
                             <div class="mobile-split-row details-row">
                                 <div class="split-col col-cost">${formatCurrency(pos.marketValue)} / ${formatCurrency(pos.cost)}</div>

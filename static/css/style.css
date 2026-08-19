@@ -1,18 +1,18 @@
-/* Modern CSS Variables for cohesive dark slate styling */
+/* Modern CSS Variables for clean, crisp light theme */
 :root {
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --bg-tertiary: #334155;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --accent-blue: #3b82f6;
-    --accent-blue-hover: #2563eb;
-    --accent-green: #10b981;
-    --accent-red: #ef4444;
-    --border-color: #475569;
+    --bg-primary: #ffffff;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f8fafc;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --accent-blue: #2563eb;
+    --accent-blue-hover: #1d4ed8;
+    --accent-green: #16a34a;
+    --accent-red: #dc2626;
+    --border-color: #e2e8f0;
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.05);
 }
 
 * {
@@ -66,7 +66,7 @@ body {
     margin-bottom: 24px;
     font-weight: 700;
     font-size: 1.8rem;
-    background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    background: linear-gradient(135deg, #1d4ed8, #2563eb);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -76,7 +76,7 @@ body {
     width: 100%;
     padding: 12px 16px;
     margin-bottom: 16px;
-    background-color: var(--bg-primary);
+    background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     color: var(--text-primary);
@@ -120,7 +120,7 @@ body {
     position: sticky;
     top: 0;
     z-index: 100;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
 }
 
 .header-container {
@@ -136,7 +136,7 @@ body {
 .header-logo {
     font-size: 1.4rem;
     font-weight: 800;
-    background: linear-gradient(to right, #60a5fa, #3b82f6);
+    background: linear-gradient(to right, #1d4ed8, #2563eb);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -263,9 +263,9 @@ body {
 }
 
 .todo-pill {
-    background-color: rgba(251, 191, 36, 0.15);
-    color: #fbbf24;
-    border: 1px solid rgba(251, 191, 36, 0.3);
+    background-color: rgba(217, 119, 6, 0.12);
+    color: #b45309;
+    border: 1px solid rgba(217, 119, 6, 0.25);
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 0.75rem;
@@ -316,7 +316,7 @@ body {
 
 /* Group-by toggle button */
 .btn-toggle {
-    background: transparent;
+    background: #ffffff;
     border: 1.5px solid var(--border-color);
     color: var(--text-secondary);
     padding: 6px 13px;
@@ -337,21 +337,34 @@ body {
 }
 
 .btn-toggle.active {
-    background: rgba(96, 165, 250, 0.12);
+    background: #eff6ff;
     border-color: var(--accent-blue);
     color: var(--accent-blue);
 }
 
 /* Separator row injected between underlying groups */
 .group-header-row td {
-    background: rgba(96, 165, 250, 0.07);
-    color: var(--accent-blue);
+    background: #eff6ff !important;
+    color: var(--accent-blue) !important;
     font-weight: 700;
     font-size: 0.78rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     padding: 5px 12px;
-    border-top: 1px solid rgba(96, 165, 250, 0.25);
+    border-top: 1px solid var(--border-color) !important;
+}
+
+.group-bg-even td {
+    background-color: #ffffff !important;
+}
+
+.group-bg-odd td {
+    background-color: #f8fafc !important;
+}
+
+.group-bg-even:hover td,
+.group-bg-odd:hover td {
+    background-color: #f1f5f9 !important;
 }
 
 /* Responsive Table Wrapper */
@@ -366,12 +379,15 @@ table {
     width: 100%;
     border-collapse: collapse;
     text-align: left;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    background-color: #ffffff;
 }
 
 th {
-    background-color: rgba(71, 85, 105, 0.4);
+    background-color: #f8fafc;
     color: var(--text-primary);
+    font-size: 0.85rem;
     font-weight: 600;
     padding: 12px 16px;
     border-bottom: 2px solid var(--border-color);
@@ -381,9 +397,11 @@ th {
 td {
     padding: 12px 16px;
     border-bottom: 1px solid var(--border-color);
-    border-right: 1px solid rgba(71, 85, 105, 0.3);
+    border-right: 1px solid var(--border-color);
     white-space: nowrap;
     color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
 }
 
 td:last-child {
@@ -395,17 +413,17 @@ tr:last-child td {
 }
 
 tr:hover td {
-    background-color: rgba(71, 85, 105, 0.15);
+    background-color: #f1f5f9;
 }
 
 .val-positive {
     color: var(--accent-green);
-    font-weight: 600;
+    font-weight: 500;
 }
 
 .val-negative {
     color: var(--accent-red);
-    font-weight: 600;
+    font-weight: 500;
 }
 
 /* Table & text utility helper classes */
@@ -431,14 +449,15 @@ tr:hover td {
     border: none !important;
     padding: 0 !important;
     border-radius: 0 !important;
-    font-weight: 400 !important;
-    font-size: 0.88rem;
+    font-weight: 500 !important;
+    font-size: 0.85rem;
     color: var(--text-primary);
     font-family: inherit;
 }
 
 td[data-label="Symbol"] {
-    font-weight: 400 !important;
+    font-size: 0.85rem;
+    font-weight: 500 !important;
     padding-left: 16px !important;
 }
 
@@ -493,7 +512,7 @@ td[data-label="Symbol"] {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: rgba(15, 23, 42, 0.6);
+    background: #f1f5f9;
     padding: 3px;
     border-radius: 8px;
     border: 1px solid var(--border-color);
@@ -518,7 +537,7 @@ td[data-label="Symbol"] {
 .nav-tab.active {
     background: var(--accent-blue);
     color: #ffffff;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
 }
 
 /* Tab Content Visibility */
@@ -558,7 +577,7 @@ td[data-label="Symbol"] {
 
 .filter-group input,
 .filter-group select {
-    background-color: var(--bg-primary);
+    background-color: #ffffff;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     color: var(--text-primary);
@@ -612,7 +631,7 @@ td[data-label="Symbol"] {
 }
 
 .preset-btn {
-    background: var(--bg-tertiary);
+    background: #ffffff;
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
     padding: 3px 9px;
@@ -626,12 +645,12 @@ td[data-label="Symbol"] {
 .preset-btn:hover {
     border-color: var(--accent-blue);
     color: var(--accent-blue);
-    background: rgba(96, 165, 250, 0.1);
+    background: #eff6ff;
 }
 
 /* Underlying Banner */
 .underlying-banner {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
     border: 1px solid var(--border-color);
     border-radius: 10px;
     padding: 16px 20px;
@@ -674,9 +693,9 @@ td[data-label="Symbol"] {
 
 /* Call / Put Badges */
 .badge-call {
-    background-color: rgba(16, 185, 129, 0.15);
-    color: var(--accent-green);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    background-color: rgba(22, 163, 74, 0.1);
+    color: #15803d;
+    border: 1px solid rgba(22, 163, 74, 0.25);
     padding: 2px 6px;
     border-radius: 4px;
     font-weight: 700;
@@ -684,9 +703,9 @@ td[data-label="Symbol"] {
 }
 
 .badge-put {
-    background-color: rgba(239, 68, 68, 0.15);
-    color: var(--accent-red);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    background-color: rgba(220, 38, 38, 0.1);
+    color: #b91c1c;
+    border: 1px solid rgba(220, 38, 38, 0.25);
     padding: 2px 6px;
     border-radius: 4px;
     font-weight: 700;
@@ -695,10 +714,10 @@ td[data-label="Symbol"] {
 
 /* DTE Group Visual Elements */
 .dte-group-row td {
-    background: linear-gradient(90deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.85)) !important;
+    background: #f1f5f9 !important;
     padding: 8px 14px !important;
     border-top: 2px solid var(--border-color) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-bottom: 1px solid var(--border-color) !important;
 }
 
 .dte-header-content {
@@ -715,7 +734,7 @@ td[data-label="Symbol"] {
     font-size: 0.78rem;
     font-weight: 800;
     letter-spacing: 0.03em;
-    box-shadow: 0 1px 4px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
 }
 
 .dte-group-date {
@@ -724,9 +743,9 @@ td[data-label="Symbol"] {
 }
 
 .dte-pill {
-    background: rgba(96, 165, 250, 0.12);
-    color: #93c5fd;
-    border: 1px solid rgba(96, 165, 250, 0.25);
+    background: rgba(37, 99, 235, 0.1);
+    color: #1d4ed8;
+    border: 1px solid rgba(37, 99, 235, 0.2);
     padding: 2px 8px;
     border-radius: 999px;
     font-weight: 700;
@@ -734,27 +753,27 @@ td[data-label="Symbol"] {
 }
 
 .dte-bg-group-0 {
-    background-color: rgba(15, 23, 42, 0.3);
+    background-color: #ffffff;
 }
 
 .dte-bg-group-1 {
-    background-color: rgba(30, 41, 59, 0.25);
+    background-color: #f8fafc;
 }
 
 tr.row-call td {
-    background-color: rgba(16, 185, 129, 0.05) !important;
+    background-color: rgba(22, 163, 74, 0.03) !important;
 }
 
 tr.row-call:hover td {
-    background-color: rgba(16, 185, 129, 0.12) !important;
+    background-color: rgba(22, 163, 74, 0.08) !important;
 }
 
 tr.row-put td {
-    background-color: rgba(239, 68, 68, 0.05) !important;
+    background-color: rgba(220, 38, 38, 0.03) !important;
 }
 
 tr.row-put:hover td {
-    background-color: rgba(239, 68, 68, 0.12) !important;
+    background-color: rgba(220, 38, 38, 0.08) !important;
 }
 
 /* =====================================================================================
@@ -956,21 +975,22 @@ tr.row-put:hover td {
     #transactions-container tr,
     #realized-container tr {
         display: block;
-        padding: 5px 8px 5px 12px;
+        padding: 8px 12px;
+        background-color: #ffffff;
         box-shadow: none;
         margin-bottom: 0;
         transition: background-color 0.2s;
         border-left: 3.5px solid transparent !important;
         border-right: none !important;
-        border-top: 1px solid rgba(148, 163, 184, 0.18) !important;
+        border-top: 1px solid var(--border-color) !important;
         border-bottom: none !important;
         border-radius: 0 !important;
     }
 
     #positions-container tr.group-start-row,
     #box-container tr.group-start-row {
-        border-top: 1.5px solid var(--border-color) !important;
-        border-left: 1.5px solid var(--border-color) !important;
+        border-top: 1px solid var(--border-color) !important;
+        border-left: 1px solid var(--border-color) !important;
         border-top-left-radius: 0 !important;
         border-top-right-radius: 0 !important;
     }
@@ -987,7 +1007,7 @@ tr.row-put:hover td {
     #box-container tr.group-end-row:last-child,
     #transactions-container tr:last-child,
     #realized-container tr:last-child {
-        border-bottom: 1.5px solid var(--border-color) !important;
+        border-bottom: 1px solid var(--border-color) !important;
     }
 
     #positions-container tr.group-spacer-row {
@@ -999,13 +1019,14 @@ tr.row-put:hover td {
     #transactions-container td,
     #realized-container td {
         border: none !important;
+        background-color: transparent !important;
     }
 
     #positions-container tr:not(.group-header-row):hover,
     #box-container tr:not(.group-header-row):hover,
     #transactions-container tr:hover,
     #realized-container tr:hover {
-        background-color: var(--bg-tertiary);
+        background-color: #f8fafc;
     }
 
     /* Keep group header rows full-width */
@@ -1046,7 +1067,8 @@ tr.row-put:hover td {
 
     .split-col {
         flex: 1;
-        font-size: 0.76rem;
+        font-size: 0.82rem;
+        font-weight: 500;
     }
 
     .split-col:nth-child(1) {
@@ -1058,8 +1080,14 @@ tr.row-put:hover td {
     }
 
     .split-col.col-symbol {
-        font-size: 0.80rem;
-        font-weight: 400 !important;
+        font-size: 0.82rem;
+        font-weight: 500 !important;
+        color: var(--text-primary);
+    }
+
+    .split-col.col-pl {
+        font-size: 0.82rem;
+        font-weight: 500 !important;
     }
 
     .split-col.col-qty,
@@ -1068,11 +1096,13 @@ tr.row-put:hover td {
     .split-col.col-dte,
     .split-col.col-delta,
     .split-col.col-mpr {
+        font-size: 0.82rem;
+        font-weight: 500;
         color: var(--text-secondary);
     }
 
     .mobile-pl-pct {
-        font-size: 0.72rem;
+        font-size: 0.82rem;
         font-weight: 500;
         margin-left: 2px;
         opacity: 0.85;
@@ -1184,18 +1214,18 @@ tr.row-put:hover td {
 }
 
 .txn-badge-trade {
-    background: rgba(59, 130, 246, 0.15);
-    color: #60a5fa;
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
 }
 
 .txn-badge-dividend {
-    background: rgba(16, 185, 129, 0.15);
-    color: #34d399;
+    background: rgba(22, 163, 74, 0.1);
+    color: #16a34a;
 }
 
 .txn-badge-assignment {
-    background: rgba(245, 158, 11, 0.15);
-    color: #fbbf24;
+    background: rgba(217, 119, 6, 0.1);
+    color: #d97706;
 }
 
 /* Position effect coloring */
@@ -1230,7 +1260,7 @@ tr.group-spacer-row td {
 }
 
 tr:not(.group-spacer-row) td {
-    background-color: rgba(30, 41, 59, 0.5);
+    background-color: #ffffff;
 }
 
 /* Card Borders around each symbol group (Desktop) */
@@ -1261,6 +1291,6 @@ tr.group-end-row td.desktop-only-col:last-of-type {
 
 /* Inline Pending Order Rows */
 tr.pending-order-row td {
-    border-top: 1px dashed rgba(148, 163, 184, 0.25) !important;
-    background-color: rgba(148, 163, 184, 0.04) !important;
+    border-top: 1px dashed #cbd5e1 !important;
+    background-color: #f8fafc !important;
 }
