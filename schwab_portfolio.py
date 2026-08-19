@@ -572,14 +572,31 @@ def _enrich_positions(positions: list) -> float:
     return csp
 
 
-def _compute_todo(positions: list) -> dict[str, str]:
+def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]:
     """
-    Return a mapping {accountNumber: "Nx SYM, Mx SYM2"} for uncovered longs.
+    Return a mapping {accountNumber: "action1, action2"} for action items:
+    1. STO # x symbol (markPercentChange of underlying) for uncovered stocks/ETFs
+    2. BTC # x option symbol (total gain) for sold calls with P/L% >= 60%
     Excludes tickers in _TODO_EXCLUDE.
     """
-    # net[key] = contracts_long - contracts_short_call  (positive = uncovered)
-    net: dict[tuple, int] = {}
+    if quotes is None:
+        quotes = {}
 
+    underlying_mark_pct: dict[str, float] = {}
+    for pos in positions:
+        sym = pos['symbol']
+        if not is_option(sym):
+            underlying_mark_pct[sym] = pos.get('markPercentChange', 0.0)
+
+    for sym, q_data in quotes.items():
+        if not is_option(sym) and sym not in underlying_mark_pct:
+            q_fields = q_data.get('quote', {}) if isinstance(q_data, dict) else {}
+            underlying_mark_pct[sym] = float(q_fields.get('markPercentChange', 0.0) or 0.0)
+
+    actions_by_account: dict[str, list] = {}
+
+    # 1. Uncovered stocks/ETFs -> STO # x symbol (markPercentChange)
+    net: dict[tuple, int] = {}
     for pos in positions:
         acc        = pos['accountNumber']
         symbol     = pos['symbol']
@@ -591,12 +608,44 @@ def _compute_todo(positions: list) -> dict[str, str]:
         qty = 0 if is_put else int(qty * get_option_multiplier(symbol) / 100)
         net[key] = net.get(key, 0) + qty
 
-    todo_by_account: dict[str, list] = {}
     for (acc, underlying), uncovered in net.items():
         if underlying not in _TODO_EXCLUDE and uncovered > 0:
-            todo_by_account.setdefault(acc, []).append(f"{uncovered}x {underlying}")
+            pct = underlying_mark_pct.get(underlying, 0.0)
+            pct_str = f"{pct:+.2f}%"
+            actions_by_account.setdefault(acc, []).append(
+                f"STO {uncovered}x {underlying} ({pct_str})"
+            )
 
-    return {acc: ", ".join(items) for acc, items in todo_by_account.items()}
+    # 2. Sold call options rules: BTC (P/L% >= 60% or delta < 0.10) and ROLLOUT (delta > 0.50)
+    for pos in positions:
+        acc    = pos['accountNumber']
+        symbol = pos['symbol']
+        qty    = pos['quantity']
+        pl_pct = pos.get('P/L%', 0.0)
+        delta  = pos.get('delta', 0.0)
+        dte    = pos.get('dte', -1)
+        mpr    = pos.get('mpr', 0.0)
+
+        if is_option(symbol) and qty < 0:
+            try:
+                opt = OptionSymbol.parse_symbol(symbol)
+                if opt.contract_type == 'C':
+                    close_qty = int(abs(qty))
+
+                    # BTC rule: total gain >= 60% OR (0.0 < delta < 0.10)
+                    if pl_pct >= 60.0 or (0.0 < delta < 0.10):
+                        actions_by_account.setdefault(acc, []).append(
+                            f"BTC {close_qty}x {symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
+                        )
+
+                    if delta > 0.50:
+                        actions_by_account.setdefault(acc, []).append(
+                            f"ROLLOUT {close_qty}x {symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
+                        )
+            except Exception as e:
+                logging.warning("Could not parse option symbol %s for action check: %s", symbol, e)
+
+    return {acc: "; ".join(items) for acc, items in actions_by_account.items()}
 
 
 def _enrich_quotes(positions: list, quotes: dict) -> None:
@@ -697,15 +746,15 @@ def process_accounts_data(accounts_json: list, access_token: str) -> dict:
         })
         global_positions.extend(account_positions)
 
-    # --- Todo (uncovered longs) ---
-    todo_map = _compute_todo(global_positions)
-    for summary in account_summaries:
-        summary['Todo'] = todo_map.get(summary['accountNumber'], '')
-
-    # --- Quotes → delta + MPR ---
+    # --- Quotes → delta + MPR + markPercentChange ---
     unique_symbols = list({p['symbol'] for p in global_positions})
     quotes = fetch_quotes(access_token, unique_symbols)
     _enrich_quotes(global_positions, quotes)
+
+    # --- Actions (STO & BTC rules) ---
+    todo_map = _compute_todo(global_positions, quotes)
+    for summary in account_summaries:
+        summary['Todo'] = todo_map.get(summary['accountNumber'], '')
 
     # --- Active orders ---
     active_orders = fetch_active_orders(access_token, account_nums)

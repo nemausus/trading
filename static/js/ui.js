@@ -15,6 +15,11 @@ export function showView(viewId) {
 }
 
 export function clearDashboard() {
+    const actionsContainer = document.getElementById('actions-container');
+    if (actionsContainer) {
+        actionsContainer.innerHTML = '';
+    }
+
     const posContainer = document.getElementById('positions-container');
     if (posContainer) {
         posContainer.innerHTML = `
@@ -63,6 +68,96 @@ export function renderSummaries(summaries) {
 export function renderPositions(positions) {
     lastPositions = positions || [];
     renderUnifiedAccounts([], lastPositions, lastOrders);
+}
+
+function parseActionItem(accNum, actionStr) {
+    const match = actionStr.match(/^(STO|BTC|ROLLOUT)\s+(\d+x)\s+(.+?)\s+\((.+?)\)$/);
+    if (match) {
+        return {
+            account: accNum,
+            type: match[1],
+            qty: match[2],
+            symbol: match[3],
+            details: match[4]
+        };
+    }
+    return {
+        account: accNum,
+        type: 'ACTION',
+        qty: '-',
+        symbol: actionStr,
+        details: '-'
+    };
+}
+
+function renderAccountActionsHtml(sum) {
+    if (!sum || !sum.Todo) return '';
+
+    const itemStrs = sum.Todo.split(/;\s*|,\s*(?=(?:STO|BTC|ROLLOUT)\b)/).map(s => s.trim()).filter(Boolean);
+    if (itemStrs.length === 0) return '';
+
+    const actions = itemStrs.map(s => parseActionItem(sum.accountNumber, s)).filter(Boolean);
+    actions.sort((a, b) => (a.type || '').localeCompare(b.type || ''));
+
+    let rowsHtml = '';
+    let mobileListHtml = '';
+
+    actions.forEach(act => {
+        let typeClass = 'action-type-sto';
+        if (act.type === 'BTC') typeClass = 'action-type-btc';
+        else if (act.type === 'ROLLOUT') typeClass = 'action-type-roll';
+
+        rowsHtml += `
+            <tr>
+                <td><span class="action-type-badge ${typeClass}">${act.type}</span></td>
+                <td style="text-align: right; font-weight: 500;">${act.qty}</td>
+                <td><span class="symbol-text">${act.symbol}</span></td>
+                <td style="color: var(--text-secondary); font-size: 0.82rem;">${act.details}</td>
+            </tr>
+        `;
+
+        mobileListHtml += `
+            <div class="mobile-action-row">
+                <div class="mobile-action-left">
+                    <span class="action-type-badge ${typeClass}">${act.type}</span>
+                    <span style="font-weight: 500;">${act.qty}</span>
+                    <span class="symbol-text" style="font-weight: 500;">${act.symbol}</span>
+                </div>
+                <div class="mobile-action-right">${act.details}</div>
+            </div>
+        `;
+    });
+
+    return `
+        <div class="account-actions-section">
+            <div class="account-actions-header">
+                <span>⚡ Action Items</span>
+                <span class="account-actions-count">${actions.length} Pending</span>
+            </div>
+
+            <!-- Desktop Table View -->
+            <div class="desktop-only-action-table table-responsive" style="border: 1px solid var(--border-color); border-radius: 6px;">
+                <table style="font-size: 0.82rem;">
+                    <thead>
+                        <tr style="background-color: var(--bg-tertiary);">
+                            <th>Action</th>
+                            <th style="text-align: right;">Qty</th>
+                            <th>Symbol</th>
+                            <th>Metrics / Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Mobile Compact List View -->
+            <div class="mobile-only-action-list">
+                ${mobileListHtml}
+            </div>
+        </div>
+    `;
 }
 
 export function renderUnifiedAccounts(summaries = [], positions = [], orders = []) {
@@ -151,11 +246,6 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
         // Render Summary Header Bar for this account card
         let summaryBarHtml = '';
         if (sum) {
-            const todoItems = sum.Todo ? sum.Todo.split(',').map(s => s.trim()) : [];
-            const todoPillsHtml = todoItems.length > 0
-                ? `<div class="todo-list-pills" style="margin-top: 0; display: inline-flex;">${todoItems.map(item => `<span class="todo-pill">${item}</span>`).join('')}</div>`
-                : `<span style="color: var(--accent-green); font-weight:600; font-size:0.78rem;">Covered / Complete</span>`;
-
             let riskClass = "risk-low";
             if (sum.Risk < 90) riskClass = "risk-high";
             else if (sum.Risk < 95) riskClass = "risk-med";
@@ -169,12 +259,8 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         </div>
                         <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px;">
                             <span>Cash: <strong>${formatCurrency(sum.Cash)}</strong></span>
-                            <span>Loan: <strong>${formatCurrency(sum['Total Loan'])}</strong> <span style="font-size:0.75rem; color:var(--text-secondary);">(Margin: ${formatCurrency(sum.Margin)} | Box: ${formatCurrency(sum.BOX)} | CSP: ${formatCurrency(sum.CSP)})</span></span>
                             <span>Risk: <strong class="${riskClass}">${formatPercent(sum.Risk)}</strong></span>
-                            <div style="display: inline-flex; align-items: center; gap: 6px;">
-                                <span style="color: var(--text-secondary); font-weight: 600; font-size: 0.78rem;">Action:</span>
-                                ${todoPillsHtml}
-                            </div>
+                            <span>Loan: <strong>${formatCurrency(sum['Total Loan'])}</strong> <span style="font-size:0.75rem; color:var(--text-secondary);">(Margin: ${formatCurrency(sum.Margin)} | Box: ${formatCurrency(sum.BOX)} | CSP: ${formatCurrency(sum.CSP)})</span></span>
                         </div>
                     </div>
                 </div>
@@ -201,11 +287,11 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                                 <th class="text-right">Qty</th>
                                 <th class="text-right">Cost/Share</th>
                                 <th class="text-right">Mark</th>
-                                <th class="text-right">Mark %</th>
                                 <th class="text-right">Cost Basis</th>
                                 <th class="text-right">Market Value</th>
                                 <th class="text-right">P/L</th>
                                 <th class="desktop-only-pl-pct text-right">P/L%</th>
+                                <th class="text-right">Day %</th>
                                 <th class="text-center">DTE</th>
                                 <th class="text-center">Delta</th>
                                 <th class="text-center">MPR</th>
@@ -296,11 +382,11 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         <td class="desktop-only-col" style="text-align: right;">${pos.quantity}</td>
                         <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['cost/share'])}</td>
                         <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
-                        <td class="desktop-only-col ${markPctDisplay.cssClass}" style="text-align: right;">${markPctDisplay.valDisplay !== '-' ? `${markPctDisplay.sign}${markPctDisplay.valDisplay}` : '-'}</td>
                         <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.cost)}</td>
                         <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.marketValue)}</td>
                         <td class="desktop-only-col ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay}</td>
                         <td class="desktop-only-col ${plPercent.cssClass}" style="text-align: right;">${plPercent.sign}${plPercent.valDisplay}</td>
+                        <td class="desktop-only-col ${markPctDisplay.cssClass}" style="text-align: right;">${markPctDisplay.valDisplay !== '-' ? `${markPctDisplay.sign}${markPctDisplay.valDisplay}` : '-'}</td>
                         <td class="desktop-only-col ${dteCssClass}" style="text-align: center;">${dteDisplay}</td>
                         <td class="desktop-only-col ${deltaCssClass}" style="text-align: center;">${deltaDisplay}</td>
                         <td class="desktop-only-col" style="text-align: center;">${mprDisplay}</td>
@@ -331,9 +417,12 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
             tableHtml += `</tbody></table></div>`;
         }
 
+    const accountActionsHtml = sum ? renderAccountActionsHtml(sum) : '';
+
         html += `
             <div class="section-card account-card" style="margin-bottom: 20px; padding: 0; overflow: hidden; border-radius: 8px;">
                 ${summaryBarHtml}
+                ${accountActionsHtml}
                 ${tableHtml}
             </div>
         `;

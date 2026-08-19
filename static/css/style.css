@@ -257,19 +257,65 @@ body {
 
 .todo-list-pills {
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 8px;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 0;
 }
 
 .todo-pill {
-    background-color: rgba(217, 119, 6, 0.12);
-    color: #b45309;
-    border: 1px solid rgba(217, 119, 6, 0.25);
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    font-size: 0.80rem;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.action-type-badge {
     font-weight: 600;
+    font-size: 0.82rem;
+}
+
+.action-type-sto {
+    color: #d97706;
+}
+
+.action-type-btc {
+    color: #15803d;
+}
+
+.action-type-roll {
+    color: #dc2626;
+}
+
+.account-actions-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background-color: #ffffff;
+}
+
+.account-actions-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.account-actions-count {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #d97706;
+    background: rgba(217, 119, 6, 0.1);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.mobile-only-action-list {
+    display: none;
 }
 
 /* Tables Section styling */
@@ -947,8 +993,49 @@ tr.row-put:hover td {
         display: none !important;
     }
 
-    .desktop-only-col {
+    .desktop-only-col,
+    .desktop-only-action-table {
         display: none !important;
+    }
+
+    .mobile-only-action-list {
+        display: flex !important;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .account-actions-section {
+        padding: 8px 12px !important;
+    }
+
+    .account-actions-header {
+        margin-bottom: 6px !important;
+        font-size: 0.82rem !important;
+    }
+
+    .mobile-action-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 3px 0;
+        border-bottom: 1px dashed var(--border-color);
+        font-size: 0.80rem;
+    }
+
+    .mobile-action-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .mobile-action-left {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .mobile-action-right {
+        text-align: right;
+        font-size: 0.78rem;
     }
 
     #positions-container tr.pending-order-row {

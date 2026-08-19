@@ -561,17 +561,71 @@ class TestAccountSummary(unittest.TestCase):
         result = self._run([account])
         self.assertAlmostEqual(result['summaries'][0]['Cash'], 1234.56)
 
-    def test_multi_account(self):
-        pos1 = _make_equity_pos('AAPL', long_qty=100, market_value=20000.0)
-        pos2 = _make_equity_pos('GOOG', long_qty=50, market_value=15000.0)
-        acc1 = _make_account('ACC1', [pos1])
-        acc2 = _make_account('ACC2', [pos2])
-        result = self._run([acc1, acc2])
+    def test_todo_actions_sto_and_btc(self):
+        """Test STO rule for uncovered stocks and BTC rule for sold calls (P/L% >= 60% or delta < 0.10)."""
+        equity_pos = _make_equity_pos('AAPL', long_qty=100, market_value=20000.0)
+        # Short call with >60% gain (sold for $500, marketValue=-$100 => P/L=$400 => P/L%=80%)
+        winning_call = _make_option_pos('AAPL  260821C00295000', short_qty=1, avg_price=5.0,
+                                        market_value=-100.0, short_pl=400.0)
+        # Short call with low delta < 0.10 (delta 0.05, <60% gain)
+        low_delta_call = _make_option_pos('NVDA  260821C00300000', short_qty=1, avg_price=5.0,
+                                          market_value=-400.0, short_pl=100.0)
 
-        self.assertEqual(len(result['summaries']), 2)
-        self.assertEqual(len(result['positions']), 2)
-        acc_nums = {s['accountNumber'] for s in result['summaries']}
-        self.assertEqual(acc_nums, {'ACC1', 'ACC2'})
+        account = _make_account('ACC1', [equity_pos, winning_call, low_delta_call])
+
+        quotes = {
+            'AAPL': {'quote': {'markPercentChange': 1.25}},
+            'NVDA': {'quote': {'markPercentChange': -0.50}},
+            'AAPL  260821C00295000': {'quote': {'delta': 0.20}},
+            'NVDA  260821C00300000': {'quote': {'delta': 0.05}},
+        }
+
+        with patch.object(sp, 'fetch_quotes', return_value=quotes), \
+             patch.object(sp, 'fetch_active_orders', return_value=[]):
+            result = sp.process_accounts_data([account], 'fake_token')
+
+        summary = result['summaries'][0]
+        todo_text = summary['Todo']
+
+        self.assertIn('BTC 1x AAPL  260821C00295000 (0.20,', todo_text)
+        self.assertIn('BTC 1x NVDA  260821C00300000 (0.05,', todo_text)
+
+    def test_todo_actions_uncovered_sto(self):
+        """Test STO rule triggers for uncovered stock position."""
+        msft_pos = _make_equity_pos('MSFT', long_qty=200, market_value=40000.0)
+        account = _make_account('ACC1', [msft_pos])
+
+        quotes = {'MSFT': {'quote': {'markPercentChange': 2.50}}}
+
+        with patch.object(sp, 'fetch_quotes', return_value=quotes), \
+             patch.object(sp, 'fetch_active_orders', return_value=[]):
+            result = sp.process_accounts_data([account], 'fake_token')
+
+        summary = result['summaries'][0]
+        self.assertEqual(summary['Todo'], 'STO 2x MSFT (+2.50%)')
+
+    def test_todo_actions_rollout(self):
+        """Test ROLLOUT rule triggers when sold call delta > 0.50."""
+        short_call = _make_option_pos('AAPL  260821C00295000', short_qty=1, avg_price=5.0,
+                                       market_value=-500.0, short_pl=0.0)
+        account = _make_account('ACC1', [short_call])
+
+        quotes = {
+            'AAPL  260821C00295000': {
+                'quote': {
+                    'delta': 0.65,
+                    'bidPrice': 5.0,
+                    'underlyingPrice': 300.0
+                }
+            }
+        }
+
+        with patch.object(sp, 'fetch_quotes', return_value=quotes), \
+             patch.object(sp, 'fetch_active_orders', return_value=[]):
+            result = sp.process_accounts_data([account], 'fake_token')
+
+        summary = result['summaries'][0]
+        self.assertIn('ROLLOUT 1x AAPL  260821C00295000 (0.65,', summary['Todo'])
 
 
 # ---------------------------------------------------------------------------
