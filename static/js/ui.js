@@ -7,6 +7,32 @@ import {
 export let lastPositions = [];
 export let lastOrders = [];
 
+// ── Shared UI helpers ──────────────────────────────────────────────────────
+
+/** Render a standard empty-state placeholder. */
+function _noDataHtml(msg) {
+    return `<div class="no-data-msg"><p>${msg}</p></div>`;
+}
+
+/**
+ * Render a full responsive table scaffold.
+ * @param {Array<{label: string, cls?: string}>} headers - Column header descriptors.
+ * @param {string} bodyHtml - Pre-rendered <tr> rows HTML string.
+ */
+function _buildTable(headers, bodyHtml) {
+    const headCols = headers
+        .map(h => `<th${h.cls ? ` class="${h.cls}"` : ''}>${h.label}</th>`)
+        .join('');
+    return `
+        <div class="table-responsive">
+            <table>
+                <thead><tr>${headCols}</tr></thead>
+                <tbody>${bodyHtml}</tbody>
+            </table>
+        </div>
+    `;
+}
+
 export function showView(viewId) {
     document.querySelectorAll('.view').forEach(view => {
         view.classList.remove('active-view');
@@ -22,31 +48,27 @@ export function clearDashboard() {
 
     const posContainer = document.getElementById('positions-container');
     if (posContainer) {
-        posContainer.innerHTML = `
-            <div class="no-data-msg">
-                <p>Connect your Schwab account to retrieve positions.</p>
-            </div>
-        `;
+        posContainer.innerHTML = _noDataHtml('Connect your Schwab account to retrieve positions.');
     }
 
     const chainContainer = document.getElementById('chain-container');
     if (chainContainer) {
-        chainContainer.innerHTML = `<div class="no-data-msg"><p>Enter a symbol and click "Fetch Chain" to retrieve option contracts.</p></div>`;
+        chainContainer.innerHTML = _noDataHtml('Enter a symbol and click "Fetch Chain" to retrieve option contracts.');
     }
 
     const boxContainer = document.getElementById('box-container');
     if (boxContainer) {
-        boxContainer.innerHTML = `<div class="no-data-msg"><p>Select a date range and click "Find Boxes" to scan for SPX box spread opportunities.</p></div>`;
+        boxContainer.innerHTML = _noDataHtml('Select a date range and click "Find Boxes" to scan for SPX box spread opportunities.');
     }
 
     const txnContainer = document.getElementById('transactions-container');
     if (txnContainer) {
-        txnContainer.innerHTML = `<div class="no-data-msg"><p>No transactions stored yet. Click <strong>Sync</strong> to fetch from Schwab.</p></div>`;
+        txnContainer.innerHTML = _noDataHtml('No transactions stored yet. Click <strong>Sync</strong> to fetch from Schwab.');
     }
 
     const realizedContainer = document.getElementById('realized-container');
     if (realizedContainer) {
-        realizedContainer.innerHTML = `<div class="no-data-msg"><p>Loading realized transactions...</p></div>`;
+        realizedContainer.innerHTML = _noDataHtml('Loading realized transactions...');
     }
 
     const realizedPivot = document.getElementById('realized-pivot-container');
@@ -245,7 +267,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
     });
 
     if ((!summaries || summaries.length === 0) && mergedPositions.length === 0) {
-        container.innerHTML = `<div class="no-data-msg"><p>No open positions or account data found in Schwab accounts.</p></div>`;
+        container.innerHTML = _noDataHtml('No open positions or account data found in Schwab accounts.');
         return;
     }
 
@@ -271,7 +293,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
     ])).sort();
 
     if (allAccNums.length === 0) {
-        container.innerHTML = `<div class="no-data-msg"><p>No open positions found in Schwab accounts.</p></div>`;
+        container.innerHTML = _noDataHtml('No open positions found in Schwab accounts.');
         return;
     }
 
@@ -318,7 +340,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
         // Render Positions Table / Cards for this account
         let tableHtml = '';
         if (accPositions.length === 0) {
-            tableHtml = `<div class="no-data-msg" style="padding: 16px;"><p>No open positions in this account.</p></div>`;
+            tableHtml = _noDataHtml('No open positions in this account.');
         } else {
             tableHtml = `
                 <div class="table-responsive">
@@ -510,7 +532,7 @@ export function renderUnderlyingBanner(underlying) {
 export function renderOptionChainTable(contracts) {
     const container = document.getElementById('chain-container');
     if (!contracts || contracts.length === 0) {
-        container.innerHTML = `<div class="no-data-msg"><p>No option contracts match the selected filters.</p></div>`;
+        container.innerHTML = _noDataHtml('No option contracts match the selected filters.');
         return;
     }
 
@@ -571,32 +593,21 @@ export function renderOptionChainTable(contracts) {
         `;
     }).join('');
 
-    container.innerHTML = `
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th class="text-right">Strike</th>
-                        <th class="text-right">Mark</th>
-                        <th class="text-center">Delta</th>
-                        <th class="text-center">MPR</th>
-                        <th class="text-center">Strike %</th>
-                        <th class="text-right">BE %</th>
-                        <th class="text-right">IV</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rowsHtml}
-                </tbody>
-            </table>
-        </div>
-    `;
+    container.innerHTML = _buildTable([
+        { label: 'Strike', cls: 'text-right' },
+        { label: 'Mark',   cls: 'text-right' },
+        { label: 'Delta',  cls: 'text-center' },
+        { label: 'MPR',    cls: 'text-center' },
+        { label: 'Strike %', cls: 'text-center' },
+        { label: 'BE %',   cls: 'text-right' },
+        { label: 'IV',     cls: 'text-right' },
+    ], rowsHtml);
 }
 
 export function renderBoxes(boxes) {
     const container = document.getElementById('box-container');
     if (!boxes || boxes.length === 0) {
-        container.innerHTML = `<div class="no-data-msg"><p>No SPX box spreads found for the selected criteria. Try adjusting the date range or box size.</p></div>`;
+        container.innerHTML = _noDataHtml('No SPX box spreads found for the selected criteria. Try adjusting the date range or box size.');
         return;
     }
 
@@ -647,27 +658,16 @@ export function renderBoxes(boxes) {
         `;
     }).join('');
 
-    container.innerHTML = `
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th class="text-center">Size</th>
-                        <th class="text-right">BTO PUT</th>
-                        <th class="text-right">STO PUT</th>
-                        <th class="text-right">STO CALL</th>
-                        <th class="text-right">BTO CALL</th>
-                        <th class="text-right">Net Credit</th>
-                        <th class="text-right">Ann. Rate</th>
-                        <th class="text-right">Liquidity</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rowsHtml}
-                </tbody>
-            </table>
-        </div>
-    `;
+    container.innerHTML = _buildTable([
+        { label: 'Size',       cls: 'text-center' },
+        { label: 'BTO PUT',    cls: 'text-right' },
+        { label: 'STO PUT',    cls: 'text-right' },
+        { label: 'STO CALL',   cls: 'text-right' },
+        { label: 'BTO CALL',   cls: 'text-right' },
+        { label: 'Net Credit', cls: 'text-right' },
+        { label: 'Ann. Rate',  cls: 'text-right' },
+        { label: 'Liquidity',  cls: 'text-right' },
+    ], rowsHtml);
 }
 
 // =====================================================================================
@@ -716,7 +716,7 @@ export function renderTransactions(transactions) {
     const statsBar = document.getElementById('txn-stats-bar');
 
     if (!transactions || transactions.length === 0) {
-        container.innerHTML = `<div class="no-data-msg"><p>No transactions stored yet. Click <strong>Sync</strong> to fetch from Schwab.</p></div>`;
+        container.innerHTML = _noDataHtml('No transactions stored yet. Click <strong>Sync</strong> to fetch from Schwab.');
         if (statsBar) statsBar.style.display = 'none';
         return;
     }
@@ -785,28 +785,17 @@ export function renderTransactions(transactions) {
         `;
     }).join('');
 
-    container.innerHTML = `
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Account</th>
-                        <th>Date</th>
-                        <th>Type</th>
-                        <th>Symbol</th>
-                        <th>Asset</th>
-                        <th class="text-center">Effect</th>
-                        <th class="text-right">Qty</th>
-                        <th class="text-right">Price</th>
-                        <th class="text-right">Net Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rowsHtml}
-                </tbody>
-            </table>
-        </div>
-    `;
+    container.innerHTML = _buildTable([
+        { label: 'Account' },
+        { label: 'Date' },
+        { label: 'Type' },
+        { label: 'Symbol' },
+        { label: 'Asset' },
+        { label: 'Effect',     cls: 'text-center' },
+        { label: 'Qty',        cls: 'text-right' },
+        { label: 'Price',      cls: 'text-right' },
+        { label: 'Net Amount', cls: 'text-right' },
+    ], rowsHtml);
 }
 
 export function renderRealized(realizedList) {
@@ -814,7 +803,7 @@ export function renderRealized(realizedList) {
     const pivotContainer = document.getElementById('realized-pivot-container');
 
     if (!realizedList || realizedList.length === 0) {
-        container.innerHTML = `<div class="no-data-msg"><p>No realized transactions match the criteria.</p></div>`;
+        container.innerHTML = _noDataHtml('No realized transactions match the criteria.');
         if (pivotContainer) pivotContainer.innerHTML = '';
         return;
     }
@@ -870,64 +859,43 @@ export function renderRealized(realizedList) {
             }
         });
 
-
-        const headerCols = symbols.map(sym => `<th style="text-align:right;">${sym}</th>`).join('');
-
         const rows = months.map(m => {
             const cells = symbols.map(sym => {
                 const val = pivotData[sym][m];
-                const cls = val > 0 ? 'val-positive' : (val < 0 ? 'val-negative' : '');
-                const displayVal = val !== 0 ? formatCurrency(val) : '—';
-                return `<td style="text-align:right;" class="${cls}">${displayVal}</td>`;
+                const plFmt = getPLFormatting(val);
+                const displayVal = val !== 0 ? plFmt.valDisplay : '—';
+                return `<td class="text-right ${plFmt.cssClass}">${displayVal}</td>`;
             }).join('');
 
-            const mTotal = monthTotals[m];
-            const mTotalCls = mTotal > 0 ? 'val-positive' : (mTotal < 0 ? 'val-negative' : '');
-            const mTotalDisplay = mTotal !== 0 ? formatCurrency(mTotal) : '—';
+            const mTotalFmt = getPLFormatting(monthTotals[m]);
+            const mTotalDisplay = monthTotals[m] !== 0 ? mTotalFmt.valDisplay : '—';
 
             return `
                 <tr>
                     <td style="font-weight:600;">${m}</td>
                     ${cells}
-                    <td style="text-align:right; font-weight:600;" class="${mTotalCls}">${mTotalDisplay}</td>
+                    <td class="text-right font-semibold ${mTotalFmt.cssClass}">${mTotalDisplay}</td>
                 </tr>
             `;
         }).join('');
 
         const totalCells = symbols.map(sym => {
             const val = symbolTotals[sym];
-            const cls = val > 0 ? 'val-positive' : (val < 0 ? 'val-negative' : '');
-            const displayVal = val !== 0 ? formatCurrency(val) : '—';
-            return `<td style="text-align:right; font-weight:600;" class="${cls}">${displayVal}</td>`;
+            const plFmt = getPLFormatting(val);
+            const displayVal = val !== 0 ? plFmt.valDisplay : '—';
+            return `<td class="text-right font-semibold ${plFmt.cssClass}">${displayVal}</td>`;
         }).join('');
 
-        const grandTotalCls = grandTotal > 0 ? 'val-positive' : (grandTotal < 0 ? 'val-negative' : '');
-        const grandTotalDisplay = grandTotal !== 0 ? formatCurrency(grandTotal) : '—';
+        const grandTotalFmt = getPLFormatting(grandTotal);
+        const grandTotalDisplay = grandTotal !== 0 ? grandTotalFmt.valDisplay : '—';
 
         pivotContainer.innerHTML = `
             <div class="section-card" style="margin-bottom: 20px;">
                 <h3 style="margin-bottom: 12px;">Monthly P/L by Symbol</h3>
-                <div class="table-responsive">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Month</th>
-                                ${headerCols}
-                                <th style="text-align:right;">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rows}
-                        </tbody>
-                        <tfoot>
-                            <tr style="border-top: 2px solid var(--border-color); font-weight:600;">
-                                <td>Total</td>
-                                ${totalCells}
-                                <td style="text-align:right; font-weight:800;" class="${grandTotalCls}">${grandTotalDisplay}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
+                ${_buildTable(
+                    [{ label: 'Month' }, ...symbols.map(sym => ({ label: sym, cls: 'text-right' })), { label: 'Total', cls: 'text-right' }],
+                    rows + `<tr style="border-top: 2px solid var(--border-color); font-weight:600;"><td>Total</td>${totalCells}<td class="text-right font-bold ${grandTotalFmt.cssClass}">${grandTotalDisplay}</td></tr>`
+                )}
             </div>
         `;
 
@@ -967,26 +935,15 @@ export function renderRealized(realizedList) {
         `;
     }).join('');
 
-    container.innerHTML = `
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Open Date</th>
-                        <th class="text-right">Open Price</th>
-                        <th>Close Date</th>
-                        <th class="text-right">Close Price</th>
-                        <th>Symbol</th>
-                        <th class="text-right">Qty</th>
-                        <th class="text-right">Realized P/L</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rowsHtml}
-                </tbody>
-            </table>
-        </div>
-    `;
+    container.innerHTML = _buildTable([
+        { label: 'Open Date' },
+        { label: 'Open Price',   cls: 'text-right' },
+        { label: 'Close Date' },
+        { label: 'Close Price',  cls: 'text-right' },
+        { label: 'Symbol' },
+        { label: 'Qty',          cls: 'text-right' },
+        { label: 'Realized P/L', cls: 'text-right' },
+    ], rowsHtml);
 }
 
 

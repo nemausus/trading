@@ -3,12 +3,15 @@
     --bg-primary: #ffffff;
     --bg-secondary: #ffffff;
     --bg-tertiary: #f8fafc;
-    --text-primary: #0f172a;
-    --text-secondary: #64748b;
+    --bg-hover: #f1f5f9;
     --accent-blue: #2563eb;
     --accent-blue-hover: #1d4ed8;
+    --accent-blue-subtle: #eff6ff;
     --accent-green: #16a34a;
     --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
     --border-color: #e2e8f0;
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
@@ -150,14 +153,46 @@ body {
 
 
 
-.status-pill {
+/* ── Shared badge/pill base ─────────────────────────────────────────── */
+/* Use modifier classes (.badge-pill--green, --red, --blue, --amber) for colour */
+.badge-pill {
     display: inline-flex;
     align-items: center;
-    padding: 4px 12px;
+    padding: 2px 8px;
     border-radius: 9999px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 600;
     border: 1px solid transparent;
+}
+
+.badge-pill--green {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: var(--accent-green);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.badge-pill--red {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: var(--accent-red);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.badge-pill--blue {
+    background-color: rgba(37, 99, 235, 0.1);
+    color: var(--accent-blue);
+    border-color: rgba(37, 99, 235, 0.25);
+}
+
+.badge-pill--amber {
+    background-color: rgba(217, 119, 6, 0.1);
+    color: var(--accent-amber);
+    border-color: rgba(217, 119, 6, 0.25);
+}
+
+/* status-pill: larger padding variant reuses badge-pill colour modifiers */
+.status-pill {
+    padding: 4px 12px;
+    font-size: 0.8rem;
 }
 
 .status-pill.connected {
@@ -278,7 +313,7 @@ body {
 }
 
 .action-type-sto {
-    color: #d97706;
+    color: var(--accent-amber);
 }
 
 .action-type-btc {
@@ -286,7 +321,7 @@ body {
 }
 
 .action-type-roll {
-    color: #dc2626;
+    color: var(--accent-red);
 }
 
 /* Inline Action Badges for Position Rows */
@@ -306,7 +341,7 @@ body {
 
 .badge-action-inline.action-type-sto {
     background: rgba(37, 99, 235, 0.12);
-    color: #2563eb;
+    color: var(--accent-blue);
     border: 1px solid rgba(37, 99, 235, 0.25);
 }
 
@@ -318,14 +353,14 @@ body {
 
 .badge-action-inline.action-type-roll {
     background: rgba(217, 119, 6, 0.12);
-    color: #d97706;
+    color: var(--accent-amber);
     border: 1px solid rgba(217, 119, 6, 0.25);
 }
 
 .account-actions-section {
     padding: 12px 16px;
     border-bottom: 1px solid var(--border-color);
-    background-color: #ffffff;
+    background-color: var(--bg-secondary);
 }
 
 .account-actions-header {
@@ -338,10 +373,11 @@ body {
     gap: 6px;
 }
 
+/* Extends .badge-pill with amber colour modifier */
 .account-actions-count {
     font-size: 0.72rem;
     font-weight: 600;
-    color: #d97706;
+    color: var(--accent-amber);
     background: rgba(217, 119, 6, 0.1);
     padding: 1px 6px;
     border-radius: 4px;
@@ -366,7 +402,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     flex-wrap: wrap;
     gap: 16px;
 }
@@ -416,14 +452,14 @@ body {
 }
 
 .btn-toggle.active {
-    background: #eff6ff;
+    background: var(--accent-blue-subtle);
     border-color: var(--accent-blue);
     color: var(--accent-blue);
 }
 
 /* Separator row injected between underlying groups */
 .group-header-row td {
-    background: #eff6ff !important;
+    background: var(--accent-blue-subtle) !important;
     color: var(--accent-blue) !important;
     font-weight: 700;
     font-size: 0.78rem;
@@ -434,16 +470,16 @@ body {
 }
 
 .group-bg-even td {
-    background-color: #ffffff !important;
+    background-color: var(--bg-secondary) !important;
 }
 
 .group-bg-odd td {
-    background-color: #f8fafc !important;
+    background-color: var(--bg-tertiary) !important;
 }
 
 .group-bg-even:hover td,
 .group-bg-odd:hover td {
-    background-color: #f1f5f9 !important;
+    background-color: var(--bg-hover) !important;
 }
 
 /* Responsive Table Wrapper */
@@ -460,11 +496,11 @@ table {
     text-align: left;
     font-size: 0.85rem;
     font-weight: 500;
-    background-color: #ffffff;
+    background-color: var(--bg-secondary);
 }
 
 th {
-    background-color: #f8fafc;
+    background-color: var(--bg-tertiary);
     color: var(--text-primary);
     font-size: 0.85rem;
     font-weight: 600;
@@ -492,7 +528,7 @@ tr:last-child td {
 }
 
 tr:hover td {
-    background-color: #f1f5f9;
+    background-color: var(--bg-hover);
 }
 
 .val-positive {
@@ -724,7 +760,7 @@ td[data-label="Symbol"] {
 .preset-btn:hover {
     border-color: var(--accent-blue);
     color: var(--accent-blue);
-    background: #eff6ff;
+    background: var(--accent-blue-subtle);
 }
 
 /* Underlying Banner */
@@ -770,25 +806,26 @@ td[data-label="Symbol"] {
     font-weight: 700;
 }
 
-/* Call / Put Badges */
-.badge-call {
-    background-color: rgba(22, 163, 74, 0.1);
-    color: #15803d;
-    border: 1px solid rgba(22, 163, 74, 0.25);
+/* Call / Put Badges — share structural base with .badge-pill */
+.badge-call,
+.badge-put {
     padding: 2px 6px;
     border-radius: 4px;
     font-weight: 700;
     font-size: 0.75rem;
+    border: 1px solid transparent;
+}
+
+.badge-call {
+    background-color: rgba(22, 163, 74, 0.1);
+    color: #15803d;
+    border-color: rgba(22, 163, 74, 0.25);
 }
 
 .badge-put {
     background-color: rgba(220, 38, 38, 0.1);
     color: #b91c1c;
-    border: 1px solid rgba(220, 38, 38, 0.25);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: 700;
-    font-size: 0.75rem;
+    border-color: rgba(220, 38, 38, 0.25);
 }
 
 /* DTE Group Visual Elements */
@@ -823,7 +860,7 @@ td[data-label="Symbol"] {
 
 .dte-pill {
     background: rgba(37, 99, 235, 0.1);
-    color: #1d4ed8;
+    color: var(--accent-blue-hover);
     border: 1px solid rgba(37, 99, 235, 0.2);
     padding: 2px 8px;
     border-radius: 999px;
@@ -832,11 +869,11 @@ td[data-label="Symbol"] {
 }
 
 .dte-bg-group-0 {
-    background-color: #ffffff;
+    background-color: var(--bg-secondary);
 }
 
 .dte-bg-group-1 {
-    background-color: #f8fafc;
+    background-color: var(--bg-tertiary);
 }
 
 tr.row-call td {
@@ -992,37 +1029,26 @@ tr.row-put:hover td {
     }
 
     /* Transform Positions, Boxes, Txn & Realized tables into consistent cards on mobile */
-    #positions-container,
-    #box-container,
-    #transactions-container,
-    #realized-container {
+    /* ── Mobile card-table: shared rules for all four data-table containers ── */
+    .mobile-card-table {
         margin-left: -12px;
         margin-right: -12px;
     }
 
-    #positions-container .table-responsive,
-    #box-container .table-responsive,
-    #transactions-container .table-responsive,
-    #realized-container .table-responsive {
+    .mobile-card-table .table-responsive {
         border: none;
         overflow-x: visible;
         padding: 0 !important;
     }
 
-    #positions-container table,
-    #box-container table,
-    #transactions-container table,
-    #realized-container table {
+    .mobile-card-table table {
         border-collapse: collapse !important;
         border-spacing: 0 !important;
         width: 100%;
         background: transparent;
     }
 
-    #positions-container thead,
-    #box-container thead,
-    #transactions-container thead,
-    #realized-container thead {
+    .mobile-card-table thead {
         display: none !important;
     }
 
@@ -1082,21 +1108,20 @@ tr.row-put:hover td {
         border: none !important;
     }
 
-    #positions-container tbody,
-    #box-container tbody,
-    #transactions-container tbody,
-    #realized-container tbody {
+    .mobile-card-table tbody {
         display: flex;
         flex-direction: column;
     }
 
+    /* positions & box: skip group-header / spacer rows from card layout */
     #positions-container tr:not(.group-header-row):not(.group-spacer-row),
     #box-container tr:not(.group-header-row),
+    /* transactions & realized: all rows get card layout */
     #transactions-container tr,
     #realized-container tr {
         display: block;
         padding: 8px 12px;
-        background-color: #ffffff;
+        background-color: var(--bg-secondary);
         box-shadow: none;
         margin-bottom: 0;
         transition: background-color 0.2s;
@@ -1120,19 +1145,20 @@ tr.row-put:hover td {
         border-top: 2.5px solid var(--border-color) !important;
     }
 
+    /* Row immediately after a group header: suppress its top border — the header's rule already separates groups */
     #positions-container tr.group-header-row + tr.group-start-row,
     #box-container tr.group-header-row + tr.group-start-row {
-        border-top: 1px solid var(--border-color) !important;
+        border-top: none !important;
     }
 
     #positions-container tr.group-bg-even,
     #box-container tr.group-bg-even {
-        background-color: #ffffff !important;
+        background-color: var(--bg-secondary) !important;
     }
 
     #positions-container tr.group-bg-odd,
     #box-container tr.group-bg-odd {
-        background-color: #f8fafc !important;
+        background-color: var(--bg-tertiary) !important;
     }
 
     #positions-container tr.group-end-row,
@@ -1154,10 +1180,7 @@ tr.row-put:hover td {
         display: none !important;
     }
 
-    #positions-container td,
-    #box-container td,
-    #transactions-container td,
-    #realized-container td {
+    .mobile-card-table td {
         border: none !important;
         background-color: transparent !important;
     }
@@ -1166,10 +1189,10 @@ tr.row-put:hover td {
     #box-container tr:not(.group-header-row):hover,
     #transactions-container tr:hover,
     #realized-container tr:hover {
-        background-color: #f1f5f9;
+        background-color: var(--bg-hover);
     }
 
-    /* Keep group header rows full-width */
+    /* Keep group header rows full-width — flat separator label (no box) */
     #positions-container tr.group-header-row,
     #box-container tr.group-header-row {
         display: block;
@@ -1177,20 +1200,30 @@ tr.row-put:hover td {
         border: none;
         padding: 0;
         box-shadow: none;
-        margin: 8px 0 0 0;
+        margin: 0;
     }
 
     #positions-container tr.group-header-row td,
     #box-container tr.group-header-row td {
         display: block;
-        background: var(--bg-tertiary);
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        padding: 6px 10px;
-        font-weight: 700;
-        color: var(--text-primary);
-        font-size: 0.8rem;
+        background: transparent;
+        border: none;
+        border-top: 2px solid var(--border-color);
+        border-radius: 0;
+        padding: 8px 12px 4px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
         text-align: left !important;
+    }
+
+    /* First group-header in the list needs no top separator */
+    #positions-container tbody tr.group-header-row:first-child td,
+    #box-container tbody tr.group-header-row:first-child td {
+        border-top: none;
+        padding-top: 0;
     }
 
     .mobile-split-row {
@@ -1340,7 +1373,7 @@ tr.row-put:hover td {
     background: rgba(239, 68, 68, 0.1);
 }
 
-/* Type badges */
+/* Type badges — base structure, then colour modifiers override */
 .txn-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -1355,17 +1388,17 @@ tr.row-put:hover td {
 
 .txn-badge-trade {
     background: rgba(37, 99, 235, 0.1);
-    color: #2563eb;
+    color: var(--accent-blue);
 }
 
 .txn-badge-dividend {
     background: rgba(22, 163, 74, 0.1);
-    color: #16a34a;
+    color: var(--accent-green);
 }
 
 .txn-badge-assignment {
     background: rgba(217, 119, 6, 0.1);
-    color: #d97706;
+    color: var(--accent-amber);
 }
 
 /* Position effect coloring */
@@ -1400,37 +1433,39 @@ tr.group-spacer-row td {
 }
 
 tr:not(.group-spacer-row) td {
-    background-color: #ffffff;
+    background-color: var(--bg-secondary);
 }
 
-/* Card Borders around each symbol group (Desktop) */
-tr.group-start-row td {
-    border-top: 1px solid var(--border-color) !important;
-}
+/* Card Borders around each symbol group — desktop only */
+@media (min-width: 769px) {
+    tr.group-start-row td {
+        border-top: 1px solid var(--border-color) !important;
+    }
 
-tr.group-end-row td {
-    border-bottom: 1px solid var(--border-color) !important;
-}
+    tr.group-end-row td {
+        border-bottom: 1px solid var(--border-color) !important;
+    }
 
-#positions-container tr:not(.group-spacer-row) td:first-child {
-    border-left: 1px solid var(--border-color) !important;
-    padding-left: 16px !important;
-}
+    #positions-container tr:not(.group-spacer-row) td:first-child {
+        border-left: 1px solid var(--border-color) !important;
+        padding-left: 16px !important;
+    }
 
-#positions-container tr:not(.group-spacer-row) td.desktop-only-col:last-of-type {
-    border-right: 1px solid var(--border-color) !important;
-}
+    #positions-container tr:not(.group-spacer-row) td.desktop-only-col:last-of-type {
+        border-right: 1px solid var(--border-color) !important;
+    }
 
-/* Corner radius for group cards */
-tr.group-start-row td:first-child,
-tr.group-start-row td.desktop-only-col:last-of-type,
-tr.group-end-row td:first-child,
-tr.group-end-row td.desktop-only-col:last-of-type {
-    border-radius: 0 !important;
-}
+    /* Corner radius for group cards */
+    tr.group-start-row td:first-child,
+    tr.group-start-row td.desktop-only-col:last-of-type,
+    tr.group-end-row td:first-child,
+    tr.group-end-row td.desktop-only-col:last-of-type {
+        border-radius: 0 !important;
+    }
 
-/* Inline Pending Order Rows */
-tr.pending-order-row td {
-    border-top: 1px dashed #cbd5e1 !important;
-    background-color: #f8fafc !important;
+    /* Inline Pending Order Rows */
+    tr.pending-order-row td {
+        border-top: 1px dashed #cbd5e1 !important;
+        background-color: var(--bg-tertiary) !important;
+    }
 }
