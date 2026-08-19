@@ -660,8 +660,8 @@ class TestPositionSort(unittest.TestCase):
 
 class TestFetchOptionChain(unittest.TestCase):
 
-    @patch('requests.get')
-    def test_fetch_option_chain_parsing(self, mock_get):
+    @patch('requests.request')
+    def test_fetch_option_chain_parsing(self, mock_request):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -685,7 +685,7 @@ class TestFetchOptionChain(unittest.TestCase):
                 }
             }
         }
-        mock_get.return_value = mock_response
+        mock_request.return_value = mock_response
 
         res = sp.fetch_option_chain('fake_token', 'AAPL', 'CALL')
 
@@ -701,8 +701,8 @@ class TestFetchOptionChain(unittest.TestCase):
         self.assertEqual(opt['delta'], 0.50)
         self.assertAlmostEqual(opt['change'], 0.0)  # strike 200 == stock 200
 
-    @patch('requests.get')
-    def test_fetch_option_chain_server_side_filtering(self, mock_get):
+    @patch('requests.request')
+    def test_fetch_option_chain_server_side_filtering(self, mock_request):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -717,7 +717,7 @@ class TestFetchOptionChain(unittest.TestCase):
                 }
             }
         }
-        mock_get.return_value = mock_response
+        mock_request.return_value = mock_response
 
         # Filter: min_dte=7, max_dte=60, min_delta=0.1, max_delta=0.3
         res = sp.fetch_option_chain('fake_token', 'AAPL', 'CALL', min_dte=7, max_dte=60, min_delta=0.1, max_delta=0.3)

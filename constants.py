@@ -42,8 +42,12 @@ def get_secondary_account_hash() -> str:
 
 def get_account_hash(account_number: str) -> str:
     """Returns the account hash for a given account number."""
-    if account_number.endswith('acc1'):
+    primary_suffix = os.environ.get('PRIMARY_ACCOUNT_SUFFIX', 'acc1')
+    secondary_suffix = os.environ.get('SECONDARY_ACCOUNT_SUFFIX', 'acc2')
+
+    if account_number.endswith(primary_suffix):
         return get_primary_account_hash()
-    if account_number.endswith('acc2'):
+    if account_number.endswith(secondary_suffix):
         return get_secondary_account_hash()
     raise ValueError(f"Unknown account number: {account_number}")
+

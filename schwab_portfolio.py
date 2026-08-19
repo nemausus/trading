@@ -27,6 +27,13 @@ _SPX_BOX_ROUNDING = 10_000.0
 # Tickers excluded from the uncovered-long (Todo) list
 _TODO_EXCLUDE = frozenset(('QQQM', 'VTI', 'SNOW', 'SPX'))
 
+# Strategy thresholds for action recommendations
+_BTC_PROFIT_TAKE_PCT = 60.0
+_BTC_DELTA_LOW_THRESHOLD = 0.10
+_ROLLOUT_DELTA_HIGH_THRESHOLD = 0.50
+_MPR_ANNUALIZATION_FACTOR = 3000.0
+
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -546,8 +553,15 @@ def _group_spx(spx_positions: list, acc_num: str) -> tuple[list, float]:
 
 def _is_short_put(pos: dict) -> bool:
     """Return True if *pos* is a short put position (negative qty, put contract)."""
-    symbol = pos['symbol']
-    return pos['quantity'] < 0 and len(symbol) > 12 and symbol[12] == 'P'
+    symbol = pos.get('symbol', '')
+    if pos.get('quantity', 0.0) >= 0 or not is_option(symbol):
+        return False
+    try:
+        opt = OptionSymbol.parse_symbol(symbol)
+        return opt.contract_type == 'P'
+    except Exception:
+        return False
+
 
 
 def _enrich_positions(positions: list) -> float:
@@ -613,7 +627,14 @@ def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]
         underlying = _base_symbol(symbol)
         key        = (acc, underlying)
 
-        is_put = len(symbol) > 12 and symbol[12] == 'P'
+        is_put = False
+        if is_option(symbol):
+            try:
+                opt = OptionSymbol.parse_symbol(symbol)
+                is_put = (opt.contract_type == 'P')
+            except Exception:
+                pass
+
         qty = 0 if is_put else int(qty * get_option_multiplier(symbol) / 100)
         net[key] = net.get(key, 0) + qty
 
@@ -622,7 +643,7 @@ def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]
             pct = underlying_mark_pct.get(underlying, 0.0)
             pct_str = f"{pct:+.2f}%"
             actions_by_account.setdefault(acc, []).append(
-                f"STO {underlying} ({pct_str})"
+                f"STO {uncovered}x {underlying} ({pct_str})"
             )
             for pos in positions:
                 if (pos['accountNumber'] == acc and
@@ -645,21 +666,23 @@ def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]
             try:
                 opt = OptionSymbol.parse_symbol(symbol)
                 if opt.contract_type == 'C':
+                    opt_qty_str = f"{abs(int(qty))}x "
 
                     # BTC rule: total gain >= 60% OR (0.0 < delta < 0.10)
-                    if pl_pct >= 60.0 or (0.0 < delta < 0.10):
+                    if pl_pct >= _BTC_PROFIT_TAKE_PCT or (0.0 < delta < _BTC_DELTA_LOW_THRESHOLD):
                         actions_by_account.setdefault(acc, []).append(
-                            f"BTC {symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
+                            f"BTC {opt_qty_str}{symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
                         )
                         pos['action'] = f"BTC {symbol}"
 
-                    if delta > 0.50:
+                    if delta > _ROLLOUT_DELTA_HIGH_THRESHOLD:
                         actions_by_account.setdefault(acc, []).append(
-                            f"ROLL {symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
+                            f"ROLLOUT {opt_qty_str}{symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
                         )
                         pos['action'] = f"ROLL {symbol}"
             except Exception as e:
                 logging.warning("Could not parse option symbol %s for action check: %s", symbol, e)
+
 
     return {acc: "; ".join(items) for acc, items in actions_by_account.items()}
 
@@ -679,7 +702,7 @@ def _enrich_quotes(positions: list, quotes: dict) -> None:
         pos['delta'] = quote_fields.get('delta', 0.0) or 0.0
         pos['markPercentChange'] = float(quote_fields.get('markPercentChange', 0.0) or 0.0)
 
-        if len(symbol) > 12:
+        if is_option(symbol):
             try:
                 bid = quote_fields.get('bidPrice', 0.0) or 0.0
                 up  = quote_fields.get('underlyingPrice', 0.0) or 0.0
@@ -693,8 +716,9 @@ def _enrich_quotes(positions: list, quotes: dict) -> None:
                     time_value = bid - max(0.0, strike - up)
 
                 if dte > 0 and up > 0:
-                    pos['mpr'] = (time_value * 3000.0) / dte / up
+                    pos['mpr'] = (time_value * _MPR_ANNUALIZATION_FACTOR) / dte / up
             except Exception as e:
+
                 logging.error("Error calculating MPR for %s: %s", symbol, e)
 
 
