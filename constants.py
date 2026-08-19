@@ -19,14 +19,22 @@ SCHWAB_TZ: datetime.timezone = datetime.timezone(
 )
 
 
-def get_primary_account_hash() -> str | None:
-    """Returns the primary account hash from environment variables."""
-    return os.environ.get('IND_ACCOUNT')
+def get_primary_account_hash() -> str:
+    """Return the primary account hash from environment variables.
+
+    Raises:
+        EnvironmentError: If the IND_ACCOUNT environment variable is not set.
+    """
+    account_hash = os.environ.get('IND_ACCOUNT')
+    if not account_hash:
+        raise EnvironmentError("IND_ACCOUNT environment variable is not configured.")
+    return account_hash
 
 
 def get_secondary_account_hash() -> str | None:
     """Returns the secondary account hash from environment variables."""
     return os.environ.get('IRA_ACCOUNT')
+
 
 def get_account_hash(account_number: str) -> str | None:
     """Returns the account hash for a given account number."""

@@ -133,10 +133,11 @@ def sync_transactions(uid: str, access_token: str) -> dict:
             account_hash (str)  -- resolved account hash (or error key)
     """
     # -- Step 1: resolve account hash ----------------------------------------
-    account_hash = get_primary_account_hash()
-    if not account_hash:
+    try:
+        account_hash = get_primary_account_hash()
+    except EnvironmentError as e:
         return {
-            "error": "Could not resolve primary account hash from Schwab.",
+            "error": str(e),
             "new_count": 0,
         }
 

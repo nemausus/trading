@@ -118,6 +118,11 @@ def redirect_error(message: str):
     return redirect(f'/?schwab=error&message={err_msg}')
 
 
+def _get_limit(default: int, cap: int) -> int:
+    """Parse and cap the 'limit' query-string parameter."""
+    return min(request.args.get('limit', default=default, type=int), cap)
+
+
 @app.route('/api/auth/schwab', methods=['POST'])
 @limiter.limit("5 per minute")
 @require_firebase_auth
@@ -296,19 +301,13 @@ def schwab_sync_transactions(decoded_token, access_token):
 @require_firebase_auth
 def schwab_get_transactions(decoded_token):
     uid = decoded_token['uid']
-
-    # Auto-discover the primary account hash from constants (no Schwab call needed)
-    account_hash = get_primary_account_hash()
-    if not account_hash:
-        app.logger.error("No primary account hash found for user %s", uid)
-        return jsonify({'error': 'No primary account hash found'}), 400
-
-    limit = request.args.get('limit', default=100, type=int)
-    limit = min(limit, 100)  # cap to prevent abuse
-
     try:
-        txns = firestore_db.get_transactions(uid, account_hash, limit)
+        account_hash = get_primary_account_hash()
+        txns = firestore_db.get_transactions(uid, account_hash, _get_limit(100, 100))
         return jsonify({'transactions': txns, 'account_hash': account_hash})
+    except EnvironmentError as e:
+        app.logger.error("No primary account hash for user %s: %s", uid, e)
+        return jsonify({'error': 'No primary account hash found'}), 400
     except Exception as e:
         app.logger.error("Error reading transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to read transactions'}), 502
@@ -319,20 +318,14 @@ def schwab_get_transactions(decoded_token):
 @require_firebase_auth
 def schwab_get_realized(decoded_token):
     uid = decoded_token['uid']
-
-    # Auto-discover the primary account hash from constants (no Schwab call needed)
-    account_hash = get_primary_account_hash()
-    if not account_hash:
-        app.logger.error("No primary account hash found for user %s", uid)
-        return jsonify({'error': 'No primary account hash found'}), 400
-
-    limit = request.args.get('limit', default=1000, type=int)
-    limit = min(limit, 1000)  # cap to prevent abuse
-
     try:
-        txns = firestore_db.get_transactions(uid, account_hash, limit)
+        account_hash = get_primary_account_hash()
+        txns = firestore_db.get_transactions(uid, account_hash, _get_limit(1000, 1000))
         realized_txns = _calculate_realized_pl(txns)
         return jsonify({'realized_transactions': realized_txns, 'account_hash': account_hash})
+    except EnvironmentError as e:
+        app.logger.error("No primary account hash for user %s: %s", uid, e)
+        return jsonify({'error': 'No primary account hash found'}), 400
     except Exception as e:
         app.logger.error("Error reading transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to read transactions'}), 502
@@ -455,8 +448,11 @@ def _calculate_realized_pl(txns):
             'netAmount': val['netAmount_sum']
         })
 
-    # Sort grouped_rows by ['accountNumber', 'time', 'positionEffect'], ascending=[True, True, False]
-    # We sort positionEffect descending ('OPENING' > 'INTEREST' > 'CLOSING') first, then other keys ascending.
+    # Two-pass stable sort: first sort by positionEffect descending
+    # ('OPENING' > 'INTEREST' > 'CLOSING' alphabetically) so that openings are
+    # processed before closings within the same (account, time) group, then
+    # re-sort ascending by (accountNumber, time). Python's sort is stable so
+    # the positionEffect ordering is preserved within equal (account, time) keys.
     grouped_rows.sort(key=lambda x: x['positionEffect'] or '', reverse=True)
     grouped_rows.sort(key=lambda x: (x['accountNumber'] or '', x['time'] or ''))
 

@@ -32,6 +32,15 @@ _TODO_EXCLUDE = frozenset(('QQQM', 'VTI', 'SNOW', 'SPX'))
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _schwab_headers(access_token: str) -> dict:
+    """Return standard Schwab Bearer auth headers for API calls."""
+    return {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+
+
+def _fval(d: dict, key: str, default: float = 0.0) -> float:
+    """Safely read a float from *d*, treating None and missing as *default*."""
+    return float(d.get(key, default) or default)
+
 def _parse_expiration_date(expiration_date: str) -> datetime.date:
     try:
         dt = datetime.datetime.strptime(expiration_date, '%y%m%d')
@@ -129,7 +138,7 @@ def fetch_quotes(access_token: str, symbols: list) -> dict:
     if not symbols:
         return {}
 
-    headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+    headers = _schwab_headers(access_token)
     quotes: dict = {}
 
     for i in range(0, len(symbols), 200):
@@ -151,7 +160,7 @@ def fetch_quotes(access_token: str, symbols: list) -> dict:
 
 def fetch_active_orders(access_token: str, account_nums: list) -> list:
     """Fetch open (no closeTime) orders for every account in *account_hashes*."""
-    headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+    headers = _schwab_headers(access_token)
     from_date = to_iso_datetime_str(
         (datetime.datetime.now(SCHWAB_TZ) - datetime.timedelta(days=7)).date().isoformat()
     )
@@ -217,14 +226,14 @@ def _parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) 
                 exp_date_raw = item.get('expirationDate', '')
                 exp_date = exp_date_raw[:10] if exp_date_raw else ''
 
-                bid = float(item.get('bid', 0.0) or 0.0)
-                ask = float(item.get('ask', 0.0) or 0.0)
-                mark = float(item.get('mark', 0.0) or (bid + ask) / 2.0)
-                delta = float(item.get('delta', 0.0) or 0.0)
-                volatility = float(item.get('volatility', 0.0) or 0.0)
+                bid = _fval(item, 'bid')
+                ask = _fval(item, 'ask')
+                mark = _fval(item, 'mark') or (bid + ask) / 2.0
+                delta = _fval(item, 'delta')
+                volatility = _fval(item, 'volatility')
                 volume = int(item.get('totalVolume', 0) or 0)
                 open_interest = int(item.get('openInterest', 0) or 0)
-                time_value = float(item.get('timeValue', 0.0) or 0.0)
+                time_value = _fval(item, 'timeValue')
 
                 change_pct = (strike * 100.0 / stock_price - 100.0) if stock_price > 0 else 0.0
                 be_price = strike + mark if delta > 0 else strike - mark
@@ -282,7 +291,7 @@ def _validate_chain_params(symbol: str, min_dte: int | None, max_dte: int | None
 
 def _fetch_chains(access_token: str, params: dict) -> dict | None:
     """GET /marketdata/v1/chains and return parsed JSON, or None on error."""
-    headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+    headers = _schwab_headers(access_token)
     url = "https://api.schwabapi.com/marketdata/v1/chains"
     try:
         return schwab_request("GET", url, headers=headers, params=params)
@@ -462,10 +471,7 @@ SCHWAB_TRADER_BASE_URL = "https://api.schwabapi.com/trader/v1"
 
 def fetch_accounts_raw(access_token: str) -> list:
     """Fetch raw account data (with positions) from the Schwab Trader API."""
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Accept": "application/json",
-    }
+    headers = _schwab_headers(access_token)
     return schwab_request(
         "GET",
         f"{SCHWAB_TRADER_BASE_URL}/accounts",
@@ -690,8 +696,6 @@ def _enrich_quotes(positions: list, quotes: dict) -> None:
                     pos['mpr'] = (time_value * 3000.0) / dte / up
             except Exception as e:
                 logging.error("Error calculating MPR for %s: %s", symbol, e)
-
-
 
 
 
