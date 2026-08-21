@@ -144,6 +144,8 @@ def calculate_realized_pl_with_status(txns: list[dict]) -> tuple[list[dict], set
         key = f"{row['accountNumber']}_{row['symbol']}_{row['sl']}"
 
         if row['positionEffect'] == 'INTEREST':
+            interest_aids = '_'.join(sorted(row.get('activity_ids', [])))
+            rec_id = f"realized_interest_{row['accountNumber']}_{interest_aids}" if interest_aids else f"realized_{row['accountNumber']}_interest_{row['time']}_{idx}"
             result.append({
                 'accountNumber': row['accountNumber'],
                 'amount': 1.0,
@@ -153,7 +155,7 @@ def calculate_realized_pl_with_status(txns: list[dict]) -> tuple[list[dict], set
                 'sell_date': row['time'],
                 'sell_price': 0.0,
                 'P/L': row['netAmount'],
-                'id': f"realized_{row['accountNumber']}_interest_{row['time']}_{idx}"
+                'id': rec_id
             })
             for aid in row.get('activity_ids', []):
                 processed_activity_ids.add(aid)
@@ -172,7 +174,13 @@ def calculate_realized_pl_with_status(txns: list[dict]) -> tuple[list[dict], set
                 unit_net_row = row['netAmount'] / row['amount'] if row['amount'] else 0.0
                 realized_pl = (unit_net_o + unit_net_row) * matched_quantity
 
-                rec_id = f"realized_{row['accountNumber']}_{row['symbol']}_{o['time']}_{row['time']}_{idx}"
+                open_aids = '_'.join(sorted(o.get('activity_ids', [])))
+                close_aids = '_'.join(sorted(row.get('activity_ids', [])))
+                if open_aids and close_aids:
+                    rec_id = f"realized_{open_aids}_{close_aids}"
+                else:
+                    rec_id = f"realized_{row['accountNumber']}_{row['symbol']}_{o['time']}_{row['time']}_{idx}"
+
                 result.append({
                     'accountNumber': o['accountNumber'],
                     'amount': matched_quantity,
