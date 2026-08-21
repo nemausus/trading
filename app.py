@@ -12,7 +12,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 import firestore_db
-from constants import get_all_account_hashes, get_primary_account_hash
+from constants import get_all_account_hashes, get_secondary_account_hash
 from schwab_auth import SchwabAuthManager
 import schwab_portfolio
 import schwab_transactions
@@ -334,6 +334,10 @@ def schwab_get_realized(decoded_token):
             for acc_hash in account_hashes:
                 realized_pl.process_account_realized_pl(uid, acc_hash)
             realized = firestore_db.get_realized_pl_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
+        # csv_realized = realized_pl.load_csv_realized_pl()
+        # realized.extend(csv_realized)
+        # realized.sort(key=lambda x: x.get('sell_date', ''), reverse=True)
+        # firestore_db.save_realized_pl_transactions(uid, get_secondary_account_hash(), csv_realized)
         for r in realized:
             if isinstance(r, dict):
                 r.pop('account_hash', None)
@@ -344,6 +348,7 @@ def schwab_get_realized(decoded_token):
     except Exception as e:
         app.logger.error("Error reading realized transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to read transactions'}), 502
+
 
 
 

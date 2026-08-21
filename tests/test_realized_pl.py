@@ -185,7 +185,54 @@ class TestRealizedPL(unittest.TestCase):
         self.assertEqual(result[0]['P/L'], 500.0)
         self.assertEqual(processed_ids, {'act_open_1', 'act_close_1'})
 
+    def test_load_csv_realized_pl_missing_file(self):
+        records = realized_pl.load_csv_realized_pl('/non/existent/path.csv')
+        self.assertEqual(records, [])
+
+    def test_format_csv_symbol(self):
+        self.assertEqual(realized_pl._format_csv_symbol('META 09/11/2026 640.00 C'), 'META  260911C00640000')
+        self.assertEqual(realized_pl._format_csv_symbol('IBIT 09/11/2026 39.00 C'), 'IBIT  260911C00039000')
+        self.assertEqual(realized_pl._format_csv_symbol('NVDA 02/13/2026 197.50 C'), 'NVDA  260213C00197500')
+        self.assertEqual(realized_pl._format_csv_symbol('QQQ'), 'QQQ')
+        self.assertEqual(realized_pl._format_csv_symbol(''), '')
+
+    def test_load_csv_realized_pl_valid(self):
+        import tempfile
+        csv_content = (
+            "Realized Gain/Loss - Lot Details for Roth_Contributory_IRA as of Fri Aug 21 01:48:02 EDT 2026\n"
+            "Symbol,Name,Closed Date,Opened Date,Quantity,Proceeds Per Share,Cost Per Share,Proceeds,Cost Basis (CB),Gain/Loss ($)\n"
+            'IBIT 09/11/2026 39.00 C,CALL ISHR BITCOIN TR,08/21/2026,08/21/2026,4,$0.36,$2.81,$145.34,"$1,122.65",-$977.31\n'
+        )
+        with tempfile.NamedTemporaryFile('w+', suffix='.csv', delete=False) as tmp:
+            tmp.write(csv_content)
+            tmp.flush()
+            tmp_path = tmp.name
+
+        try:
+            records = realized_pl.load_csv_realized_pl(tmp_path)
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0]['accountNumber'], '11112222')
+            self.assertEqual(records[0]['symbol'], 'IBIT  260911C00039000')
+            self.assertEqual(records[0]['buy_date'], '2026-08-21')
+            self.assertEqual(records[0]['sell_date'], '2026-08-21')
+            self.assertEqual(records[0]['amount'], 4.0)
+            self.assertEqual(records[0]['buy_price'], 2.81)
+            self.assertEqual(records[0]['sell_price'], 0.36)
+            self.assertEqual(records[0]['P/L'], -977.31)
+        finally:
+            import os
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def test_load_csv_realized_pl_default_path(self):
+        records = realized_pl.load_csv_realized_pl()
+        self.assertIsInstance(records, list)
+        if records:
+            for rec in records:
+                self.assertEqual(rec['accountNumber'], '11112222')
+
 
 if __name__ == '__main__':
     unittest.main()
+
 

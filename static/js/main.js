@@ -206,12 +206,15 @@ document.getElementById('btn-sync-transactions')?.addEventListener('click', sync
 const handleRealizedFilter = () => {
     const symbolInput = document.getElementById('realized-symbol');
     const minDateInput = document.getElementById('realized-min-date');
+    const accountSelect = document.getElementById('realized-account');
     const symbolVal = symbolInput ? symbolInput.value.trim().toUpperCase() : 'ALL';
     const minDateVal = minDateInput ? minDateInput.value : '';
-    applyRealizedFilters(symbolVal, minDateVal);
+    const accountVal = accountSelect ? accountSelect.value : 'ALL';
+    applyRealizedFilters(symbolVal, minDateVal, accountVal);
 };
 
 document.getElementById('btn-filter-realized')?.addEventListener('click', handleRealizedFilter);
+document.getElementById('realized-account')?.addEventListener('change', handleRealizedFilter);
 document.getElementById('realized-symbol')?.addEventListener('keyup', (e) => {
     if (e.key === 'Enter') handleRealizedFilter();
 });
@@ -222,10 +225,13 @@ document.getElementById('realized-min-date')?.addEventListener('keyup', (e) => {
 document.getElementById('btn-reset-realized')?.addEventListener('click', () => {
     const symbolInput = document.getElementById('realized-symbol');
     const minDateInput = document.getElementById('realized-min-date');
+    const accountSelect = document.getElementById('realized-account');
     if (symbolInput) symbolInput.value = 'ALL';
+    if (accountSelect) accountSelect.value = 'ALL';
     const currentYear = new Date().getFullYear();
     const defaultMinDate = `${currentYear}-01-01`;
     if (minDateInput) minDateInput.value = defaultMinDate;
-    applyRealizedFilters('ALL', defaultMinDate);
+    applyRealizedFilters('ALL', defaultMinDate, 'ALL');
 });
+
 

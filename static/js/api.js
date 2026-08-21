@@ -376,6 +376,23 @@ export async function fetchRealized() {
 
         if (response.ok) {
             allRealized = data.realized_transactions || [];
+            // Populate account dropdown options dynamically
+            const accountSelect = document.getElementById('realized-account');
+            if (accountSelect) {
+                const currentSelection = accountSelect.value || 'ALL';
+                const accountsSet = new Set(allRealized.map(r => r.accountNumber).filter(Boolean));
+                const sortedAccounts = Array.from(accountsSet).sort();
+
+                accountSelect.innerHTML = '<option value="ALL">ALL</option>' +
+                    sortedAccounts.map(acc => `<option value="${acc}">${acc}</option>`).join('');
+
+                if (sortedAccounts.includes(currentSelection)) {
+                    accountSelect.value = currentSelection;
+                } else {
+                    accountSelect.value = 'ALL';
+                }
+            }
+
             // Apply default filters
             const symbolInput = document.getElementById('realized-symbol');
             const minDateInput = document.getElementById('realized-min-date');
@@ -389,8 +406,9 @@ export async function fetchRealized() {
 
             const symbolVal = symbolInput ? symbolInput.value.trim().toUpperCase() : 'ALL';
             const minDateVal = minDateInput ? minDateInput.value : defaultMinDate;
+            const accountVal = accountSelect ? accountSelect.value : 'ALL';
 
-            applyRealizedFilters(symbolVal, minDateVal);
+            applyRealizedFilters(symbolVal, minDateVal, accountVal);
         } else {
             const errMsg = data.error || 'Failed to load realized transactions';
             if (data.error === 'No primary account hash found') {
@@ -407,7 +425,7 @@ export async function fetchRealized() {
     }
 }
 
-export function applyRealizedFilters(symbol, minDate) {
+export function applyRealizedFilters(symbol, minDate, accountNum) {
     let filtered = allRealized;
 
     // Filter by symbol if not "ALL" and not empty
@@ -418,6 +436,11 @@ export function applyRealizedFilters(symbol, minDate) {
     // Filter by min sell/close date
     if (minDate) {
         filtered = filtered.filter(r => r.sell_date && r.sell_date >= minDate);
+    }
+
+    // Filter by accountNumber if not "ALL" and not empty
+    if (accountNum && accountNum !== 'ALL') {
+        filtered = filtered.filter(r => String(r.accountNumber) === String(accountNum));
     }
 
     renderRealized(filtered);
