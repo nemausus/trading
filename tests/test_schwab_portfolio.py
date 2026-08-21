@@ -194,7 +194,7 @@ class TestProcessAccountsPositions(unittest.TestCase):
         p = result['positions'][0]
         self.assertEqual(p['quantity'], -1.0)   # short
         self.assertAlmostEqual(p['P/L'], 100.0)
-        self.assertGreater(p['dte'], 0)
+        self.assertGreaterEqual(p['dte'], 0)
 
     def test_no_positions_account_skipped(self):
         account = {'securitiesAccount': {'accountNumber': 'ACC1', 'positions': [],

@@ -58,3 +58,46 @@ export function getPLPercentFormatting(plPercent) {
 export function getSymbolBadgeClass(symbol) {
     return 'symbol-text';
 }
+
+export function formatOptionSymbol(symbol) {
+    if (!symbol) return '';
+    const s = symbol.trim();
+    if (s.length >= 18 && (s.includes('C') || s.includes('P'))) {
+        const ticker = s.slice(0, 6).trim();
+        const rest = s.slice(6);
+        let cpIdx = rest.indexOf('C');
+        if (cpIdx === -1) cpIdx = rest.indexOf('P');
+        if (cpIdx >= 6) {
+            const yymmdd = rest.slice(0, cpIdx);
+            const cp = rest[cpIdx];
+            const strikeStr = rest.slice(cpIdx + 1);
+            if (yymmdd.length === 6 && /^\d+$/.test(strikeStr)) {
+                const yy = yymmdd.slice(0, 2);
+                const mm = parseInt(yymmdd.slice(2, 4), 10);
+                const dd = parseInt(yymmdd.slice(4, 6), 10);
+                const strikeVal = parseInt(strikeStr, 10) / 1000.0;
+                const strikeFmt = (strikeVal % 1 === 0) ? strikeVal.toFixed(0) : strikeVal.toString();
+                return `${ticker} ${mm}/${dd}/${yy} ${strikeFmt}${cp}`;
+            }
+        }
+    }
+
+    const parts = s.split(/\s+/);
+    if (parts.length === 4 && (parts[3] === 'C' || parts[3] === 'P') && parts[1].includes('/')) {
+        const [ticker, dateStr, strikeStr, cp] = parts;
+        try {
+            const dateParts = dateStr.split('/');
+            const mm = parseInt(dateParts[0], 10);
+            const dd = parseInt(dateParts[1], 10);
+            const yy = dateParts[2].length === 4 ? dateParts[2].slice(2) : dateParts[2];
+            const strikeVal = parseFloat(strikeStr);
+            const strikeFmt = isNaN(strikeVal) ? strikeStr : ((strikeVal % 1 === 0) ? strikeVal.toFixed(0) : strikeVal.toString());
+            return `${ticker} ${mm}/${dd}/${yy} ${strikeFmt}${cp}`;
+        } catch (e) {
+            // Fall through
+        }
+    }
+
+    return s;
+}
+

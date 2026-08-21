@@ -1,7 +1,7 @@
 import {
     formatCurrency, formatPercent, formatNumber,
     baseUnderlying, sortPositionsGrouped,
-    getPLFormatting, getPLPercentFormatting, getSymbolBadgeClass
+    getPLFormatting, getPLPercentFormatting, getSymbolBadgeClass, formatOptionSymbol
 } from './utils.js';
 
 export let lastPositions = [];
@@ -172,7 +172,7 @@ function renderAccountActionsHtml(sum) {
             <tr>
                 <td><span class="action-type-badge ${typeClass}">${act.type}</span></td>
                 <td style="text-align: right; font-weight: 500;">${act.qty}</td>
-                <td><span class="symbol-text">${act.symbol}</span></td>
+                <td><span class="symbol-text">${formatOptionSymbol(act.symbol)}</span></td>
                 <td style="color: var(--text-secondary); font-size: 0.82rem;">${act.details}</td>
             </tr>
         `;
@@ -182,7 +182,7 @@ function renderAccountActionsHtml(sum) {
                 <div class="mobile-action-left">
                     <span class="action-type-badge ${typeClass}">${act.type}</span>
                     <span style="font-weight: 500;">${act.qty}</span>
-                    <span class="symbol-text" style="font-weight: 500;">${act.symbol}</span>
+                    <span class="symbol-text" style="font-weight: 500;">${formatOptionSymbol(act.symbol)}</span>
                 </div>
                 <div class="mobile-action-right">${act.details}</div>
             </div>
@@ -449,10 +449,13 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                     });
                 }
 
+                const isOptionPos = (pos.symbol && pos.symbol.length > 10 && pos.symbol.includes(' ')) || (pos.dte !== undefined && pos.dte >= 0);
+                const chainBtnHtml = isOptionPos ? `<button class="btn-icon-chain" data-symbol="${pos.symbol}" title="View Roll Chain">🔗</button>` : '';
+
                 tableHtml += spacerHtml + `
                     <tr class="${groupBgClass} ${groupStartClass} ${groupEndClass}">
                         <!-- Desktop Columns -->
-                        <td class="desktop-only-col" data-label="Symbol">${actionBadgeHtml} <span class="${symbolBadgeClass}">${pos.symbol}</span></td>
+                        <td class="desktop-only-col" data-label="Symbol">${actionBadgeHtml} <span class="${symbolBadgeClass}">${formatOptionSymbol(pos.symbol)}</span> ${chainBtnHtml}</td>
                         <td class="desktop-only-col" style="text-align: right;">${pos.quantity}</td>
                         <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['cost/share'])}</td>
                         <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
@@ -468,7 +471,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         <!-- Mobile Only Combined Row Layout -->
                         <td class="mobile-only-card-col" colspan="12">
                             <div class="mobile-split-row header-row">
-                                <div class="split-col col-symbol">${actionBadgeHtml} <span>${pos.quantity} x ${pos.symbol}</span></div>
+                                <div class="split-col col-symbol">${actionBadgeHtml} <span>${pos.quantity} x ${formatOptionSymbol(pos.symbol)}</span> ${chainBtnHtml}</div>
                                 <div class="split-col col-pl ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
                             </div>
                             <div class="mobile-split-row details-row">
@@ -914,7 +917,7 @@ export function renderRealized(realizedList) {
                 <td class="desktop-only-col" style="text-align:right;">${formatCurrency(r.buy_price)}</td>
                 <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.sell_date)}</td>
                 <td class="desktop-only-col" style="text-align:right;">${formatCurrency(r.sell_price)}</td>
-                <td class="desktop-only-col"><span class="${symbolBadgeClass}">${symbol}</span></td>
+                <td class="desktop-only-col"><span class="${symbolBadgeClass}">${formatOptionSymbol(symbol)}</span></td>
                 <td class="desktop-only-col" style="text-align:right;">${formatNumber(r.amount, 0)}</td>
                 <td class="desktop-only-col ${plFormat.cssClass}" style="text-align:right; font-weight:600;">${plFormat.sign}${plFormat.valDisplay}</td>
 
@@ -922,7 +925,7 @@ export function renderRealized(realizedList) {
                 <td class="mobile-only-card-col" colspan="8">
                     <div class="mobile-split-row header-row">
                         <div class="split-col col-symbol">
-                            <span class="${symbolBadgeClass}">${symbol}</span>
+                            <span class="${symbolBadgeClass}">${formatOptionSymbol(symbol)}</span>
                             <span style="color: var(--text-secondary); font-size:0.75rem; margin-left:6px;">Acc: ${r.accountNumber || '—'} &bull; Qty: ${formatNumber(r.amount, 0)}</span>
                         </div>
                         <div class="split-col ${plFormat.cssClass}" style="text-align: right; font-weight: 700;">${plFormat.sign}${plFormat.valDisplay}</div>
@@ -947,6 +950,101 @@ export function renderRealized(realizedList) {
         { label: 'Realized P/L', cls: 'text-right' },
     ], rowsHtml);
 }
+
+
+export function renderRollChainModal(data) {
+    const modal = document.getElementById('roll-chain-modal');
+    const badgeEl = document.getElementById('modal-roll-badge');
+    const bodyEl = document.getElementById('modal-roll-body');
+
+    if (!modal || !bodyEl) return;
+
+    modal.classList.remove('hidden');
+
+    if (!data || data.error) {
+        bodyEl.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>${data ? data.error : 'Failed to load roll chain.'}</p></div>`;
+        return;
+    }
+
+    const rollChain = data.roll_chain || {};
+    const chain = rollChain.chain || [];
+    const summary = rollChain.summary || {};
+    const targetSymbol = rollChain.target_symbol || '';
+    const underlying = rollChain.underlying || '';
+
+    if (badgeEl) badgeEl.textContent = underlying || targetSymbol;
+
+    if (chain.length === 0) {
+        bodyEl.innerHTML = `<div class="no-data-msg"><p>No transaction history found for ${targetSymbol}.</p></div>`;
+        return;
+    }
+
+    const netAmountFmt = getPLFormatting(summary.total_net_amount || 0);
+
+    let summaryHtml = `
+        <div class="roll-summary-pill">
+            <div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">Roll History</div>
+                <div style="font-size: 1rem; font-weight: 600;">${summary.is_rolled ? `${summary.total_legs} Legs Sequence` : 'Direct Open Position'}</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">Total Net Credit / Debit</div>
+                <div style="font-size: 1.1rem; font-weight: 700;" class="${netAmountFmt.cssClass}">${netAmountFmt.sign}${netAmountFmt.valDisplay}</div>
+            </div>
+        </div>
+    `;
+
+    let timelineHtml = '<div class="roll-timeline">';
+    const displayChain = [...chain].reverse();
+
+    displayChain.forEach((leg, idx) => {
+        const isCurrent = (leg.symbol === targetSymbol || idx === 0);
+        const actionTagClass = leg.action === 'STO' ? 'action-type-sto' : (leg.action === 'BTO' ? 'action-type-btc' : 'action-type-roll');
+        const stepNetVal = leg.roll_net_amount !== undefined ? leg.roll_net_amount : (leg.netAmount || 0);
+        const netFmt = getPLFormatting(stepNetVal);
+        const stepLabel = leg.roll_net_amount !== undefined ? 'Roll Net Credit' : 'Leg Net';
+
+        let detailsStr = '';
+        if (leg.close_leg) {
+            const closeNetFmt = getPLFormatting(leg.close_leg.netAmount || 0);
+            detailsStr = `<div style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">Rolled from <strong>${formatOptionSymbol(leg.close_leg.symbol)}</strong> (BTC ${leg.close_leg.amount}x @ ${formatCurrency(leg.close_leg.price)} &bull; ${closeNetFmt.valDisplay})</div>`;
+        }
+
+        const dateStr = leg.time ? leg.time.slice(0, 10) : 'Initial';
+
+        timelineHtml += `
+            <div class="roll-timeline-item">
+                <div class="roll-timeline-node" style="${isCurrent ? 'background: var(--accent-green, #10b981);' : ''}"></div>
+                <div class="roll-timeline-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                        <div>
+                            <span class="action-type-badge ${actionTagClass}" style="margin-right:6px;">${leg.action}</span>
+                            <strong style="font-size:0.95rem;">${formatOptionSymbol(leg.symbol)}</strong>
+                            ${isCurrent ? ' <span style="font-size:0.75rem; background:rgba(16,185,129,0.15); color:var(--accent-green); padding:1px 6px; border-radius:4px;">Current Open</span>' : ''}
+                        </div>
+                        <span style="font-size:0.8rem; color:var(--text-secondary);">${dateStr}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-secondary); margin-top:4px;">
+                        <span>Qty: ${leg.amount} @ ${formatCurrency(leg.price)}</span>
+                        <span class="${netFmt.cssClass}" style="font-weight:600;">${stepLabel}: ${netFmt.sign}${netFmt.valDisplay}</span>
+                    </div>
+                    ${detailsStr}
+                </div>
+            </div>
+        `;
+    });
+
+    timelineHtml += '</div>';
+
+    bodyEl.innerHTML = summaryHtml + timelineHtml;
+}
+
+
+export function closeRollChainModal() {
+    const modal = document.getElementById('roll-chain-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
 
 
 

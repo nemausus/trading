@@ -294,55 +294,64 @@ def load_csv_realized_pl(csv_path: str = ROTH_REALIZED_CSV_PATH) -> list[dict]:
     Returns:
         List of realized P/L transaction dictionaries.
     """
-    with open(csv_path, 'r', encoding='utf-8') as f:
-        rows = list(csv.reader(f))
+    if not os.path.exists(csv_path):
+        logger.warning("Realized P/L CSV file not found at %s", csv_path)
+        return []
 
-    header_idx = None
-    for i, row in enumerate(rows):
-        if row and len(row) > 0 and row[0].strip() == 'Symbol':
-            header_idx = i
-            break
+    try:
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            rows = list(csv.reader(f))
 
-    if header_idx is None:
-        raise ValueError("Header 'Symbol' not found in CSV file %s", csv_path)
+        header_idx = None
+        for i, row in enumerate(rows):
+            if row and len(row) > 0 and row[0].strip() == 'Symbol':
+                header_idx = i
+                break
 
-    def parse_num(val: str) -> float:
-        if not val:
-            return 0.0
-        v = val.replace('$', '').replace(',', '').strip()
-        return float(v)
+        if header_idx is None:
+            logger.warning("Header 'Symbol' not found in CSV file %s", csv_path)
+            return []
 
-    def parse_date(val: str) -> str:
-        if not val:
-            return ''
-        try:
-            return datetime.strptime(val.strip(), '%m/%d/%Y').strftime('%Y-%m-%d')
-        except ValueError:
-            return val.strip()
+        def parse_num(val: str) -> float:
+            if not val:
+                return 0.0
+            v = val.replace('$', '').replace(',', '').strip()
+            return float(v)
 
-    records = []
-    for row in rows[header_idx + 1:]:
-        if not row or len(row) < 10 or not row[0].strip():
-            continue
-        symbol = _format_csv_symbol(row[0].strip())
-        closed_date = parse_date(row[2])
-        opened_date = parse_date(row[3])
-        qty = parse_num(row[4])
-        proceeds_per_share = parse_num(row[5])
-        cost_per_share = parse_num(row[6])
-        gain_loss = parse_num(row[9])
+        def parse_date(val: str) -> str:
+            if not val:
+                return ''
+            try:
+                return datetime.strptime(val.strip(), '%m/%d/%Y').strftime('%Y-%m-%d')
+            except ValueError:
+                return val.strip()
 
-        records.append({
-            'accountNumber': '11112222',
-            'amount': qty,
-            'symbol': symbol,
-            'buy_date': opened_date,
-            'buy_price': cost_per_share,
-            'sell_date': closed_date,
-            'sell_price': proceeds_per_share,
-            'P/L': gain_loss,
-            'id': f"csv_11112222_{opened_date}_{closed_date}_{symbol}_{qty}"
-        })
+        records = []
+        for row in rows[header_idx + 1:]:
+            if not row or len(row) < 10 or not row[0].strip():
+                continue
+            symbol = _format_csv_symbol(row[0].strip())
+            closed_date = parse_date(row[2])
+            opened_date = parse_date(row[3])
+            qty = parse_num(row[4])
+            proceeds_per_share = parse_num(row[5])
+            cost_per_share = parse_num(row[6])
+            gain_loss = parse_num(row[9])
 
-    records.sort(key=lambda x: x.get('sell_date', ''), reverse=True)
-    return records
+            records.append({
+                'accountNumber': '11112222',
+                'amount': qty,
+                'symbol': symbol,
+                'buy_date': opened_date,
+                'buy_price': cost_per_share,
+                'sell_date': closed_date,
+                'sell_price': proceeds_per_share,
+                'P/L': gain_loss,
+                'id': f"csv_11112222_{opened_date}_{closed_date}_{symbol}_{qty}"
+            })
+
+        records.sort(key=lambda x: x.get('sell_date', ''), reverse=True)
+        return records
+    except Exception as e:
+        logger.warning("Error loading realized P/L CSV from %s: %s", csv_path, e)
+        return []

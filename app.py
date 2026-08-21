@@ -17,6 +17,7 @@ from schwab_auth import SchwabAuthManager
 import schwab_portfolio
 import schwab_transactions
 import realized_pl
+import roll_chain
 
 
 schwab_auth = SchwabAuthManager()
@@ -348,6 +349,25 @@ def schwab_get_realized(decoded_token):
     except Exception as e:
         app.logger.error("Error reading realized transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to read transactions'}), 502
+
+
+@app.route('/api/schwab/roll-chain')
+@limiter.limit("30 per minute")
+@require_firebase_auth
+def schwab_get_roll_chain(decoded_token):
+    uid = decoded_token['uid']
+    symbol = request.args.get('symbol', '').strip()
+    if not symbol:
+        return jsonify({'error': 'Parameter symbol is required'}), 400
+
+    try:
+        account_hashes = get_all_account_hashes()
+        txns = firestore_db.get_transactions_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
+        chain_data = roll_chain.build_roll_chain(txns, symbol)
+        return jsonify({'roll_chain': chain_data})
+    except Exception as e:
+        app.logger.error("Error generating roll chain for user %s symbol %s: %s", uid, symbol, e)
+        return jsonify({'error': 'Failed to generate roll chain'}), 502
 
 
 

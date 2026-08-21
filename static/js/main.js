@@ -1,6 +1,6 @@
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './auth.js';
-import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData, fetchRealized, applyRealizedFilters } from './api.js';
-import { showView, clearDashboard, renderPositions, lastPositions } from './ui.js';
+import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData, fetchRealized, applyRealizedFilters, fetchAndShowRollChain } from './api.js';
+import { showView, clearDashboard, renderPositions, lastPositions, closeRollChainModal } from './ui.js';
 
 // Parse URL params on load
 const urlParams = new URLSearchParams(window.location.search);
@@ -232,6 +232,30 @@ document.getElementById('btn-reset-realized')?.addEventListener('click', () => {
     const defaultMinDate = `${currentYear}-01-01`;
     if (minDateInput) minDateInput.value = defaultMinDate;
     applyRealizedFilters('ALL', defaultMinDate, 'ALL');
+});
+
+
+// =====================================================================================
+// --- ROLL CHAIN MODAL DELEGATION ---
+// =====================================================================================
+document.addEventListener('click', (e) => {
+    const chainBtn = e.target.closest('.btn-icon-chain');
+    if (chainBtn) {
+        e.preventDefault();
+        const symbol = chainBtn.getAttribute('data-symbol');
+        if (symbol) fetchAndShowRollChain(symbol);
+        return;
+    }
+
+    if (e.target.id === 'modal-roll-close' || e.target.closest('#modal-roll-close')) {
+        closeRollChainModal();
+        return;
+    }
+
+    if (e.target.id === 'roll-chain-modal') {
+        closeRollChainModal();
+        return;
+    }
 });
 
 

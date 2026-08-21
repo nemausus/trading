@@ -1,5 +1,5 @@
 import { auth } from './auth.js';
-import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionChainTable, renderTransactions, renderRealized } from './ui.js';
+import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionChainTable, renderTransactions, renderRealized, renderRollChainModal } from './ui.js';
 
 export let rawChainData = { underlying: {}, chain: [] };
 
@@ -444,5 +444,29 @@ export function applyRealizedFilters(symbol, minDate, accountNum) {
     }
 
     renderRealized(filtered);
+}
+
+
+export async function fetchAndShowRollChain(symbol) {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    renderRollChainModal({ roll_chain: { target_symbol: symbol, chain: [] } });
+
+    try {
+        const token = await user.getIdToken();
+        const response = await fetch(`/api/schwab/roll-chain?symbol=${encodeURIComponent(symbol)}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (response.ok) {
+            renderRollChainModal(data);
+        } else {
+            renderRollChainModal({ error: data.error || 'Failed to fetch roll chain' });
+        }
+    } catch (err) {
+        console.error('Error fetching roll chain:', err);
+        renderRollChainModal({ error: err.message });
+    }
 }
 
