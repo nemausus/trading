@@ -133,6 +133,31 @@ def get_transactions_for_accounts(uid: str, account_hashes: list[str], limit: in
     )
 
 
+def get_unprocessed_transactions(
+    uid: str,
+    account_hash: str,
+    limit: int = 1000,
+) -> list[dict]:
+    """
+    Returns unprocessed raw transactions for the given user/account, ordered by
+    time ascending (oldest first for FIFO matching), up to *limit* records.
+    """
+    db = get_db()
+    col = _txn_collection(db, uid, account_hash)
+    docs = col.stream()
+    unprocessed = []
+    for doc in docs:
+        data = doc.to_dict()
+        if not data.get('processed', False):
+            if 'activityId' not in data:
+                data['activityId'] = doc.id
+            data.pop('fetched_at', None)
+            unprocessed.append(data)
+    unprocessed.sort(key=lambda x: x.get('time', ''))
+    return unprocessed[:limit]
+
+
+
 def get_latest_transaction_time(uid: str, account_hash: str) -> str | None:
     """
     Returns the ``time`` field of the most recently stored transaction for the
@@ -193,6 +218,115 @@ def save_transactions(
             activity_id = str(txn['activityId'])
             doc_ref = col.document(activity_id)
             payload = dict(txn)
+            if 'processed' not in payload:
+                payload['processed'] = False
             payload['fetched_at'] = firestore.SERVER_TIMESTAMP
             batch.set(doc_ref, payload)
         batch.commit()
+
+
+# ---------------------------------------------------------------------------
+# Realized P/L helpers
+# ---------------------------------------------------------------------------
+
+def _realized_pl_collection(db, uid: str, account_hash: str):
+    """Returns the Firestore CollectionReference for a user's realized P/L records."""
+    return (
+        db.collection('users')
+        .document(uid)
+        .collection('accounts')
+        .document(account_hash)
+        .collection('realized_pl')
+    )
+
+
+def get_realized_pl_transactions(
+    uid: str,
+    account_hash: str,
+    limit: int,
+) -> list[dict]:
+    """
+    Returns stored realized P/L transactions for the given user/account,
+    ordered by sell_date descending, up to *limit* records.
+    """
+    db = get_db()
+    col = _realized_pl_collection(db, uid, account_hash)
+    docs = col.order_by('sell_date', direction='DESCENDING').limit(limit).stream()
+    results = []
+    for doc in docs:
+        data = doc.to_dict()
+        data.pop('created_at', None)
+        results.append(data)
+    return results
+
+
+def get_realized_pl_for_accounts(
+    uid: str,
+    account_hashes: list[str],
+    limit: int,
+) -> list[dict]:
+    """
+    Returns stored realized P/L transactions for multiple accounts, ordered by
+    sell_date descending, up to *limit* records across specified accounts.
+    """
+    return sorted(
+        (r for h in account_hashes for r in get_realized_pl_transactions(uid, h, limit)),
+        key=lambda x: x.get('sell_date', ''),
+        reverse=True,
+    )
+
+
+def save_realized_pl_transactions(
+    uid: str,
+    account_hash: str,
+    docs: list[dict],
+) -> None:
+    """
+    Batch-write realized P/L documents to Firestore.
+
+    Each document is stored at:
+        users/{uid}/accounts/{account_hash}/realized_pl/{doc_id}
+    """
+    if not docs:
+        return
+    db = get_db()
+    col = _realized_pl_collection(db, uid, account_hash)
+
+    for i in range(0, len(docs), _BATCH_SIZE):
+        batch = db.batch()
+        for idx, item in enumerate(docs[i:i + _BATCH_SIZE]):
+            doc_id = item.get('id')
+            if not doc_id:
+                doc_id = (
+                    f"realized_{item.get('accountNumber', '')}_"
+                    f"{item.get('symbol', '')}_{item.get('buy_date', '')}_"
+                    f"{item.get('sell_date', '')}_{idx}"
+                )
+            doc_ref = col.document(str(doc_id))
+            payload = dict(item)
+            payload['created_at'] = firestore.SERVER_TIMESTAMP
+            batch.set(doc_ref, payload, merge=True)
+        batch.commit()
+
+
+def mark_transactions_processed(
+    uid: str,
+    account_hash: str,
+    activity_ids: set[str] | list[str],
+) -> None:
+    """
+    Update raw transaction documents in Firestore to mark them as processed.
+    """
+    if not activity_ids:
+        return
+    db = get_db()
+    col = _txn_collection(db, uid, account_hash)
+    act_list = list(activity_ids)
+
+    for i in range(0, len(act_list), _BATCH_SIZE):
+        batch = db.batch()
+        for aid in act_list[i:i + _BATCH_SIZE]:
+            doc_ref = col.document(str(aid))
+            batch.update(doc_ref, {'processed': True})
+        batch.commit()
+

@@ -144,7 +144,48 @@ class TestRealizedPL(unittest.TestCase):
         self.assertEqual(result[0]['symbol'], 'AAPL')
         self.assertEqual(result[0]['P/L'], 500.0)
 
+    def test_calculate_realized_pl_with_status(self):
+        txns = [
+            {
+                'activityId': 'act_open_1',
+                'type': 'TRADE',
+                'netAmount': -2000.0,
+                'time': '2026-01-01T10:00:00-07:00',
+                'accountNumber': 'ACC1',
+                'transferItems': [
+                    {
+                        'positionEffect': 'OPENING',
+                        'instrument': {'symbol': 'AAPL', 'instrumentId': '1'},
+                        'amount': 100.0,
+                        'cost': 2000.0,
+                        'price': 20.0,
+                    }
+                ]
+            },
+            {
+                'activityId': 'act_close_1',
+                'type': 'TRADE',
+                'netAmount': 2500.0,
+                'time': '2026-02-01T10:00:00-07:00',
+                'accountNumber': 'ACC1',
+                'transferItems': [
+                    {
+                        'positionEffect': 'CLOSING',
+                        'instrument': {'symbol': 'AAPL', 'instrumentId': '1'},
+                        'amount': -100.0,
+                        'cost': 2500.0,
+                        'price': 25.0,
+                    }
+                ]
+            }
+        ]
+        result, processed_ids = realized_pl.calculate_realized_pl_with_status(txns)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['symbol'], 'AAPL')
+        self.assertEqual(result[0]['P/L'], 500.0)
+        self.assertEqual(processed_ids, {'act_open_1', 'act_close_1'})
 
 
 if __name__ == '__main__':
     unittest.main()
+

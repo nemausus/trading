@@ -293,6 +293,8 @@ def schwab_sync_transactions(decoded_token, access_token):
                     "Transaction sync error for user %s: %s", uid, result['error']
                 )
                 return jsonify({'error': result['error']}), 502
+            if result.get('new_count', 0) > 0:
+                realized_pl.process_account_realized_pl(uid, acc_hash)
             results.append(result)
         return jsonify({'results': results})
     except Exception as e:
@@ -312,6 +314,8 @@ def schwab_get_transactions(decoded_token):
             if isinstance(t, dict):
                 t.pop('account_hash', None)
                 t.pop('accountHash', None)
+                t.pop('processed', None)
+                t.pop('remaining_amount', None)
         return jsonify({'transactions': txns})
     except Exception as e:
         app.logger.error("Error reading transactions for user %s: %s", uid, e)
@@ -325,16 +329,22 @@ def schwab_get_realized(decoded_token):
     uid = decoded_token['uid']
     try:
         account_hashes = get_all_account_hashes()
-        txns = firestore_db.get_transactions_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
-        realized = realized_pl.calculate_realized_pl(txns)
+        realized = firestore_db.get_realized_pl_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
+        if not realized:
+            for acc_hash in account_hashes:
+                realized_pl.process_account_realized_pl(uid, acc_hash)
+            realized = firestore_db.get_realized_pl_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
         for r in realized:
             if isinstance(r, dict):
                 r.pop('account_hash', None)
                 r.pop('accountHash', None)
+                r.pop('created_at', None)
+                r.pop('id', None)
         return jsonify({'realized_transactions': realized})
     except Exception as e:
-        app.logger.error("Error reading transactions for user %s: %s", uid, e)
+        app.logger.error("Error reading realized transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to read transactions'}), 502
+
 
 
 
