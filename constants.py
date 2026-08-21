@@ -51,3 +51,23 @@ def get_account_hash(account_number: str) -> str:
         return get_secondary_account_hash()
     raise ValueError(f"Unknown account number: {account_number}")
 
+
+def get_account_number_for_hash(account_hash: str) -> str:
+    """Returns the account number (or suffix) for a given account hash."""
+    primary_suffix = os.environ.get('PRIMARY_ACCOUNT_SUFFIX', 'acc1')
+    secondary_suffix = os.environ.get('SECONDARY_ACCOUNT_SUFFIX', 'acc2')
+    if account_hash == get_primary_account_hash():
+        return primary_suffix
+    if account_hash == get_secondary_account_hash():
+        return secondary_suffix
+    return "UNKNOWN"
+
+
+def get_all_account_hashes() -> list[str]:
+    """Return all configured account hashes (primary and secondary).
+
+    Returns a list of unique account hashes that are configured in environment variables.
+    """
+    return [get_primary_account_hash(), get_secondary_account_hash()]
+
+

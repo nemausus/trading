@@ -4,9 +4,22 @@ schwab_api.py
 Common HTTP utility for interacting with the Schwab API backend.
 """
 
+from datetime import datetime
+import json
 import logging
+
 import requests
+
 from constants import SCHWAB_REQUEST_TIMEOUT
+
+
+def _save_response_dump(url: str, data: dict | list) -> None:
+    """Save raw response JSON to a file in responses/ directory for debugging."""
+    filename = "responses/" + url.replace("/", "_").replace(":", "_") + ".json"
+    with open(filename, 'w') as f:
+        f.write(str(datetime.now()))
+        f.write("\n")
+        json.dump(data, f, indent=2)
 
 
 def schwab_request(
@@ -24,16 +37,14 @@ def schwab_request(
     Logs the request, executes the call, validates status via raise_for_status(),
     and returns parsed JSON response content.
     """
-    method_upper = method.upper()
-    if params:
-        logging.info("Making Schwab API %s request to %s (params=%s)", method_upper, url, params)
-    else:
-        logging.info("Making Schwab API %s request to %s", method_upper, url)
+    logging.warning("Making Schwab API %s request to %s (params=%s)", method, url, params)
 
     resp = requests.request(
-        method_upper, url,
+        method.upper(), url,
         headers=headers, params=params, data=data,
         timeout=timeout, **kwargs,
     )
     resp.raise_for_status()
-    return resp.json()
+    ret = resp.json()
+    _save_response_dump(url, ret)
+    return ret

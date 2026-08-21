@@ -121,6 +121,18 @@ def get_transactions(
     return results
 
 
+def get_transactions_for_accounts(uid: str, account_hashes: list[str], limit: int) -> list[dict]:
+    """
+    Returns stored transactions for multiple accounts, ordered by time descending,
+    up to *limit* records across all specified accounts.
+    """
+    return sorted(
+        (t for h in account_hashes for t in get_transactions(uid, h, limit)),
+        key=lambda x: x.get('time', ''),
+        reverse=True,
+    )
+
+
 def get_latest_transaction_time(uid: str, account_hash: str) -> str | None:
     """
     Returns the ``time`` field of the most recently stored transaction for the

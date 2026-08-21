@@ -909,6 +909,7 @@ export function renderRealized(realizedList) {
         return `
             <tr>
                 <!-- Desktop Columns -->
+                <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${r.accountNumber || '—'}</td>
                 <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.buy_date)}</td>
                 <td class="desktop-only-col" style="text-align:right;">${formatCurrency(r.buy_price)}</td>
                 <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.sell_date)}</td>
@@ -918,11 +919,11 @@ export function renderRealized(realizedList) {
                 <td class="desktop-only-col" style="text-align:right; font-weight:600;" class="${plFormat.cssClass}">${plFormat.sign}${plFormat.valDisplay}</td>
 
                 <!-- Mobile Only Combined Row Layout -->
-                <td class="mobile-only-card-col" colspan="7">
+                <td class="mobile-only-card-col" colspan="8">
                     <div class="mobile-split-row header-row">
                         <div class="split-col col-symbol">
                             <span class="${symbolBadgeClass}">${symbol}</span>
-                            <span style="color: var(--text-secondary); font-size:0.75rem; margin-left:6px;">Qty: ${formatNumber(r.amount, 0)}</span>
+                            <span style="color: var(--text-secondary); font-size:0.75rem; margin-left:6px;">Acc: ${r.accountNumber || '—'} &bull; Qty: ${formatNumber(r.amount, 0)}</span>
                         </div>
                         <div class="split-col ${plFormat.cssClass}" style="text-align: right; font-weight: 700;">${plFormat.sign}${plFormat.valDisplay}</div>
                     </div>
@@ -936,6 +937,7 @@ export function renderRealized(realizedList) {
     }).join('');
 
     container.innerHTML = _buildTable([
+        { label: 'Account' },
         { label: 'Open Date' },
         { label: 'Open Price',   cls: 'text-right' },
         { label: 'Close Date' },

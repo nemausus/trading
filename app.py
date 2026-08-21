@@ -12,7 +12,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 import firestore_db
-from constants import get_primary_account_hash
+from constants import get_all_account_hashes, get_primary_account_hash
 from schwab_auth import SchwabAuthManager
 import schwab_portfolio
 import schwab_transactions
@@ -285,13 +285,16 @@ def schwab_boxes(decoded_token, access_token):
 def schwab_sync_transactions(decoded_token, access_token):
     uid = decoded_token['uid']
     try:
-        result = schwab_transactions.sync_transactions(uid, access_token)
-        if 'error' in result:
-            app.logger.error(
-                "Transaction sync error for user %s: %s", uid, result['error']
-            )
-            return jsonify({'error': result['error']}), 502
-        return jsonify(result)
+        results = []
+        for acc_hash in get_all_account_hashes():
+            result = schwab_transactions.sync_transactions(uid, access_token, acc_hash)
+            if 'error' in result:
+                app.logger.error(
+                    "Transaction sync error for user %s: %s", uid, result['error']
+                )
+                return jsonify({'error': result['error']}), 502
+            results.append(result)
+        return jsonify({'results': results})
     except Exception as e:
         app.logger.error("Error syncing transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to sync transactions'}), 502
@@ -303,12 +306,13 @@ def schwab_sync_transactions(decoded_token, access_token):
 def schwab_get_transactions(decoded_token):
     uid = decoded_token['uid']
     try:
-        account_hash = get_primary_account_hash()
-        txns = firestore_db.get_transactions(uid, account_hash, _get_limit(100, 100))
-        return jsonify({'transactions': txns, 'account_hash': account_hash})
-    except EnvironmentError as e:
-        app.logger.error("No primary account hash for user %s: %s", uid, e)
-        return jsonify({'error': 'No primary account hash found'}), 400
+        account_hashes = get_all_account_hashes()
+        txns = firestore_db.get_transactions_for_accounts(uid, account_hashes, _get_limit(100, 100))
+        for t in txns:
+            if isinstance(t, dict):
+                t.pop('account_hash', None)
+                t.pop('accountHash', None)
+        return jsonify({'transactions': txns})
     except Exception as e:
         app.logger.error("Error reading transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to read transactions'}), 502
@@ -320,15 +324,17 @@ def schwab_get_transactions(decoded_token):
 def schwab_get_realized(decoded_token):
     uid = decoded_token['uid']
     try:
-        account_hash = get_primary_account_hash()
-        txns = firestore_db.get_transactions(uid, account_hash, _get_limit(1000, 1000))
-        realized_txns = realized_pl.calculate_realized_pl(txns)
-        return jsonify({'realized_transactions': realized_txns, 'account_hash': account_hash})
-    except EnvironmentError as e:
-        app.logger.error("No primary account hash for user %s: %s", uid, e)
-        return jsonify({'error': 'No primary account hash found'}), 400
+        account_hashes = get_all_account_hashes()
+        txns = firestore_db.get_transactions_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
+        realized = realized_pl.calculate_realized_pl(txns)
+        for r in realized:
+            if isinstance(r, dict):
+                r.pop('account_hash', None)
+                r.pop('accountHash', None)
+        return jsonify({'realized_transactions': realized})
     except Exception as e:
         app.logger.error("Error reading transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to read transactions'}), 502
+
 
 

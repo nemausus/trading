@@ -317,8 +317,15 @@ export async function syncTransactions() {
         const data = await response.json();
 
         if (response.ok) {
-            const msg = data.new_count > 0
-                ? `✓ ${data.new_count} new transaction${data.new_count !== 1 ? 's' : ''} synced`
+            let totalNewCount = 0;
+            if (Array.isArray(data.results)) {
+                totalNewCount = data.results.reduce((sum, res) => sum + (res.new_count || 0), 0);
+            } else if (typeof data.new_count === 'number') {
+                totalNewCount = data.new_count;
+            }
+
+            const msg = totalNewCount > 0
+                ? `✓ ${totalNewCount} new transaction${totalNewCount !== 1 ? 's' : ''} synced`
                 : '✓ Already up to date';
             if (statusSpan) {
                 statusSpan.textContent = msg;
