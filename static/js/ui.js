@@ -916,7 +916,7 @@ export function renderRealized(realizedList) {
                 <td class="desktop-only-col" style="text-align:right;">${formatCurrency(r.sell_price)}</td>
                 <td class="desktop-only-col"><span class="${symbolBadgeClass}">${symbol}</span></td>
                 <td class="desktop-only-col" style="text-align:right;">${formatNumber(r.amount, 0)}</td>
-                <td class="desktop-only-col" style="text-align:right; font-weight:600;" class="${plFormat.cssClass}">${plFormat.sign}${plFormat.valDisplay}</td>
+                <td class="desktop-only-col ${plFormat.cssClass}" style="text-align:right; font-weight:600;">${plFormat.sign}${plFormat.valDisplay}</td>
 
                 <!-- Mobile Only Combined Row Layout -->
                 <td class="mobile-only-card-col" colspan="8">
