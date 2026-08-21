@@ -381,8 +381,8 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                 const isGroupEnd = (index === accPositions.length - 1 || baseUnderlying(accPositions[index + 1].symbol) !== underlying);
 
                 const symbolBadgeClass = getSymbolBadgeClass(pos.symbol);
-                const pl = getPLFormatting(pos['P/L']);
-                const plPercent = getPLPercentFormatting(pos['P/L%']);
+                const pl = getPLFormatting(pos['P/L'], 0);
+                const plPercent = getPLPercentFormatting(pos['P/L%'], 0);
 
                 const markPctDisplay = (pos.markPercentChange !== undefined && pos.markPercentChange !== null)
                     ? getPLPercentFormatting(pos.markPercentChange)

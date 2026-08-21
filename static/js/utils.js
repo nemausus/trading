@@ -1,6 +1,11 @@
-export function formatCurrency(val) {
+export function formatCurrency(val, decimals = 2) {
     if (val === null || val === undefined || isNaN(val)) return '-';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    }).format(val);
 }
 
 export function formatPercent(val) {
@@ -33,23 +38,23 @@ export function sortPositionsGrouped(positions) {
     });
 }
 
-export function getPLFormatting(plVal) {
-    if (plVal === null || plVal === undefined) {
+export function getPLFormatting(plVal, decimals = 2) {
+    if (plVal === null || plVal === undefined || isNaN(plVal)) {
         return { valDisplay: '-', cssClass: '', sign: '' };
     }
     return {
-        valDisplay: formatCurrency(plVal),
+        valDisplay: formatCurrency(plVal, decimals),
         cssClass: plVal >= 0 ? 'val-positive' : 'val-negative',
         sign: plVal >= 0 ? '+' : ''
     };
 }
 
-export function getPLPercentFormatting(plPercent) {
-    if (plPercent === null || plPercent === undefined) {
+export function getPLPercentFormatting(plPercent, decimals = 2) {
+    if (plPercent === null || plPercent === undefined || isNaN(plPercent)) {
         return { valDisplay: '-', cssClass: '', sign: '' };
     }
     return {
-        valDisplay: formatNumber(plPercent, 2) + '%',
+        valDisplay: formatNumber(plPercent, decimals) + '%',
         cssClass: plPercent >= 0 ? 'val-positive' : 'val-negative',
         sign: plPercent >= 0 ? '+' : ''
     };
