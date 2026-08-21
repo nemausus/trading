@@ -46,5 +46,5 @@ def schwab_request(
     )
     resp.raise_for_status()
     ret = resp.json()
-    _save_response_dump(url, ret)
+    # _save_response_dump(url, ret)
     return ret
