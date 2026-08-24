@@ -185,6 +185,46 @@ class TestRealizedPL(unittest.TestCase):
         self.assertEqual(result[0]['P/L'], 500.0)
         self.assertEqual(processed_ids, {'act_open_1', 'act_close_1'})
 
+    def test_calculate_realized_pl_with_integer_activity_ids(self):
+        txns = [
+            {
+                'activityId': 1001,
+                'type': 'TRADE',
+                'netAmount': -2000.0,
+                'time': '2026-01-01T10:00:00-07:00',
+                'accountNumber': 'ACC1',
+                'transferItems': [
+                    {
+                        'positionEffect': 'OPENING',
+                        'instrument': {'symbol': 'AAPL', 'instrumentId': '1'},
+                        'amount': 100.0,
+                        'cost': 2000.0,
+                        'price': 20.0,
+                    }
+                ]
+            },
+            {
+                'activityId': 1002,
+                'type': 'TRADE',
+                'netAmount': 2500.0,
+                'time': '2026-02-01T10:00:00-07:00',
+                'accountNumber': 'ACC1',
+                'transferItems': [
+                    {
+                        'positionEffect': 'CLOSING',
+                        'instrument': {'symbol': 'AAPL', 'instrumentId': '1'},
+                        'amount': -100.0,
+                        'cost': 2500.0,
+                        'price': 25.0,
+                    }
+                ]
+            }
+        ]
+        result, processed_ids = realized_pl.calculate_realized_pl_with_status(txns)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(processed_ids, {'1001', '1002'})
+        self.assertEqual(result[0]['id'], 'realized_1001_1002')
+
     def test_load_csv_realized_pl_missing_file(self):
         records = realized_pl.load_csv_realized_pl('/non/existent/path.csv')
         self.assertEqual(records, [])

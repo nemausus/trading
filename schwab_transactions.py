@@ -15,7 +15,6 @@ Flow:
 
 import datetime
 import logging
-import requests
 
 import firestore_db
 from constants import SCHWAB_TZ, get_account_number_for_hash

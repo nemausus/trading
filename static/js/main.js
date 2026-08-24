@@ -82,24 +82,24 @@ document.getElementById('btn-refresh-data')?.addEventListener('click', () => {
 const tabBtnPortfolio = document.getElementById('tab-btn-portfolio');
 const tabBtnChain = document.getElementById('tab-btn-chain');
 const tabBtnBox = document.getElementById('tab-btn-box');
-const tabBtnTransactions = document.getElementById('tab-btn-transactions');
 const tabBtnRealized = document.getElementById('tab-btn-realized');
+const tabBtnTransactions = document.getElementById('tab-btn-transactions');
 const tabContentPortfolio = document.getElementById('tab-content-portfolio');
 const tabContentChain = document.getElementById('tab-content-chain');
 const tabContentBox = document.getElementById('tab-content-box');
-const tabContentTransactions = document.getElementById('tab-content-transactions');
 const tabContentRealized = document.getElementById('tab-content-realized');
+const tabContentTransactions = document.getElementById('tab-content-transactions');
 
-const allTabBtns = [tabBtnPortfolio, tabBtnChain, tabBtnBox, tabBtnTransactions, tabBtnRealized];
-const allTabContents = [tabContentPortfolio, tabContentChain, tabContentBox, tabContentTransactions, tabContentRealized];
+const allTabBtns = [tabBtnPortfolio, tabBtnChain, tabBtnBox, tabBtnRealized, tabBtnTransactions];
+const allTabContents = [tabContentPortfolio, tabContentChain, tabContentBox, tabContentRealized, tabContentTransactions];
 
 // Map of hash fragment -> { btn, content } for each tab
 const TAB_MAP = {
     portfolio:    { btn: tabBtnPortfolio,    content: tabContentPortfolio },
     chain:        { btn: tabBtnChain,        content: tabContentChain },
     box:          { btn: tabBtnBox,          content: tabContentBox },
-    transactions: { btn: tabBtnTransactions, content: tabContentTransactions },
     realized:     { btn: tabBtnRealized,     content: tabContentRealized },
+    transactions: { btn: tabBtnTransactions, content: tabContentTransactions },
 };
 
 let txnsLoaded = false;
@@ -151,14 +151,12 @@ window.addEventListener('hashchange', () => {
     navigateToTab(hash || 'portfolio');
 });
 
-if (tabBtnPortfolio && tabBtnChain && tabBtnBox && tabBtnTransactions) {
+if (tabBtnPortfolio && tabBtnChain && tabBtnBox && tabBtnRealized && tabBtnTransactions) {
     tabBtnPortfolio.addEventListener('click',    () => navigateToTab('portfolio'));
     tabBtnChain.addEventListener('click',        () => navigateToTab('chain'));
     tabBtnBox.addEventListener('click',          () => navigateToTab('box'));
+    tabBtnRealized.addEventListener('click',     () => navigateToTab('realized'));
     tabBtnTransactions.addEventListener('click', () => navigateToTab('transactions'));
-}
-if (tabBtnRealized) {
-    tabBtnRealized.addEventListener('click', () => navigateToTab('realized'));
 }
 
 

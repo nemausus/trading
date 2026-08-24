@@ -1,5 +1,15 @@
 # Codebase Maintenance Rules
 
+## Python Execution Environment Rule
+All Python commands, test executions, CLI scripts, and utility tools in this workspace MUST be executed using the local virtual environment interpreter:
+```bash
+./.venv/bin/python <script.py> [args]
+./.venv/bin/python -m unittest discover tests
+```
+Do NOT use system `python` or `python3` (except for running `python3 scripts/remove_trailing_spaces.py`), as system Python lacks project virtualenv dependencies (`firebase-admin`, `requests`, `python-dotenv`, etc.).
+
+---
+
 ## Trailing Whitespace Cleanup Rule
 After editing, creating, or modifying any code files in this workspace (Python, Javascript, CSS, HTML, Markdown, etc.), the agent MUST always run the trailing space post-processing script:
 ```bash

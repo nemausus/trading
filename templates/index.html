@@ -41,10 +41,10 @@
                 <div class="header-left">
                     <nav class="header-nav">
                         <button id="tab-btn-portfolio" class="nav-tab active">Portfolio</button>
-                        <button id="tab-btn-realized" class="nav-tab">Realized</button>
-                        <button id="tab-btn-chain" class="nav-tab">Chains</button>
-                        <button id="tab-btn-transactions" class="nav-tab">Txn</button>
+                        <button id="tab-btn-chain" class="nav-tab">Chain</button>
                         <button id="tab-btn-box" class="nav-tab">Box</button>
+                        <button id="tab-btn-realized" class="nav-tab">Realized</button>
+                        <button id="tab-btn-transactions" class="nav-tab">Txn</button>
                     </nav>
                 </div>
                 <div class="header-right">
@@ -72,53 +72,7 @@
                 </div>
             </div>
 
-            <!-- TAB 2: REALIZED GAIN/LOSS CONTENT -->
-            <div id="tab-content-realized" class="tab-content">
-                <div class="section-card">
-                    <div class="section-header-row">
-                        <h3>Realized Gain / Loss</h3>
-                    </div>
-
-                    <div class="chain-filter-bar">
-                        <div class="filter-group">
-                            <label for="realized-symbol">Symbol Filter</label>
-                            <input type="text" id="realized-symbol" value="ALL" placeholder="e.g. AAPL or ALL"
-                                style="text-transform: uppercase;">
-                        </div>
-
-                        <div class="filter-group">
-                            <label for="realized-account">Account</label>
-                            <select id="realized-account">
-                                <option value="ALL" selected>ALL</option>
-                            </select>
-                        </div>
-
-                        <div class="filter-group">
-                            <label for="realized-min-date">Min Sell Date</label>
-                            <input type="date" id="realized-min-date">
-                        </div>
-
-                        <div class="filter-actions">
-                            <button id="btn-filter-realized" class="btn-action-refresh">Apply Filters</button>
-                            <button id="btn-reset-realized" class="btn-toggle">Reset Filters</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Pivot Table container -->
-                <div id="realized-pivot-container"></div>
-
-                <!-- Realized Table -->
-                <div class="section-card">
-                    <div id="realized-container" class="mobile-card-table">
-                        <div class="no-data-msg">
-                            <p>Loading realized transactions...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB 3: OPTION CHAINS CONTENT -->
+            <!-- TAB 2: OPTION CHAINS CONTENT -->
             <div id="tab-content-chain" class="tab-content">
                 <div class="section-card">
                     <div class="section-header-row">
@@ -194,31 +148,7 @@
                 </div>
             </div>
 
-            <!-- TAB 4: TRANSACTIONS CONTENT -->
-            <div id="tab-content-transactions" class="tab-content">
-                <div class="section-card">
-                    <div class="txn-top-bar">
-                        <div id="txn-stats-bar" class="txn-stats-inline" style="display:none;">
-                            <span class="txn-stat-item">Earliest: <span id="txn-stat-earliest">—</span></span>
-                            <span class="txn-stat-divider">•</span>
-                            <span class="txn-stat-item">Latest: <span id="txn-stat-latest">—</span></span>
-                        </div>
-                        <div class="txn-sync-actions">
-                            <span id="txn-sync-status" class="txn-sync-status"></span>
-                            <button id="btn-sync-transactions" class="btn-action-refresh">&#8635; Sync</button>
-                        </div>
-                    </div>
-
-                    <div id="transactions-container" class="mobile-card-table">
-                        <div class="no-data-msg">
-                            <p>No transactions loaded yet. Click <strong>Sync</strong> to fetch from Schwab, or switch
-                                to this tab to load stored records.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB 5: BOX SPREADS CONTENT -->
+            <!-- TAB 3: BOX SPREADS CONTENT -->
             <div id="tab-content-box" class="tab-content">
                 <div class="section-card">
                     <div class="section-header-row">
@@ -260,6 +190,76 @@
                     <div id="box-container" class="mobile-card-table">
                         <div class="no-data-msg">
                             <p>Select a date range and click "Find Boxes" to scan for SPX box spread opportunities.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: REALIZED GAIN/LOSS CONTENT -->
+            <div id="tab-content-realized" class="tab-content">
+                <div class="section-card">
+                    <div class="section-header-row">
+                        <h3>Realized Gain / Loss</h3>
+                    </div>
+
+                    <div class="chain-filter-bar">
+                        <div class="filter-group">
+                            <label for="realized-symbol">Symbol Filter</label>
+                            <input type="text" id="realized-symbol" value="ALL" placeholder="e.g. AAPL or ALL"
+                                style="text-transform: uppercase;">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="realized-account">Account</label>
+                            <select id="realized-account">
+                                <option value="ALL" selected>ALL</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="realized-min-date">Min Sell Date</label>
+                            <input type="date" id="realized-min-date">
+                        </div>
+
+                        <div class="filter-actions">
+                            <button id="btn-filter-realized" class="btn-action-refresh">Apply Filters</button>
+                            <button id="btn-reset-realized" class="btn-toggle">Reset Filters</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pivot Table container -->
+                <div id="realized-pivot-container"></div>
+
+                <!-- Realized Table -->
+                <div class="section-card">
+                    <div id="realized-container" class="mobile-card-table">
+                        <div class="no-data-msg">
+                            <p>Loading realized transactions...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: TRANSACTIONS CONTENT -->
+            <div id="tab-content-transactions" class="tab-content">
+                <div class="section-card">
+                    <div class="txn-top-bar">
+                        <div id="txn-stats-bar" class="txn-stats-inline" style="display:none;">
+                            <span class="txn-stat-item">Earliest: <span id="txn-stat-earliest">—</span></span>
+                            <span class="txn-stat-divider">•</span>
+                            <span class="txn-stat-item">Latest: <span id="txn-stat-latest">—</span></span>
+                        </div>
+                        <div class="txn-sync-actions">
+                            <span id="txn-sync-status" class="txn-sync-status"></span>
+                            <button id="btn-sync-transactions" class="btn-action-refresh">&#8635; Sync</button>
+                        </div>
+                    </div>
+
+                    <div id="transactions-container" class="mobile-card-table">
+                        <div class="no-data-msg">
+                            <p>No transactions loaded yet. Click <strong>Sync</strong> to fetch from Schwab, or switch
+                                to this tab to load stored records.</p>
                         </div>
                     </div>
                 </div>

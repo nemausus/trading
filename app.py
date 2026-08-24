@@ -294,8 +294,8 @@ def schwab_sync_transactions(decoded_token, access_token):
                     "Transaction sync error for user %s: %s", uid, result['error']
                 )
                 return jsonify({'error': result['error']}), 502
-            if result.get('new_count', 0) > 0:
-                realized_pl.process_account_realized_pl(uid, acc_hash)
+            # Force calculate realized pl for this account, even if no new transactions.
+            realized_pl.process_account_realized_pl(uid, acc_hash)
             results.append(result)
         return jsonify({'results': results})
     except Exception as e:

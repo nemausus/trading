@@ -65,7 +65,7 @@ def normalize_transactions(txns: list[dict]) -> list[dict]:
                 sl = 'long'
 
             rows.append({
-                'activityId': txn.get('activityId'),
+                'activityId': str(txn['activityId']) if txn.get('activityId') is not None else None,
                 'accountNumber': account_num,
                 'time': time_str,
                 'symbol': symbol,
@@ -109,15 +109,15 @@ def calculate_realized_pl_with_status(txns: list[dict]) -> tuple[list[dict], set
                 'cost_sum': r['cost'],
                 'price_list': [r['price']],
                 'netAmount_sum': r['netAmount'],
-                'activity_ids': [r['activityId']] if r.get('activityId') else []
+                'activity_ids': [str(r['activityId'])] if r.get('activityId') is not None else []
             }
         else:
             aggregated[key]['amount_sum'] += r['amount']
             aggregated[key]['cost_sum'] += r['cost']
             aggregated[key]['price_list'].append(r['price'])
             aggregated[key]['netAmount_sum'] += r['netAmount']
-            if r.get('activityId'):
-                aggregated[key]['activity_ids'].append(r['activityId'])
+            if r.get('activityId') is not None:
+                aggregated[key]['activity_ids'].append(str(r['activityId']))
 
     grouped_rows = []
     for key, val in aggregated.items():
@@ -149,7 +149,7 @@ def calculate_realized_pl_with_status(txns: list[dict]) -> tuple[list[dict], set
         key = f"{row['accountNumber']}_{row['symbol']}_{row['sl']}"
 
         if row['positionEffect'] == 'INTEREST':
-            interest_aids = '_'.join(sorted(row.get('activity_ids', [])))
+            interest_aids = '_'.join(sorted(str(aid) for aid in row.get('activity_ids', [])))
             rec_id = f"realized_interest_{row['accountNumber']}_{interest_aids}" if interest_aids else f"realized_{row['accountNumber']}_interest_{row['time']}_{idx}"
             result.append({
                 'accountNumber': row['accountNumber'],
@@ -163,7 +163,7 @@ def calculate_realized_pl_with_status(txns: list[dict]) -> tuple[list[dict], set
                 'id': rec_id
             })
             for aid in row.get('activity_ids', []):
-                processed_activity_ids.add(aid)
+                processed_activity_ids.add(str(aid))
         elif row['positionEffect'] == 'OPENING':
             if key in opened:
                 opened[key].append(row)
@@ -179,8 +179,8 @@ def calculate_realized_pl_with_status(txns: list[dict]) -> tuple[list[dict], set
                 unit_net_row = row['netAmount'] / row['amount'] if row['amount'] else 0.0
                 realized_pl = (unit_net_o + unit_net_row) * matched_quantity
 
-                open_aids = '_'.join(sorted(o.get('activity_ids', [])))
-                close_aids = '_'.join(sorted(row.get('activity_ids', [])))
+                open_aids = '_'.join(sorted(str(aid) for aid in o.get('activity_ids', [])))
+                close_aids = '_'.join(sorted(str(aid) for aid in row.get('activity_ids', [])))
                 if open_aids and close_aids:
                     rec_id = f"realized_{open_aids}_{close_aids}"
                 else:
@@ -204,25 +204,25 @@ def calculate_realized_pl_with_status(txns: list[dict]) -> tuple[list[dict], set
                     o['netAmount'] = unit_net_o * o['amount']
                     opened[key].insert(0, o)
                     for aid in row.get('activity_ids', []):
-                        processed_activity_ids.add(aid)
+                        processed_activity_ids.add(str(aid))
                     break
                 elif o['amount'] < row['amount']:
                     for aid in o.get('activity_ids', []):
-                        processed_activity_ids.add(aid)
+                        processed_activity_ids.add(str(aid))
                     row['amount'] = row['amount'] - o['amount']
                     row['netAmount'] = unit_net_row * row['amount']
                 else:
                     for aid in o.get('activity_ids', []):
-                        processed_activity_ids.add(aid)
+                        processed_activity_ids.add(str(aid))
                     for aid in row.get('activity_ids', []):
-                        processed_activity_ids.add(aid)
+                        processed_activity_ids.add(str(aid))
 
                 if len(opened[key]) == 0:
                     opened.pop(key)
 
             if closing_matched and row['amount'] == 0:
                 for aid in row.get('activity_ids', []):
-                    processed_activity_ids.add(aid)
+                    processed_activity_ids.add(str(aid))
 
     result.sort(key=lambda x: x['sell_date'] or '', reverse=True)
     return result, processed_activity_ids
