@@ -364,18 +364,9 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         <tbody>
             `;
 
-            let prevUnderlying = null;
-            let currentGroupIndex = 0;
-
             accPositions.forEach((pos, index) => {
                 const underlying = baseUnderlying(pos.symbol);
 
-                if (underlying !== prevUnderlying) {
-                    currentGroupIndex++;
-                    prevUnderlying = underlying;
-                }
-
-                const groupBgClass = (currentGroupIndex % 2 === 0) ? 'group-bg-even' : 'group-bg-odd';
                 const isGroupStart = (index === 0 || baseUnderlying(accPositions[index - 1].symbol) !== underlying);
                 const groupStartClass = isGroupStart ? 'group-start-row' : '';
                 const isGroupEnd = (index === accPositions.length - 1 || baseUnderlying(accPositions[index + 1].symbol) !== underlying);
@@ -429,7 +420,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         const ordStatus = ord.status || 'WORKING';
 
                         pendingOrdersDesktopHtml += `
-                            <tr class="${groupBgClass} pending-order-row ${orderRowGroupEndClass}">
+                            <tr class="pending-order-row ${orderRowGroupEndClass}">
                                 <td class="desktop-only-col" style="padding-left: 16px;"><span class="badge-pending-order" style="font-size: 0.75rem; padding: 1px 6px; background: rgba(148, 163, 184, 0.12); color: var(--text-secondary); border-radius: 4px; font-weight: 500;">⚡ Order</span></td>
                                 <td class="desktop-only-col" style="text-align: right; color: var(--text-secondary);">${ord.quantity}</td>
                                 <td class="desktop-only-col" colspan="6" style="text-align: left; color: var(--text-secondary);">
@@ -453,7 +444,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                 const chainBtnHtml = isOptionPos ? `<button class="btn-icon-chain" data-symbol="${pos.symbol}" title="View Roll Chain">🔗</button>` : '';
 
                 tableHtml += spacerHtml + `
-                    <tr class="${groupBgClass} ${groupStartClass} ${groupEndClass}">
+                    <tr class="${groupStartClass} ${groupEndClass}">
                         <!-- Desktop Columns -->
                         <td class="desktop-only-col" data-label="Symbol">${actionBadgeHtml} <span class="${symbolBadgeClass}">${formatOptionSymbol(pos.symbol)}</span> ${chainBtnHtml}</td>
                         <td class="desktop-only-col" style="text-align: right;">${pos.quantity}</td>
@@ -801,6 +792,30 @@ export function renderTransactions(transactions) {
     ], rowsHtml);
 }
 
+const ACCOUNT_COLORS = [
+    '#2563eb', // Blue
+    '#10b981', // Emerald Green
+    '#f59e0b', // Amber
+    '#8b5cf6', // Purple
+    '#06b6d4', // Cyan
+    '#ec4899', // Pink
+    '#6366f1', // Indigo
+    '#84cc16'  // Lime
+];
+
+function getAccountColorMap(items) {
+    const accMap = {};
+    let colorIdx = 0;
+    (items || []).forEach(item => {
+        const acc = item.accountNumber || 'Default';
+        if (!accMap[acc]) {
+            accMap[acc] = ACCOUNT_COLORS[colorIdx % ACCOUNT_COLORS.length];
+            colorIdx++;
+        }
+    });
+    return accMap;
+}
+
 export function renderRealized(realizedList) {
     const container = document.getElementById('realized-container');
     const pivotContainer = document.getElementById('realized-pivot-container');
@@ -904,15 +919,37 @@ export function renderRealized(realizedList) {
 
     }
 
+    const accColorMap = getAccountColorMap(realizedList);
+    const accounts = Object.keys(accColorMap);
+
+    let legendHtml = '';
+    if (accounts.length > 0) {
+        legendHtml = `
+            <div class="account-legend-bar" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.78rem;">
+                <span style="font-weight: 600; color: var(--text-secondary);">Accounts:</span>
+                ${accounts.map(acc => `
+                    <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 500; color: var(--text-primary);">
+                        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${accColorMap[acc]};"></span>
+                        Account ${acc}
+                    </span>
+                `).join('')}
+            </div>
+        `;
+    }
+
     let rowsHtml = realizedList.map(r => {
         const symbol = r.symbol || '—';
         const symbolBadgeClass = getSymbolBadgeClass(symbol);
         const plFormat = getPLFormatting(r['P/L'] || 0);
+        const accNumber = r.accountNumber || '—';
+        const accColor = accColorMap[accNumber] || 'var(--accent-blue)';
 
         return `
-            <tr>
+            <tr style="border-left: 3.5px solid ${accColor} !important;">
                 <!-- Desktop Columns -->
-                <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${r.accountNumber || '—'}</td>
+                <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${accColor}; margin-right: 6px;"></span>${accNumber}
+                </td>
                 <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.buy_date)}</td>
                 <td class="desktop-only-col" style="text-align:right;">${formatCurrency(r.buy_price)}</td>
                 <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.sell_date)}</td>
@@ -923,23 +960,22 @@ export function renderRealized(realizedList) {
 
                 <!-- Mobile Only Combined Row Layout -->
                 <td class="mobile-only-card-col" colspan="8">
-                    <div class="mobile-split-row header-row">
-                        <div class="split-col col-symbol">
-                            <span class="${symbolBadgeClass}">${formatOptionSymbol(symbol)}</span>
-                            <span style="color: var(--text-secondary); font-size:0.75rem; margin-left:6px;">Acc: ${r.accountNumber || '—'} &bull; Qty: ${formatNumber(r.amount, 0)}</span>
+                    <div class="mobile-split-row header-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 4px;">
+                        <div class="split-col col-symbol" style="flex: 1 1 auto; overflow: hidden; min-width: 0;">
+                            <span>${formatNumber(r.amount, 0)} &times; <span class="${symbolBadgeClass}">${formatOptionSymbol(symbol)}</span></span>
                         </div>
-                        <div class="split-col ${plFormat.cssClass}" style="text-align: right; font-weight: 700;">${plFormat.sign}${plFormat.valDisplay}</div>
+                        <div class="split-col ${plFormat.cssClass}" style="flex: 0 0 auto; text-align: right; font-weight: 700; min-width: max-content; margin-left: 8px;">${plFormat.sign}${plFormat.valDisplay}</div>
                     </div>
-                    <div class="mobile-split-row details-row">
-                        <div class="split-col" style="color: var(--text-secondary);">Open: ${formatCurrency(r.buy_price)} <span style="font-size:0.72rem;">(${_shortDate(r.buy_date)})</span></div>
-                        <div class="split-col" style="text-align: right; color: var(--text-secondary);">Close: ${formatCurrency(r.sell_price)} <span style="font-size:0.72rem;">(${_shortDate(r.sell_date)})</span></div>
+                    <div class="mobile-split-row details-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; font-size: 0.78rem;">
+                        <div class="split-col" style="color: var(--text-secondary); flex: 1;">Open: ${formatCurrency(r.buy_price)} <span style="font-size:0.72rem;">(${_shortDate(r.buy_date)})</span></div>
+                        <div class="split-col" style="text-align: right; color: var(--text-secondary); flex: 1;">Close: ${formatCurrency(r.sell_price)} <span style="font-size:0.72rem;">(${_shortDate(r.sell_date)})</span></div>
                     </div>
                 </td>
             </tr>
         `;
     }).join('');
 
-    container.innerHTML = _buildTable([
+    container.innerHTML = legendHtml + _buildTable([
         { label: 'Account' },
         { label: 'Open Date' },
         { label: 'Open Price',   cls: 'text-right' },

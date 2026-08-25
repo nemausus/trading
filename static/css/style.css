@@ -469,19 +469,6 @@ body {
     border-top: 1px solid var(--border-color) !important;
 }
 
-.group-bg-even td {
-    background-color: var(--bg-secondary) !important;
-}
-
-.group-bg-odd td {
-    background-color: var(--bg-tertiary) !important;
-}
-
-.group-bg-even:hover td,
-.group-bg-odd:hover td {
-    background-color: var(--bg-hover) !important;
-}
-
 /* Responsive Table Wrapper */
 .table-responsive {
     width: 100%;
@@ -542,12 +529,29 @@ tr:hover td {
 }
 
 /* Table & text utility helper classes */
-.text-right { text-align: right !important; }
-.text-center { text-align: center !important; }
-.text-left { text-align: left !important; }
-.text-secondary { color: var(--text-secondary); }
-.font-semibold { font-weight: 600; }
-.font-bold { font-weight: 700; }
+.text-right {
+    text-align: right !important;
+}
+
+.text-center {
+    text-align: center !important;
+}
+
+.text-left {
+    text-align: left !important;
+}
+
+.text-secondary {
+    color: var(--text-secondary);
+}
+
+.font-semibold {
+    font-weight: 600;
+}
+
+.font-bold {
+    font-weight: 700;
+}
 
 .mobile-only-pl-pct {
     display: none;
@@ -1142,23 +1146,13 @@ tr.row-put:hover td {
 
     #positions-container tr.group-start-row:not(:first-child),
     #box-container tr.group-start-row:not(:first-child) {
-        border-top: 2.5px solid var(--border-color) !important;
+        border-top: 1px solid var(--accent-blue) !important;
     }
 
     /* Row immediately after a group header: suppress its top border — the header's rule already separates groups */
-    #positions-container tr.group-header-row + tr.group-start-row,
-    #box-container tr.group-header-row + tr.group-start-row {
+    #positions-container tr.group-header-row+tr.group-start-row,
+    #box-container tr.group-header-row+tr.group-start-row {
         border-top: none !important;
-    }
-
-    #positions-container tr.group-bg-even,
-    #box-container tr.group-bg-even {
-        background-color: var(--bg-secondary) !important;
-    }
-
-    #positions-container tr.group-bg-odd,
-    #box-container tr.group-bg-odd {
-        background-color: var(--bg-tertiary) !important;
     }
 
     #positions-container tr.group-end-row,
@@ -1438,8 +1432,8 @@ tr:not(.group-spacer-row) td {
 
 /* Card Borders around each symbol group — desktop only */
 @media (min-width: 769px) {
-    tr.group-start-row td {
-        border-top: 1px solid var(--border-color) !important;
+    tr.group-start-row:not(:first-child) td {
+        border-top: 1px solid var(--accent-blue) !important;
     }
 
     tr.group-end-row td {
