@@ -87,6 +87,11 @@ def to_iso_datetime_str(d: str | None) -> str:
         return datetime.datetime.now(SCHWAB_TZ).isoformat()
 
 
+def _offset_date(today: datetime.date, days: int | None) -> str | None:
+    """Return (today + days).isoformat() or None when days is None."""
+    return (today + datetime.timedelta(days=days)).isoformat() if days is not None else None
+
+
 # ---------------------------------------------------------------------------
 # OptionSymbol
 # ---------------------------------------------------------------------------
@@ -314,9 +319,8 @@ def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CAL
     _validate_chain_params(symbol, min_dte, max_dte, min_delta, max_delta)
 
     today = datetime.datetime.now(SCHWAB_TZ).date()
-
-    from_date = (today + datetime.timedelta(days=min_dte)).isoformat() if min_dte is not None and min_dte >= 0 else None
-    to_date = (today + datetime.timedelta(days=max_dte)).isoformat() if max_dte is not None and max_dte >= 0 else None
+    from_date = _offset_date(today, min_dte)
+    to_date = _offset_date(today, max_dte)
 
     params = {
         'symbol': symbol,
@@ -671,13 +675,13 @@ def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]
                     # BTC rule: total gain >= 60% OR (0.0 < delta < 0.10)
                     if pl_pct >= _BTC_PROFIT_TAKE_PCT or (0.0 < delta < _BTC_DELTA_LOW_THRESHOLD):
                         actions_by_account.setdefault(acc, []).append(
-                            f"BTC {opt_qty_str}{symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
+                            _opt_action_str('BTC', opt_qty_str, symbol, delta, dte, mpr)
                         )
                         pos['action'] = f"BTC {symbol}"
 
                     if delta > _ROLLOUT_DELTA_HIGH_THRESHOLD:
                         actions_by_account.setdefault(acc, []).append(
-                            f"ROLLOUT {opt_qty_str}{symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
+                            _opt_action_str('ROLLOUT', opt_qty_str, symbol, delta, dte, mpr)
                         )
                         pos['action'] = f"ROLL {symbol}"
             except Exception as e:
@@ -685,6 +689,11 @@ def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]
 
 
     return {acc: "; ".join(items) for acc, items in actions_by_account.items()}
+
+
+def _opt_action_str(prefix: str, qty_str: str, symbol: str, delta: float, dte: int, mpr: float) -> str:
+    """Format a BTC/ROLLOUT action string for display in the Todo field."""
+    return f"{prefix} {qty_str}{symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
 
 
 def _enrich_quotes(positions: list, quotes: dict) -> None:
@@ -699,13 +708,13 @@ def _enrich_quotes(positions: list, quotes: dict) -> None:
         if not quote_fields:
             continue
 
-        pos['delta'] = quote_fields.get('delta', 0.0) or 0.0
-        pos['markPercentChange'] = float(quote_fields.get('markPercentChange', 0.0) or 0.0)
+        pos['delta'] = _fval(quote_fields, 'delta')
+        pos['markPercentChange'] = _fval(quote_fields, 'markPercentChange')
 
         if is_option(symbol):
             try:
-                bid = quote_fields.get('bidPrice', 0.0) or 0.0
-                up  = quote_fields.get('underlyingPrice', 0.0) or 0.0
+                bid = _fval(quote_fields, 'bidPrice')
+                up  = _fval(quote_fields, 'underlyingPrice')
                 opt = OptionSymbol.parse_symbol(symbol)
                 dte = opt.dte()
                 strike = float(opt.strike_price)

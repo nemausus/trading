@@ -125,6 +125,14 @@ def _get_limit(default: int, cap: int) -> int:
     return min(request.args.get('limit', default=default, type=int), cap)
 
 
+def _strip_internal_fields(records: list, *keys: str) -> None:
+    """Remove internal Firestore fields from each record dict in-place."""
+    for record in records:
+        if isinstance(record, dict):
+            for key in keys:
+                record.pop(key, None)
+
+
 @app.route('/api/auth/schwab', methods=['POST'])
 @limiter.limit("5 per minute")
 @require_firebase_auth
@@ -311,12 +319,7 @@ def schwab_get_transactions(decoded_token):
     try:
         account_hashes = get_all_account_hashes()
         txns = firestore_db.get_transactions_for_accounts(uid, account_hashes, _get_limit(100, 100))
-        for t in txns:
-            if isinstance(t, dict):
-                t.pop('account_hash', None)
-                t.pop('accountHash', None)
-                t.pop('processed', None)
-                t.pop('remaining_amount', None)
+        _strip_internal_fields(txns, 'account_hash', 'accountHash', 'processed', 'remaining_amount')
         return jsonify({'transactions': txns})
     except Exception as e:
         app.logger.error("Error reading transactions for user %s: %s", uid, e)
@@ -339,12 +342,7 @@ def schwab_get_realized(decoded_token):
         # realized.extend(csv_realized)
         # realized.sort(key=lambda x: x.get('sell_date', ''), reverse=True)
         # firestore_db.save_realized_pl_transactions(uid, get_secondary_account_hash(), csv_realized)
-        for r in realized:
-            if isinstance(r, dict):
-                r.pop('account_hash', None)
-                r.pop('accountHash', None)
-                r.pop('created_at', None)
-                r.pop('id', None)
+        _strip_internal_fields(realized, 'account_hash', 'accountHash', 'created_at', 'id')
         return jsonify({'realized_transactions': realized})
     except Exception as e:
         app.logger.error("Error reading realized transactions for user %s: %s", uid, e)

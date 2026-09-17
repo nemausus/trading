@@ -19,6 +19,7 @@ import logging
 import firestore_db
 from constants import SCHWAB_TZ, get_account_number_for_hash
 from schwab_api import schwab_request
+from schwab_portfolio import _schwab_headers
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ def fetch_transactions_raw(
         List of raw transaction dicts from Schwab, or [] on error.
     """
     url = f"{TRADER_API_BASE_URL}/accounts/{account_hash}/transactions"
-    headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+    headers = _schwab_headers(access_token)
     params = {"startDate": from_date, "endDate": to_date}
 
     try:

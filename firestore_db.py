@@ -12,6 +12,12 @@ if not firebase_admin._apps:
 # Firestore batch write limit.
 _BATCH_SIZE = 500
 
+
+def _chunks(lst: list, n: int):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+
 # Lazy singleton — the Firestore client is thread-safe and intended to be reused.
 _db = None
 
@@ -83,15 +89,20 @@ def delete_user_schwab_credentials(uid: str) -> None:
 # Transaction helpers
 # ---------------------------------------------------------------------------
 
-def _txn_collection(db, uid: str, account_hash: str):
-    """Returns the Firestore CollectionReference for a user's transactions."""
+def _account_subcollection(db, uid: str, account_hash: str, name: str):
+    """Returns a Firestore CollectionReference nested under a user's account."""
     return (
         db.collection('users')
         .document(uid)
         .collection('accounts')
         .document(account_hash)
-        .collection('transactions')
+        .collection(name)
     )
+
+
+def _txn_collection(db, uid: str, account_hash: str):
+    """Returns the Firestore CollectionReference for a user's transactions."""
+    return _account_subcollection(db, uid, account_hash, 'transactions')
 
 
 def get_transactions(
@@ -212,9 +223,9 @@ def save_transactions(
     db = get_db()
     col = _txn_collection(db, uid, account_hash)
 
-    for i in range(0, len(docs), _BATCH_SIZE):
+    for chunk in _chunks(docs, _BATCH_SIZE):
         batch = db.batch()
-        for txn in docs[i:i + _BATCH_SIZE]:
+        for txn in chunk:
             activity_id = str(txn['activityId'])
             doc_ref = col.document(activity_id)
             payload = dict(txn)
@@ -231,13 +242,7 @@ def save_transactions(
 
 def _realized_pl_collection(db, uid: str, account_hash: str):
     """Returns the Firestore CollectionReference for a user's realized P/L records."""
-    return (
-        db.collection('users')
-        .document(uid)
-        .collection('accounts')
-        .document(account_hash)
-        .collection('realized_pl')
-    )
+    return _account_subcollection(db, uid, account_hash, 'realized_pl')
 
 
 def get_realized_pl_transactions(
@@ -292,16 +297,14 @@ def save_realized_pl_transactions(
     db = get_db()
     col = _realized_pl_collection(db, uid, account_hash)
 
-    for i in range(0, len(docs), _BATCH_SIZE):
+    for chunk in _chunks(docs, _BATCH_SIZE):
         batch = db.batch()
-        for idx, item in enumerate(docs[i:i + _BATCH_SIZE]):
-            doc_id = item.get('id')
-            if not doc_id:
-                doc_id = (
-                    f"realized_{item.get('accountNumber', '')}_"
-                    f"{item.get('symbol', '')}_{item.get('buy_date', '')}_"
-                    f"{item.get('sell_date', '')}_{idx}"
-                )
+        for idx, item in enumerate(chunk):
+            doc_id = item.get('id') or (
+                f"realized_{item.get('accountNumber', '')}_"
+                f"{item.get('symbol', '')}_{item.get('buy_date', '')}_"
+                f"{item.get('sell_date', '')}_{idx}"
+            )
             doc_ref = col.document(str(doc_id))
             payload = dict(item)
             payload['created_at'] = firestore.SERVER_TIMESTAMP
@@ -321,11 +324,9 @@ def mark_transactions_processed(
         return
     db = get_db()
     col = _txn_collection(db, uid, account_hash)
-    act_list = list(activity_ids)
-
-    for i in range(0, len(act_list), _BATCH_SIZE):
+    for chunk in _chunks(list(activity_ids), _BATCH_SIZE):
         batch = db.batch()
-        for aid in act_list[i:i + _BATCH_SIZE]:
+        for aid in chunk:
             doc_ref = col.document(str(aid))
             batch.update(doc_ref, {'processed': True})
         batch.commit()
