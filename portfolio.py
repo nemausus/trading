@@ -33,7 +33,7 @@ INS_MAP = {
 _SPX_BOX_ROUNDING = 10_000.0
 
 # Tickers excluded from the uncovered-long (Todo) list
-_TODO_EXCLUDE = frozenset(('QQQM', 'VTI', 'SNOW', 'SPX'))
+_TODO_EXCLUDE = frozenset(('QQQM', 'VTI', 'SPX'))
 
 # Strategy thresholds for action recommendations
 _BTC_PROFIT_TAKE_PCT = 60.0
