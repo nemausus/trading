@@ -6,7 +6,7 @@ from raw Schwab transaction records.
 """
 
 import logging
-from schwab_portfolio import _base_symbol
+from portfolio import _base_symbol
 
 logger = logging.getLogger(__name__)
 

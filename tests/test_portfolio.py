@@ -1,7 +1,7 @@
 """
-Unit tests for schwab_portfolio.py.
+Unit tests for portfolio.py.
 
-Run with:  python -m pytest tests/test_schwab_portfolio.py -v
+Run with:  python -m pytest tests/test_portfolio.py -v
 """
 import datetime
 import unittest
@@ -9,7 +9,8 @@ from unittest.mock import patch, MagicMock
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-import schwab_portfolio as sp
+import portfolio as sp
+from option_symbol import OptionSymbol
 
 
 # ---------------------------------------------------------------------------
@@ -65,88 +66,6 @@ def _make_account(acc_num, positions,
             }
         }
     }
-
-
-# ---------------------------------------------------------------------------
-# OptionSymbol
-# ---------------------------------------------------------------------------
-
-class TestOptionSymbol(unittest.TestCase):
-
-    def test_parse_call(self):
-        sym = sp.OptionSymbol.parse_symbol('AAPL  271231C00295000')
-        self.assertEqual(sym.underlying_symbol, 'AAPL')
-        self.assertEqual(sym.contract_type, 'C')
-        self.assertEqual(sym.strike_price, '295.00')
-        self.assertEqual(sym.expiration_date, datetime.date(2027, 12, 31))
-
-    def test_parse_put(self):
-        sym = sp.OptionSymbol.parse_symbol('NVDA  261219P00200000')
-        self.assertEqual(sym.underlying_symbol, 'NVDA')
-        self.assertEqual(sym.contract_type, 'P')
-        self.assertEqual(sym.strike_price, '200.00')
-
-    def test_parse_spx(self):
-        # SPX symbols start with "SPX   " (6 chars)
-        sym = sp.OptionSymbol.parse_symbol('SPX   261219C05000000')
-        self.assertEqual(sym.underlying_symbol, 'SPX')
-        self.assertEqual(sym.contract_type, 'C')
-        self.assertEqual(sym.strike_price, '5000.00')
-
-    def test_parse_invalid_short(self):
-        with self.assertRaises(ValueError):
-            sp.OptionSymbol.parse_symbol('AAPL')
-
-    def test_dte_future(self):
-        # expiration 30 days from today
-        future = datetime.date.today() + datetime.timedelta(days=30)
-        sym = sp.OptionSymbol('AAPL', future, 'C', '200.00')
-        self.assertEqual(sym.dte(ref_date=datetime.date.today()), 30)
-
-    def test_dte_string_ref(self):
-        future = datetime.date(2030, 1, 1)
-        sym = sp.OptionSymbol('AAPL', future, 'C', '200.00')
-        self.assertEqual(sym.dte(ref_date='2029-12-01'), 31)
-
-    def test_dte_expired(self):
-        past = datetime.date.today() - datetime.timedelta(days=5)
-        sym = sp.OptionSymbol('AAPL', past, 'C', '200.00')
-        self.assertEqual(sym.dte(ref_date=datetime.date.today()), -5)
-
-
-# ---------------------------------------------------------------------------
-# get_option_multiplier
-# ---------------------------------------------------------------------------
-
-class TestGetOptionMultiplier(unittest.TestCase):
-
-    def test_equity(self):
-        self.assertEqual(sp.get_option_multiplier('AAPL'), 1)
-
-    def test_option(self):
-        self.assertEqual(sp.get_option_multiplier('AAPL  271231C00295000'), 100)
-
-    def test_four_char_equity(self):
-        self.assertEqual(sp.get_option_multiplier('HOOD'), 1)
-
-    def test_five_char(self):
-        # 5-char symbols like "GOOGL" are equities — multiplier should be 1
-        self.assertEqual(sp.get_option_multiplier('GOOGL'), 100)
-
-
-# ---------------------------------------------------------------------------
-# _parse_expiration_date
-# ---------------------------------------------------------------------------
-
-class TestParseExpirationDate(unittest.TestCase):
-
-    def test_valid(self):
-        self.assertEqual(sp._parse_expiration_date('271231'),
-                         datetime.date(2027, 12, 31))
-
-    def test_invalid(self):
-        with self.assertRaises(ValueError):
-            sp._parse_expiration_date('bad_date')
 
 
 # ---------------------------------------------------------------------------
@@ -241,14 +160,10 @@ class TestSPXBoxLoan(unittest.TestCase):
         # Both share the same 12-char prefix 'SPX   261219'
         spx_pos = [p for p in result['positions'] if p['symbol'].startswith('SPX')]
         self.assertEqual(len(spx_pos), 1)
-        # Quantities are summed: qty=1 (long) and qty=-1 (short) -> 0
-        # but grouped position always has quantity=1 per original logic
         self.assertEqual(spx_pos[0]['quantity'], 1)
 
     def test_box_loan_rounded_to_10k(self):
         """Box loan should round group cost to nearest $10,000."""
-        # cost = marketValue - P/L
-        # long leg: cost = 10000 - 500 = 9500 → rounds to 10000
         long_leg = _make_option_pos('SPX   261219C05000000', long_qty=1,
                                     market_value=10000.0, long_pl=500.0)
         account = _make_account('ACC1', [long_leg], equity=100000.0)
@@ -279,7 +194,6 @@ class TestCSP(unittest.TestCase):
             return sp.process_accounts_data(accounts_json, 'fake_token')
 
     def test_short_put_csp(self):
-        # Short 2 puts at $200 strike → CSP = 200 * 2 * 100 = 40000 (negative because short)
         sym = 'NVDA  261219P00200000'
         pos = _make_option_pos(sym, short_qty=2, avg_price=5.0,
                                market_value=-1000.0, short_pl=0.0)
@@ -287,7 +201,6 @@ class TestCSP(unittest.TestCase):
         result = self._run([account])
 
         s = result['summaries'][0]
-        # qty is -2 (short), so CSP = 200 * (-2) * 100 = -40000
         self.assertAlmostEqual(s['CSP'], -40000.0)
 
     def test_long_put_not_counted(self):
@@ -331,7 +244,7 @@ class TestTodoList(unittest.TestCase):
 
         todo = result['summaries'][0]['Todo']
         self.assertIn('AAPL', todo)
-        self.assertIn('1x', todo)   # 100 shares = 1 contract
+        self.assertIn('1x', todo)
 
     def test_covered_stock(self):
         """100 shares of AAPL + 1 short call → fully covered, no Todo."""
@@ -414,12 +327,11 @@ class TestMPRAndDelta(unittest.TestCase):
         pos = _make_option_pos(sym, short_qty=1, market_value=-500.0, short_pl=0.0)
         account = _make_account('ACC1', [pos])
 
-        # OTM call: underlying 280 < strike 295 → no intrinsic, timeValue = bid
         quotes = self._make_quotes(sym, bid=5.0, underlying=280.0, delta=0.35)
         result = self._run([account], quotes)
 
         p = result['positions'][0]
-        opt = sp.OptionSymbol.parse_symbol(sym)
+        opt = OptionSymbol.parse_symbol(sym)
         dte = opt.dte()
         if dte > 0:
             expected_mpr = (5.0 * 3000.0) / dte / 280.0
@@ -435,8 +347,7 @@ class TestMPRAndDelta(unittest.TestCase):
         result = self._run([account], quotes)
 
         p = result['positions'][0]
-        # time_value = 55 - max(0, 250-200) = 55 - 50 = 5
-        opt = sp.OptionSymbol.parse_symbol(sym)
+        opt = OptionSymbol.parse_symbol(sym)
         dte = opt.dte()
         if dte > 0:
             expected_mpr = (5.0 * 3000.0) / dte / 250.0
@@ -454,7 +365,6 @@ class TestMPRAndDelta(unittest.TestCase):
     def test_no_mpr_when_dte_zero(self):
         """MPR should be 0 when DTE is 0 or negative (avoid division by zero)."""
         today = datetime.datetime.now(sp.SCHWAB_TZ).date()
-        # Build a symbol expiring today using actual date
         exp_str = today.strftime('%y%m%d')
         sym = f'AAPL  {exp_str}C00200000'
         pos = _make_option_pos(sym, short_qty=1, market_value=-500.0, short_pl=0.0)
@@ -464,7 +374,6 @@ class TestMPRAndDelta(unittest.TestCase):
         result = self._run([account], quotes)
 
         p = result['positions'][0]
-        # dte=0 today → MPR should not be set (stays 0)
         self.assertEqual(p['mpr'], 0.0)
 
 
@@ -537,10 +446,8 @@ class TestAccountSummary(unittest.TestCase):
 
     def test_risk_formula(self):
         """Risk = 100 + 2250 * box_loan / equity / 7."""
-        # Create SPX position so box_loan > 0
         spx_pos = _make_option_pos('SPX   261219C05000000', long_qty=1,
                                    market_value=10000.0, long_pl=0.0)
-        # cost = 10000 - 0 = 10000, box_loan = round(10000/10000)*10000 = 10000
         account = _make_account('ACC1', [spx_pos], equity=100000.0)
         result = self._run([account])
         s = result['summaries'][0]
@@ -564,10 +471,8 @@ class TestAccountSummary(unittest.TestCase):
     def test_todo_actions_sto_and_btc(self):
         """Test STO rule for uncovered stocks and BTC rule for sold calls (P/L% >= 60% or delta < 0.10)."""
         equity_pos = _make_equity_pos('AAPL', long_qty=100, market_value=20000.0)
-        # Short call with >60% gain (sold for $500, marketValue=-$100 => P/L=$400 => P/L%=80%)
         winning_call = _make_option_pos('AAPL  271231C00295000', short_qty=1, avg_price=5.0,
                                         market_value=-100.0, short_pl=400.0)
-        # Short call with low delta < 0.10 (delta 0.05, <60% gain)
         low_delta_call = _make_option_pos('NVDA  271231C00300000', short_qty=1, avg_price=5.0,
                                           market_value=-400.0, short_pl=100.0)
 
@@ -649,109 +554,12 @@ class TestPositionSort(unittest.TestCase):
 
         positions = result['positions']
         self.assertEqual(len(positions), 2)
-        # dte=-1 (equity) sorts before dte>0 (option)
         self.assertEqual(positions[0]['symbol'], 'AAPL')
         self.assertEqual(positions[1]['symbol'], 'AAPL  271231C00295000')
 
 
 # ---------------------------------------------------------------------------
-# fetch_option_chain
-# ---------------------------------------------------------------------------
-
-class TestFetchOptionChain(unittest.TestCase):
-
-    @patch('requests.request')
-    def test_fetch_option_chain_parsing(self, mock_request):
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            'underlying': {'symbol': 'AAPL', 'last': 200.0, 'change': 2.5, 'percentChange': 1.26},
-            'callExpDateMap': {
-                '2026-08-21:50': {
-                    '200.0': [{
-                        'symbol': 'AAPL  271231C00200000',
-                        'expirationDate': '2026-08-21T00:00:00.000+00:00',
-                        'daysToExpiration': 50,
-                        'strikePrice': 200.0,
-                        'bid': 10.0,
-                        'ask': 11.0,
-                        'mark': 10.5,
-                        'delta': 0.50,
-                        'volatility': 25.0,
-                        'totalVolume': 50,
-                        'openInterest': 100,
-                        'timeValue': 10.5
-                    }]
-                }
-            }
-        }
-        mock_request.return_value = mock_response
-
-        res = sp.fetch_option_chain('fake_token', 'AAPL', 'CALL')
-
-        self.assertEqual(res['underlying']['symbol'], 'AAPL')
-        self.assertEqual(res['underlying']['price'], 200.0)
-        self.assertEqual(len(res['chain']), 1)
-
-        opt = res['chain'][0]
-        self.assertEqual(opt['symbol'], 'AAPL  271231C00200000')
-        self.assertEqual(opt['contractType'], 'CALL')
-        self.assertEqual(opt['strikePrice'], 200.0)
-        self.assertEqual(opt['dte'], 50)
-        self.assertEqual(opt['delta'], 0.50)
-        self.assertAlmostEqual(opt['change'], 0.0)  # strike 200 == stock 200
-
-    @patch('requests.request')
-    def test_fetch_option_chain_server_side_filtering(self, mock_request):
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            'underlying': {'symbol': 'AAPL', 'last': 200.0},
-            'callExpDateMap': {
-                '2026-08-21:50': {
-                    '200.0': [
-                        {'symbol': 'C1', 'daysToExpiration': 5, 'delta': 0.20, 'strikePrice': 200.0},
-                        {'symbol': 'C2', 'daysToExpiration': 30, 'delta': 0.25, 'strikePrice': 210.0},
-                        {'symbol': 'C3', 'daysToExpiration': 45, 'delta': 0.50, 'strikePrice': 220.0},
-                    ]
-                }
-            }
-        }
-        mock_request.return_value = mock_response
-
-        # Filter: min_dte=7, max_dte=60, min_delta=0.1, max_delta=0.3
-        res = sp.fetch_option_chain('fake_token', 'AAPL', 'CALL', min_dte=7, max_dte=60, min_delta=0.1, max_delta=0.3)
-
-        self.assertEqual(res['totalContracts'], 3)
-        self.assertEqual(len(res['chain']), 1)
-        self.assertEqual(res['chain'][0]['symbol'], 'C2')
-
-    def test_fetch_option_chain_validation_errors(self):
-        """Verify ValueError is raised for negative DTE, out-of-range delta, or min > max."""
-        with self.assertRaises(ValueError):
-            sp.fetch_option_chain('fake_token', 'AAPL', min_dte=-5)
-
-        with self.assertRaises(ValueError):
-            sp.fetch_option_chain('fake_token', 'AAPL', max_dte=5000)
-
-        with self.assertRaises(ValueError):
-            sp.fetch_option_chain('fake_token', 'AAPL', min_dte=60, max_dte=30)
-
-        with self.assertRaises(ValueError):
-            sp.fetch_option_chain('fake_token', 'AAPL', min_delta=-2.5)
-
-        with self.assertRaises(ValueError):
-            sp.fetch_option_chain('fake_token', 'AAPL', max_delta=1.5)
-
-        with self.assertRaises(ValueError):
-            sp.fetch_option_chain('fake_token', 'AAPL', min_delta=0.5, max_delta=0.2)
-
-        with self.assertRaises(ValueError):
-            sp.fetch_option_chain('fake_token', 'AAPL_WITH_EXCESSIVELY_LONG_SYMBOL_NAME_HERE')
-
-
-# ---------------------------------------------------------------------------
-# _enrich_quotes test
+# _enrich_quotes
 # ---------------------------------------------------------------------------
 
 class TestEnrichQuotes(unittest.TestCase):
@@ -780,11 +588,9 @@ class TestEnrichQuotes(unittest.TestCase):
 
         sp._enrich_quotes(positions, quotes)
 
-        # Stock position should have markPercentChange
         self.assertIn('markPercentChange', stock_pos)
         self.assertEqual(stock_pos['markPercentChange'], 1.25)
 
-        # Option position should also have markPercentChange
         self.assertIn('markPercentChange', option_pos)
         self.assertEqual(option_pos['markPercentChange'], 0.50)
 
@@ -798,5 +604,3 @@ class TestEnrichQuotes(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
-
-

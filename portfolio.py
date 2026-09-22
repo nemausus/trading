@@ -5,6 +5,7 @@ import logging
 from constants import SCHWAB_TZ
 import schwab_api
 from schwab_api import SchwabAPIError
+from option_symbol import OptionSymbol, _parse_expiration_date
 
 # ---------------------------------------------------------------------------
 # Module-level constants
@@ -21,7 +22,8 @@ INS_MAP = {
     'GOOD_TILL_CANCEL': 'GTC',
 }
 
-# Rounding unit for SPX box spread notional (boxes are sized in $10k increments).
+
+# Rounding unit for SPX box spread loan calculation ($10k increments).
 _SPX_BOX_ROUNDING = 10_000.0
 
 # Tickers excluded from the uncovered-long (Todo) list
@@ -45,17 +47,6 @@ _MPR_ANNUALIZATION_FACTOR = 3000.0
 def _fval(d: dict, key: str, default: float = 0.0) -> float:
     """Safely read a float from *d*, treating None and missing as *default*."""
     return float(d.get(key, default) or default)
-
-def _parse_expiration_date(expiration_date: str) -> datetime.date:
-    try:
-        dt = datetime.datetime.strptime(expiration_date, '%y%m%d')
-        return dt.date()
-    except ValueError as e:
-        raise ValueError(
-            'expiration date must follow format '
-            '[two digit year][Month with leading zero]'
-            '[Day with leading zero] Found: ' + str(expiration_date)
-        ) from e
 
 
 def is_option(symbol: str) -> bool:
@@ -85,58 +76,6 @@ def to_iso_datetime_str(d: str | None) -> str:
         return datetime.datetime.now(SCHWAB_TZ).isoformat()
 
 
-def _offset_date(today: datetime.date, days: int | None) -> str | None:
-    """Return (today + days).isoformat() or None when days is None."""
-    return (today + datetime.timedelta(days=days)).isoformat() if days is not None else None
-
-
-# ---------------------------------------------------------------------------
-# OptionSymbol
-# ---------------------------------------------------------------------------
-
-class OptionSymbol:
-    """Parse and represent a Schwab OCC option symbol."""
-
-    def __init__(self, underlying_symbol: str, expiration_date: datetime.date,
-                 contract_type: str, strike_price: str):
-        self.underlying_symbol = underlying_symbol
-        self.expiration_date = expiration_date  # datetime.date
-        self.contract_type = contract_type      # 'C' or 'P'
-        self.strike_price = strike_price        # decimal string, e.g. "295.00"
-
-    @classmethod
-    def parse_symbol(cls, symbol: str) -> 'OptionSymbol':
-        """Parse an OCC option symbol string."""
-        if not symbol or len(symbol) < 13:
-            raise ValueError(f"Invalid option symbol format: {symbol}")
-
-        underlying = symbol[:6].rstrip()
-        rest = symbol[6:]
-
-        if 'P' in rest:
-            expiration_date_str, strike_str = rest.split('P', 1)
-            contract_type = 'P'
-        elif 'C' in rest:
-            expiration_date_str, strike_str = rest.split('C', 1)
-            contract_type = 'C'
-        else:
-            expiration_date_str, strike_str, contract_type = rest, "1000", 'C'
-
-        try:
-            strike = f"{int(strike_str) / 1000.0:.2f}"
-        except Exception:
-            strike = "0.00"
-
-        return cls(underlying, _parse_expiration_date(expiration_date_str),
-                   contract_type, strike)
-
-    def dte(self, ref_date=None) -> int:
-        """Days to expiration from *ref_date* (defaults to today in Schwab TZ)."""
-        if ref_date is None:
-            ref_date = datetime.datetime.now(SCHWAB_TZ).date()
-        elif isinstance(ref_date, str):
-            ref_date = datetime.date.fromisoformat(ref_date[:10])
-        return int((self.expiration_date - ref_date).days)
 
 
 # ---------------------------------------------------------------------------
@@ -197,244 +136,6 @@ def fetch_active_orders(access_token: str, account_nums: list) -> list:
             logging.error("Error fetching orders for account %s: %s", acc_num, e)
 
     return active_orders
-
-
-def _parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) -> list:
-    """Helper to flatten Schwab callExpDateMap / putExpDateMap structures into a list of option dicts."""
-    contracts = []
-    if not exp_map or not isinstance(exp_map, dict):
-        return contracts
-
-    for exp_key, strike_map in exp_map.items():
-        if not isinstance(strike_map, dict):
-            continue
-        for strike_key, contract_list in strike_map.items():
-            if not isinstance(contract_list, list):
-                continue
-            for item in contract_list:
-                if not isinstance(item, dict):
-                    continue
-
-                symbol = item.get('symbol', '')
-                strike = float(item.get('strikePrice', 0.0))
-                dte = int(item.get('daysToExpiration', 0))
-                exp_date_raw = item.get('expirationDate', '')
-                exp_date = exp_date_raw[:10] if exp_date_raw else ''
-
-                bid = _fval(item, 'bid')
-                ask = _fval(item, 'ask')
-                mark = _fval(item, 'mark') or (bid + ask) / 2.0
-                delta = _fval(item, 'delta')
-                volatility = _fval(item, 'volatility')
-                volume = int(item.get('totalVolume', 0) or 0)
-                open_interest = int(item.get('openInterest', 0) or 0)
-                time_value = _fval(item, 'timeValue')
-
-                change_pct = (strike * 100.0 / stock_price - 100.0) if stock_price > 0 else 0.0
-                be_price = strike + mark if delta > 0 else strike - mark
-                be_change_pct = (be_price * 100.0 / stock_price - 100.0) if stock_price > 0 else 0.0
-
-                denom = (stock_price if delta > 0 else strike) - mark
-                mpr = (time_value * 3000.0 / (1 if dte == 0 else dte) / denom) if (dte >= 0 and denom > 0) else 0.0
-
-                contracts.append({
-                    'symbol': symbol,
-                    'contractType': contract_type_label,
-                    'strikePrice': strike,
-                    'expirationDate': exp_date,
-                    'dte': dte,
-                    'mark': mark,
-                    'delta': delta,
-                    'volatility': volatility,
-                    'openInterest': open_interest,
-                    'change': change_pct,
-                    'beChange': be_change_pct,
-                    'mpr': mpr
-                })
-    return contracts
-
-
-def _validate_range(name: str, value, *, lo, hi, typ) -> None:
-    """Raise ValueError if *value* is not an instance of *typ* within [lo, hi]."""
-    if not isinstance(value, typ) or not (lo <= value <= hi):
-        typ_name = '/'.join(t.__name__ for t in typ) if isinstance(typ, tuple) else typ.__name__
-        raise ValueError(
-            f"Invalid {name}: {value}. Must be a {typ_name} between {lo} and {hi}."
-        )
-
-
-def _validate_chain_params(symbol: str, min_dte: int | None, max_dte: int | None,
-                            min_delta: float | None, max_delta: float | None) -> None:
-    """Validate DTE, Delta, and symbol parameters, raising ValueError for malicious or out-of-bounds values."""
-    if not symbol or not isinstance(symbol, str) or len(symbol) > 4:
-        raise ValueError(f"Invalid symbol: '{symbol}'. Must be an alphanumeric ticker up to 10 characters.")
-
-    if min_dte is not None:
-        _validate_range('min_dte', min_dte, lo=0, hi=1000, typ=int)
-    if max_dte is not None:
-        _validate_range('max_dte', max_dte, lo=0, hi=1000, typ=int)
-    if min_dte is not None and max_dte is not None and min_dte > max_dte:
-        raise ValueError(f"min_dte ({min_dte}) cannot be greater than max_dte ({max_dte}).")
-
-    if min_delta is not None:
-        _validate_range('min_delta', min_delta, lo=-1.0, hi=1.0, typ=(int, float))
-    if max_delta is not None:
-        _validate_range('max_delta', max_delta, lo=-1.0, hi=1.0, typ=(int, float))
-    if min_delta is not None and max_delta is not None and min_delta > max_delta:
-        raise ValueError(f"min_delta ({min_delta}) cannot be greater than max_delta ({max_delta}).")
-
-
-
-
-
-def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CALL',
-                       min_dte: int | None = None, max_dte: int | None = None,
-                       min_delta: float | None = None, max_delta: float | None = None) -> dict:
-    """Fetch options chain from Schwab API, filter by DTE and delta, and return structured format."""
-    _validate_chain_params(symbol, min_dte, max_dte, min_delta, max_delta)
-
-    today = datetime.datetime.now(SCHWAB_TZ).date()
-    from_date = _offset_date(today, min_dte)
-    to_date = _offset_date(today, max_dte)
-
-    ct = contract_type if contract_type in ('CALL', 'PUT', 'ALL') else 'ALL'
-
-    empty = {
-        'underlying': {'symbol': symbol, 'price': 0.0, 'change': 0.0, 'percentChange': 0.0},
-        'chain': [],
-        'totalContracts': 0
-    }
-    data = schwab_api.get_option_chains(
-        access_token, symbol,
-        contract_type=ct,
-        from_date=from_date,
-        to_date=to_date,
-        include_underlying_quote=True,
-    )
-    underlying_data = data.get('underlying', {})
-    stock_price = float(underlying_data.get('last', 0.0) or underlying_data.get('mark', 0.0) or 0.0)
-
-    underlying_info = {
-        'symbol': symbol,
-        'price': stock_price,
-        'change': float(underlying_data.get('change', 0.0) or 0.0),
-        'percentChange': float(underlying_data.get('percentChange', 0.0) or 0.0)
-    }
-
-    chain = []
-    if 'callExpDateMap' in data:
-        chain.extend(_parse_exp_map(data['callExpDateMap'], stock_price, 'CALL'))
-    if 'putExpDateMap' in data:
-        chain.extend(_parse_exp_map(data['putExpDateMap'], stock_price, 'PUT'))
-
-    total_contracts = len(chain)
-
-    filtered_chain = [
-        opt for opt in chain
-        if (min_dte is None or opt['dte'] >= min_dte)
-        and (max_dte is None or opt['dte'] <= max_dte)
-        and (min_delta is None or opt['delta'] >= min_delta)
-        and (max_delta is None or opt['delta'] <= max_delta)
-    ]
-
-    filtered_chain.sort(key=lambda x: (x['expirationDate'], x['strikePrice'], x['contractType']))
-
-    return {
-        'underlying': underlying_info,
-        'chain': filtered_chain,
-        'totalContracts': total_contracts
-    }
-
-def fetch_spx_boxes(access_token: str, from_date: str | None, to_date: str | None, sizes: list[int] | None = None) -> list[dict]:
-    """Fetch SPX option chains and identify box spreads."""
-    data = schwab_api.get_option_chains(
-        access_token, '$SPX',
-        contract_type='ALL',
-        from_date=from_date,
-        to_date=to_date,
-        include_underlying_quote=False,
-    )
-
-    calls_map = data.get('callExpDateMap', {})
-    puts_map = data.get('putExpDateMap', {})
-
-    # Reuse _parse_exp_map to extract mark/dte/openInterest uniformly.
-    # stock_price=0.0 because includeUnderlyingQuote is False;
-    # change/beChange/mpr are not used in box spread calculations.
-    all_contracts = (
-        _parse_exp_map(calls_map, 0.0, 'CALL') +
-        _parse_exp_map(puts_map,  0.0, 'PUT')
-    )
-
-    # Keep only monthly SPX contracts (exclude SPXW weeklies) with open interest.
-    monthly = [
-        c for c in all_contracts
-        if c['symbol'].startswith('SPX  ') and c['openInterest'] > 0
-    ]
-
-    # Index by (expiration_date, strike) -> {contract_type: {mark, oi, dte}}
-    options_by_exp_strike: dict = {}
-    for c in monthly:
-        key = (c['expirationDate'], c['strikePrice'])
-        if key not in options_by_exp_strike:
-            options_by_exp_strike[key] = {}
-        options_by_exp_strike[key][c['contractType']] = {
-            'mark': c['mark'],
-            'oi':   c['openInterest'],
-            'dte':  c['dte'],
-        }
-
-    boxes = []
-    if sizes is None or not sizes:
-        sizes = [100, 200, 500, 1000]
-
-    for (exp_date, lower_strike), legs in options_by_exp_strike.items():
-        if 'CALL' not in legs or 'PUT' not in legs:
-            continue
-
-        lower_call = legs['CALL']
-        lower_put  = legs['PUT']
-        dte = lower_call['dte']
-        if dte <= 0:
-            continue
-
-        for size in sizes:
-            higher_strike = lower_strike + size
-            higher_key = (exp_date, higher_strike)
-
-            if higher_key not in options_by_exp_strike:
-                continue
-
-            higher_legs = options_by_exp_strike[higher_key]
-            if 'CALL' not in higher_legs or 'PUT' not in higher_legs:
-                continue
-
-            higher_call = higher_legs['CALL']
-            higher_put  = higher_legs['PUT']
-
-            liquidity = lower_call['oi'] + lower_put['oi'] + higher_call['oi'] + higher_put['oi']
-            net_credit = (lower_call['mark'] - higher_call['mark']) + (higher_put['mark'] - lower_put['mark'])
-
-            if net_credit <= 0:
-                continue
-
-            rate = (((size - net_credit) / net_credit) * (365.0 / dte) * 100.0)
-
-            boxes.append({
-                'expirationDate': exp_date,
-                'dte':       dte,
-                'btoPut':    lower_strike,
-                'stoPut':    higher_strike,
-                'stoCall':   lower_strike,
-                'btoCall':   higher_strike,
-                'netCredit': net_credit,
-                'rate':      rate,
-                'size':      size,
-                'liquidity': liquidity,
-            })
-
-    boxes.sort(key=lambda x: x['liquidity'], reverse=True)
-    return boxes[:15]
 
 
 # ---------------------------------------------------------------------------
@@ -523,7 +224,6 @@ def _is_short_put(pos: dict) -> bool:
         return False
 
 
-
 def _enrich_positions(positions: list) -> float:
     """
     Add P/L%, dte, and CSP contribution to each position in-place.
@@ -536,7 +236,7 @@ def _enrich_positions(positions: list) -> float:
         pl     = pos['P/L']
         pos['P/L%'] = (pl / abs(cost) * 100.0) if cost != 0 else 0.0
 
-        if is_option(symbol) and len(symbol) > 10:
+        if is_option(symbol) and len(symbol) > 12:
             try:
                 opt = OptionSymbol.parse_symbol(symbol)
                 pos['dte'] = opt.dte()
@@ -545,6 +245,14 @@ def _enrich_positions(positions: list) -> float:
                     csp += float(opt.strike_price) * pos['quantity'] * 100.0
             except Exception as e:
                 logging.error("Error enriching option %s: %s", symbol, e)
+                pos['dte'] = -1
+        elif len(symbol) == 12 and symbol.startswith('SPX'):
+            try:
+                exp_date = _parse_expiration_date(symbol[6:12])
+                today = datetime.datetime.now(SCHWAB_TZ).date()
+                pos['dte'] = int((exp_date - today).days)
+            except Exception as e:
+                logging.error("Error enriching SPX box %s: %s", symbol, e)
                 pos['dte'] = -1
         else:
             pos['dte'] = -1

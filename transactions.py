@@ -1,6 +1,6 @@
 """
-schwab_transactions.py
-~~~~~~~~~~~~~~~~~~~~~~
+transactions.py
+~~~~~~~~~~~~~~~
 Incremental transaction sync from the Schwab Trader API to Firestore.
 
 Flow:

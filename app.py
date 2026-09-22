@@ -15,9 +15,11 @@ import firestore_db
 from constants import get_all_account_hashes, get_secondary_account_hash
 from schwab_api import SchwabAPIError
 from schwab_auth import SchwabAuthManager
-import schwab_portfolio
-import schwab_transactions
-import realized_pl
+import portfolio
+import chain
+import boxes
+import transactions
+import realized
 import roll_chain
 
 
@@ -226,8 +228,8 @@ def schwab_disconnect(decoded_token):
 def schwab_accounts(decoded_token, access_token):
     uid = decoded_token['uid']
     try:
-        raw_accounts = schwab_portfolio.fetch_accounts_raw(access_token)
-        parsed_data = schwab_portfolio.process_accounts_data(raw_accounts, access_token)
+        raw_accounts = portfolio.fetch_accounts_raw(access_token)
+        parsed_data = portfolio.process_accounts_data(raw_accounts, access_token)
         return jsonify(parsed_data)
     except SchwabAPIError as e:
         app.logger.error("Schwab API error fetching accounts for user %s: %s", uid, e)
@@ -252,7 +254,7 @@ def schwab_chain(decoded_token, access_token):
     max_delta = request.args.get('maxDelta', type=float)
 
     try:
-        chain_data = schwab_portfolio.fetch_option_chain(
+        chain_data = chain.fetch_option_chain(
             access_token, symbol, contract_type,
             min_dte=min_dte, max_dte=max_dte,
             min_delta=min_delta, max_delta=max_delta
@@ -287,8 +289,8 @@ def schwab_boxes(decoded_token, access_token):
             return jsonify({'error': 'Invalid sizes parameter. Must be comma-separated integers.'}), 400
 
     try:
-        boxes = schwab_portfolio.fetch_spx_boxes(access_token, from_date, to_date, sizes)
-        return jsonify({'boxes': boxes})
+        boxes_data = boxes.fetch_spx_boxes(access_token, from_date, to_date, sizes)
+        return jsonify({'boxes': boxes_data})
     except SchwabAPIError as e:
         app.logger.error("Schwab API error fetching SPX boxes for user %s: %s", uid, e)
         return jsonify({'error': 'Schwab API unavailable'}), 502
@@ -306,14 +308,14 @@ def schwab_sync_transactions(decoded_token, access_token):
     try:
         results = []
         for acc_hash in get_all_account_hashes():
-            result = schwab_transactions.sync_transactions(uid, access_token, acc_hash)
+            result = transactions.sync_transactions(uid, access_token, acc_hash)
             if 'error' in result:
                 app.logger.error(
                     "Transaction sync error for user %s: %s", uid, result['error']
                 )
                 return jsonify({'error': result['error']}), 502
             # Force calculate realized pl for this account, even if no new transactions.
-            realized_pl.process_account_realized_pl(uid, acc_hash)
+            realized.process_account_realized_pl(uid, acc_hash)
             results.append(result)
         return jsonify({'results': results})
     except SchwabAPIError as e:
@@ -346,17 +348,13 @@ def schwab_get_realized(decoded_token):
     uid = decoded_token['uid']
     try:
         account_hashes = get_all_account_hashes()
-        realized = firestore_db.get_realized_pl_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
-        if not realized:
+        records = firestore_db.get_realized_pl_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
+        if not records:
             for acc_hash in account_hashes:
-                realized_pl.process_account_realized_pl(uid, acc_hash)
-            realized = firestore_db.get_realized_pl_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
-        # csv_realized = realized_pl.load_csv_realized_pl()
-        # realized.extend(csv_realized)
-        # realized.sort(key=lambda x: x.get('sell_date', ''), reverse=True)
-        # firestore_db.save_realized_pl_transactions(uid, get_secondary_account_hash(), csv_realized)
-        _strip_internal_fields(realized, 'account_hash', 'accountHash', 'created_at', 'id')
-        return jsonify({'realized_transactions': realized})
+                realized.process_account_realized_pl(uid, acc_hash)
+            records = firestore_db.get_realized_pl_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
+        _strip_internal_fields(records, 'account_hash', 'accountHash', 'created_at', 'id')
+        return jsonify({'realized_transactions': records})
     except Exception as e:
         app.logger.error("Error reading realized transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to read transactions'}), 502

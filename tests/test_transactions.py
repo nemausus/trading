@@ -1,17 +1,17 @@
 import unittest
 from unittest.mock import patch
 
-import schwab_transactions
+import transactions
 
 
-class TestSchwabTransactions(unittest.TestCase):
-    """Unit tests for schwab_transactions.py."""
+class TestTransactions(unittest.TestCase):
+    """Unit tests for transactions.py."""
 
-    @patch('schwab_transactions.get_account_number_for_hash')
-    @patch('schwab_transactions.firestore_db.save_transactions')
-    @patch('schwab_transactions.firestore_db.get_existing_activity_ids')
-    @patch('schwab_transactions.fetch_transactions_raw')
-    @patch('schwab_transactions.firestore_db.get_latest_transaction_time')
+    @patch('transactions.get_account_number_for_hash')
+    @patch('transactions.firestore_db.save_transactions')
+    @patch('transactions.firestore_db.get_existing_activity_ids')
+    @patch('transactions.fetch_transactions_raw')
+    @patch('transactions.firestore_db.get_latest_transaction_time')
     def test_sync_transactions_success(
         self,
         mock_get_latest_time,
@@ -30,7 +30,7 @@ class TestSchwabTransactions(unittest.TestCase):
         mock_fetch_raw.return_value = raw_txns
         mock_get_existing.return_value = {"101"}
 
-        res = schwab_transactions.sync_transactions("user123", "token_abc", "HASH_PRIMARY")
+        res = transactions.sync_transactions("user123", "token_abc", "HASH_PRIMARY")
 
         self.assertEqual(res["new_count"], 1)
         self.assertEqual(res["account_number"], "acc1")

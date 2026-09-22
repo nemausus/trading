@@ -1,6 +1,6 @@
 """
-realized_pl.py
-~~~~~~~~~~~~~~
+realized.py
+~~~~~~~~~~~
 Service module for normalizing raw transactions and calculating realized
 profit/loss using FIFO (First-In, First-Out) matching.
 """

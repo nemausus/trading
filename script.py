@@ -5,7 +5,7 @@ script.py
 Standalone administrative and debugging CLI script to inspect raw transactions
 and realized P/L records stored in Firestore outside of the web application.
 
-Reuses firestore_db.py, constants.py, and realized_pl.py services directly.
+Reuses firestore_db.py, constants.py, and realized.py services directly.
 
 Usage examples:
     python script.py --account acc2 txns --limit 100

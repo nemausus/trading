@@ -1,9 +1,9 @@
 """
-Unit tests for realized_pl.py module.
+Unit tests for realized.py module.
 """
 
 import unittest
-import realized_pl
+import realized as realized_pl
 
 
 class TestRealizedPL(unittest.TestCase):
