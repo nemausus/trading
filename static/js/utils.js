@@ -18,9 +18,17 @@ export function formatNumber(val, decimals = 2) {
     return val.toFixed(decimals);
 }
 
+export function isOption(symbol) {
+    if (!symbol) return false;
+    const s = symbol.trim();
+    return s.length > 6 || (s.includes(' ') && s.length > 4) || /\d{6}[CP]\d+/.test(s);
+}
+
 export function baseUnderlying(symbol) {
-    if (symbol.length <= 4) return symbol;
-    return symbol.slice(0, 6).trimEnd();
+    if (!symbol) return '';
+    const s = symbol.trim();
+    if (!isOption(s)) return s;
+    return s.slice(0, 6).trimEnd();
 }
 
 export function sortPositionsGrouped(positions) {
@@ -31,8 +39,8 @@ export function sortPositionsGrouped(positions) {
         const ub = baseUnderlying(b.symbol);
         if (ua < ub) return -1;
         if (ua > ub) return 1;
-        const aIsOpt = a.symbol.length > 4;
-        const bIsOpt = b.symbol.length > 4;
+        const aIsOpt = isOption(a.symbol);
+        const bIsOpt = isOption(b.symbol);
         if (aIsOpt !== bIsOpt) return aIsOpt ? 1 : -1;
         return a.symbol < b.symbol ? -1 : a.symbol > b.symbol ? 1 : 0;
     });

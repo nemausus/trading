@@ -1,6 +1,6 @@
 import {
     formatCurrency, formatPercent, formatNumber,
-    baseUnderlying, sortPositionsGrouped,
+    baseUnderlying, sortPositionsGrouped, isOption,
     getPLFormatting, getPLPercentFormatting, getSymbolBadgeClass, formatOptionSymbol
 } from './utils.js';
 
@@ -92,45 +92,6 @@ export function renderPositions(positions) {
     renderUnifiedAccounts([], lastPositions, lastOrders);
 }
 
-function getPositionActionFallback(pos, accPositions) {
-    if (pos.action) return pos.action;
-
-    const symbol = pos.symbol || '';
-    const qty = pos.quantity || 0;
-    const isOptionSymbol = symbol.length > 10 && symbol.includes(' ');
-
-    if (!isOptionSymbol && qty >= 100) {
-        const underlying = symbol;
-        const EXCLUDED = ['QQQM', 'VTI', 'SNOW', 'SPX'];
-        if (EXCLUDED.includes(underlying)) return '';
-
-        let shortCallQty = 0;
-        if (Array.isArray(accPositions)) {
-            accPositions.forEach(p => {
-                if (p.symbol && p.symbol.startsWith(underlying + ' ') && p.quantity < 0) {
-                    shortCallQty += Math.abs(p.quantity);
-                }
-            });
-        }
-        const coveredContracts = Math.floor(qty / 100);
-        const uncovered = coveredContracts - shortCallQty;
-        if (uncovered > 0) {
-            return `STO ${uncovered}x`;
-        }
-    } else if (isOptionSymbol && qty < 0) {
-        const plPct = pos['P/L%'] || 0;
-        const delta = pos.delta || 0;
-        const absQty = Math.abs(qty);
-        if (plPct >= 60.0 || (delta > 0.0 && delta < 0.10)) {
-            return `BTC ${absQty}x`;
-        }
-        if (delta > 0.50) {
-            return `ROLLOUT ${absQty}x`;
-        }
-    }
-    return '';
-}
-
 function parseActionItem(accNum, actionStr) {
     const match = actionStr.match(/^(STO|BTC|ROLLOUT)\s+(\d+x)\s+(.+?)\s+\((.+?)\)$/);
     if (match) {
@@ -173,7 +134,7 @@ function renderAccountActionsHtml(sum) {
                 <td><span class="action-type-badge ${typeClass}">${act.type}</span></td>
                 <td style="text-align: right; font-weight: 500;">${act.qty}</td>
                 <td><span class="symbol-text">${formatOptionSymbol(act.symbol)}</span></td>
-                <td style="color: var(--text-secondary); font-size: 0.82rem;">${act.details}</td>
+                <td style="color: var(--text-secondary); font-size: 0.78rem;">${act.details}</td>
             </tr>
         `;
 
@@ -189,35 +150,44 @@ function renderAccountActionsHtml(sum) {
         `;
     });
 
+    const summaryListStr = actions.slice(0, 3).map(a => `${a.type} ${a.qty} ${formatOptionSymbol(a.symbol)}`).join(', ') + (actions.length > 3 ? '...' : '');
+
     return `
-        <div class="account-actions-section">
-            <div class="account-actions-header">
-                <span>⚡ Action Items</span>
-                <span class="account-actions-count">${actions.length} Pending</span>
-            </div>
+        <details class="account-actions-section">
+            <summary class="actions-collapsible-bar" role="button" aria-label="Toggle action items">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="actions-toggle-icon">▸</span>
+                    <strong style="color: var(--text-primary); font-size: 0.80rem;">⚡ Action Items</strong>
+                    <span class="account-actions-count">${actions.length} Pending</span>
+                    <span class="desktop-only-col" style="font-size: 0.76rem; color: var(--text-secondary); margin-left: 4px;">${summaryListStr}</span>
+                </div>
+                <span class="actions-toggle-label" style="font-size: 0.74rem; color: var(--schwab-link); font-weight: 600;"></span>
+            </summary>
 
-            <!-- Desktop Table View -->
-            <div class="desktop-only-action-table table-responsive" style="border: 1px solid var(--border-color); border-radius: 6px;">
-                <table style="font-size: 0.82rem;">
-                    <thead>
-                        <tr style="background-color: var(--bg-tertiary);">
-                            <th>Action</th>
-                            <th style="text-align: right;">Qty</th>
-                            <th>Symbol</th>
-                            <th>Metrics / Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rowsHtml}
-                    </tbody>
-                </table>
-            </div>
+            <div class="actions-collapsible-content" style="padding: 6px 12px; background: #ffffff;">
+                <!-- Desktop Table View -->
+                <div class="desktop-only-action-table table-responsive" style="border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 4px;">
+                    <table style="font-size: 0.78rem;">
+                        <thead>
+                            <tr style="background-color: var(--bg-tertiary);">
+                                <th>Action</th>
+                                <th style="text-align: right;">Qty</th>
+                                <th>Symbol</th>
+                                <th>Metrics / Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                </div>
 
-            <!-- Mobile Compact List View -->
-            <div class="mobile-only-action-list">
-                ${mobileListHtml}
+                <!-- Mobile Compact List View -->
+                <div class="mobile-only-action-list">
+                    ${mobileListHtml}
+                </div>
             </div>
-        </div>
+        </details>
     `;
 }
 
@@ -313,29 +283,31 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
 
             const shortPLFormat = getPLFormatting(sum['Short P/L'] || 0);
             summaryBarHtml = `
-                <div class="account-summary-bar" style="padding: 10px 16px; background-color: var(--bg-tertiary); border-bottom: 1px solid var(--border-color);">
-                    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.84rem;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <strong style="font-size: 0.98rem; color: var(--accent-blue);">Account ${sum.accountNumber}</strong>
-                            <span style="font-size: 0.98rem; font-weight: 700; color: var(--text-primary);">Net: ${formatCurrency(sum.Net)}</span>
+                <div class="account-summary-bar">
+                    <div class="account-summary-container">
+                        <div class="account-summary-header">
+                            <span class="account-summary-title">Account ${sum.accountNumber}</span>
+                            <span class="account-summary-net">Net: <strong>${formatCurrency(sum.Net)}</strong></span>
                         </div>
-                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px;">
-                            <span>Short P/L: <strong class="${shortPLFormat.cssClass}">${shortPLFormat.sign}${shortPLFormat.valDisplay}</strong></span>
-                            <span>Short Val: <strong>${formatCurrency(sum['Short Value'])}</strong></span>
-                            <span>Cash: <strong>${formatCurrency(sum.Cash)}</strong></span>
-                            <span>Risk: <strong class="${riskClass}">${formatPercent(sum.Risk)}</strong></span>
-                            <span>Loan: <strong>${formatCurrency(sum['Total Loan'])}</strong> <span style="font-size:0.75rem; color:var(--text-secondary);">(Margin: ${formatCurrency(sum.Margin)} | Box: ${formatCurrency(sum.BOX)} | CSP: ${formatCurrency(sum.CSP)})</span></span>
+                        <div class="account-summary-metrics">
+                            <div class="summary-metric-item"><span>Short P/L:</span><strong class="${shortPLFormat.cssClass}">${shortPLFormat.sign}${shortPLFormat.valDisplay}</strong></div>
+                            <div class="summary-metric-item"><span>Short Val:</span><strong>${formatCurrency(sum['Short Value'])}</strong></div>
+                            <div class="summary-metric-item"><span>Cash:</span><strong>${formatCurrency(sum.Cash)}</strong></div>
+                            <div class="summary-metric-item"><span>Risk:</span><strong class="${riskClass}">${formatPercent(sum.Risk)}</strong></div>
+                            <div class="summary-metric-item summary-metric-loan"><span>Loan:</span><strong>${formatCurrency(sum['Total Loan'])}</strong></div>
                         </div>
                     </div>
                 </div>
             `;
         } else {
             summaryBarHtml = `
-                <div class="account-summary-bar" style="padding: 10px 16px; background-color: var(--bg-tertiary); border-bottom: 1px solid var(--border-color);">
-                    <strong style="font-size: 0.98rem; color: var(--accent-blue);">Account ${accNum}</strong>
+                <div class="account-summary-bar" style="padding: 6px 12px; background-color: #f8fafc; border-bottom: 1px solid var(--border-color);">
+                    <strong style="font-size: 0.86rem; color: var(--accent-blue);">Account ${accNum}</strong>
                 </div>
             `;
         }
+
+        const actionsHtml = sum ? renderAccountActionsHtml(sum) : '';
 
         // Render Positions Table / Cards for this account
         let tableHtml = '';
@@ -344,10 +316,10 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
         } else {
             tableHtml = `
                 <div class="table-responsive">
-                    <table>
+                    <table class="schwab-positions-table">
                         <thead>
                             <tr>
-                                <th>Symbol</th>
+                                <th style="min-width: 170px;">Symbol</th>
                                 <th class="text-right">Qty</th>
                                 <th class="text-right">Cost/Share</th>
                                 <th class="text-right">Mark</th>
@@ -365,13 +337,14 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
             `;
 
             accPositions.forEach((pos, index) => {
+                const isOpt = isOption(pos.symbol);
                 const underlying = baseUnderlying(pos.symbol);
 
                 const isGroupStart = (index === 0 || baseUnderlying(accPositions[index - 1].symbol) !== underlying);
                 const groupStartClass = isGroupStart ? 'group-start-row' : '';
                 const isGroupEnd = (index === accPositions.length - 1 || baseUnderlying(accPositions[index + 1].symbol) !== underlying);
+                const groupEndClass = isGroupEnd ? 'group-end-row' : '';
 
-                const symbolBadgeClass = getSymbolBadgeClass(pos.symbol);
                 const pl = getPLFormatting(pos['P/L'], 0);
                 const plPercent = getPLPercentFormatting(pos['P/L%'], 0);
 
@@ -390,7 +363,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                     deltaCssClass = Math.abs(pos.delta) < 0.50 ? 'val-positive' : 'val-negative';
                 }
 
-                const actionStr = pos.action || getPositionActionFallback(pos, accPositions);
+                const actionStr = pos.action
                 let actionBadgeHtml = '';
                 if (actionStr) {
                     let actionTypeClass = 'action-type-sto';
@@ -398,13 +371,6 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                     else if (actionStr.startsWith('ROLL')) actionTypeClass = 'action-type-roll';
                     const badgeLabel = actionStr.split(' ')[0];
                     actionBadgeHtml = `<span class="badge-action-inline ${actionTypeClass}">${badgeLabel}</span>`;
-                }
-
-                const groupEndClass = isGroupEnd ? 'group-end-row' : '';
-
-                let spacerHtml = '';
-                if (index > 0 && isGroupStart) {
-                    spacerHtml = `<tr class="group-spacer-row"><td colspan="12"></td></tr>`;
                 }
 
                 let pendingOrdersDesktopHtml = '';
@@ -421,40 +387,68 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
 
                         pendingOrdersDesktopHtml += `
                             <tr class="pending-order-row ${orderRowGroupEndClass}">
-                                <td class="desktop-only-col" style="padding-left: 16px;"><span class="badge-pending-order" style="font-size: 0.75rem; padding: 1px 6px; background: rgba(148, 163, 184, 0.12); color: var(--text-secondary); border-radius: 4px; font-weight: 500;">⚡ Order</span></td>
+                                <td class="desktop-only-col" style="padding-left: 28px;">
+                                    <span class="badge-pending-order" style="font-size: 0.72rem; padding: 1px 5px; background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); border-radius: 3px; font-weight: 600;">⚡ Order</span>
+                                </td>
                                 <td class="desktop-only-col" style="text-align: right; color: var(--text-secondary);">${ord.quantity}</td>
                                 <td class="desktop-only-col" colspan="6" style="text-align: left; color: var(--text-secondary);">
-                                    <span>${ordType}</span> @ ${ordPrice} <span style="font-size:0.8rem; opacity:0.85;">(${ord.orderType || ''} ${ord.duration || ''})</span>
+                                    <span>${ordType}</span> @ ${ordPrice} <span style="font-size:0.75rem; opacity:0.85;">(${ord.orderType || ''} ${ord.duration || ''})</span>
                                 </td>
-                                <td class="desktop-only-col" style="text-align: right;"><span style="font-size: 0.75rem; padding: 1px 6px; background: rgba(217, 119, 6, 0.12); color: #d97706; border-radius: 4px; font-weight: 500;">${ordStatus}</span></td>
+                                <td class="desktop-only-col" style="text-align: right;"><span style="font-size: 0.72rem; padding: 1px 5px; background: rgba(217, 119, 6, 0.12); color: #d97706; border-radius: 3px; font-weight: 600;">${ordStatus}</span></td>
                                 <td class="desktop-only-col" colspan="3"></td>
                             </tr>
                         `;
 
                         pendingOrdersMobileHtml += `
-                            <div class="mobile-split-row pending-order-row" style="border-top: 1px dashed rgba(148, 163, 184, 0.25); margin-top: 5px; padding-top: 4px; padding-bottom: 2px; color: var(--text-secondary); font-size: 0.82rem;">
+                            <div class="mobile-split-row pending-order-row" style="border-top: 1px dashed rgba(148, 163, 184, 0.25); margin-top: 4px; padding-top: 3px; padding-bottom: 2px; color: var(--text-secondary); font-size: 0.80rem;">
                                 <div class="split-col"><span>⚡ Order: ${ordType} ${ord.quantity} @ ${ordPrice}</span></div>
-                                <div class="split-col" style="text-align: right;"><span style="font-size: 0.75rem; padding: 1px 5px; background: rgba(217, 119, 6, 0.12); color: #d97706; border-radius: 4px; font-weight: 500;">${ordStatus}</span></div>
+                                <div class="split-col" style="text-align: right;"><span style="font-size: 0.72rem; padding: 1px 4px; background: rgba(217, 119, 6, 0.12); color: #d97706; border-radius: 3px; font-weight: 600;">${ordStatus}</span></div>
                             </div>
                         `;
                     });
                 }
 
-                const isOptionPos = (pos.symbol && pos.symbol.length > 10 && pos.symbol.includes(' ')) || (pos.dte !== undefined && pos.dte >= 0);
-                const chainBtnHtml = isOptionPos ? `<button class="btn-icon-chain" data-symbol="${pos.symbol}" title="View Roll Chain">🔗</button>` : '';
+                let symbolCellDesktopHtml = '';
+                let rowTypeClass = isOpt ? 'row-option' : 'row-equity';
+                let cellIndentClass = isOpt ? 'cell-option-symbol' : '';
 
-                tableHtml += spacerHtml + `
-                    <tr class="${groupStartClass} ${groupEndClass}">
+                if (!isOpt) {
+                    // Parent Equity Row
+                    symbolCellDesktopHtml = `
+                        <div class="symbol-equity-wrap">
+                            <span class="symbol-equity-ticker">${pos.symbol}</span>
+                            <button class="btn-row-action" title="Stock Options">···</button>
+                            ${actionBadgeHtml}
+                        </div>
+                    `;
+                } else {
+                    // Indented Child Option Row
+                    symbolCellDesktopHtml = `
+                        <div class="symbol-option-wrap">
+                            <span class="symbol-option-ticker">${formatOptionSymbol(pos.symbol)}</span>
+                            <button class="btn-row-action btn-icon-chain" data-symbol="${pos.symbol}" title="Option Actions / Roll Chain">···</button>
+                            ${actionBadgeHtml}
+                        </div>
+                    `;
+                }
+
+                const chainBtnHtml = isOpt ? `<button class="btn-icon-chain" data-symbol="${pos.symbol}" title="View Roll Chain">🔗</button>` : '';
+                const symbolCellMobileHtml = !isOpt
+                    ? `<span class="symbol-equity-ticker">${pos.symbol}</span>`
+                    : `<span class="symbol-option-ticker">${formatOptionSymbol(pos.symbol)}</span>`;
+
+                tableHtml += `
+                    <tr class="${rowTypeClass} ${groupStartClass} ${groupEndClass}">
                         <!-- Desktop Columns -->
-                        <td class="desktop-only-col" data-label="Symbol">${actionBadgeHtml} <span class="${symbolBadgeClass}">${formatOptionSymbol(pos.symbol)}</span> ${chainBtnHtml}</td>
-                        <td class="desktop-only-col" style="text-align: right;">${pos.quantity}</td>
+                        <td class="desktop-only-col ${cellIndentClass}" data-label="Symbol">${symbolCellDesktopHtml}</td>
+                        <td class="desktop-only-col" style="text-align: right; font-weight: 500;">${pos.quantity}</td>
                         <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['cost/share'])}</td>
                         <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos['value/share'])}</td>
-                        <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.cost)}</td>
-                        <td class="desktop-only-col" style="text-align: right;">${formatCurrency(pos.marketValue)}</td>
-                        <td class="desktop-only-col ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay}</td>
-                        <td class="desktop-only-col ${plPercent.cssClass}" style="text-align: right;">${plPercent.sign}${plPercent.valDisplay}</td>
-                        <td class="desktop-only-col ${markPctDisplay.cssClass}" style="text-align: right;">${markPctDisplay.valDisplay !== '-' ? `${markPctDisplay.sign}${markPctDisplay.valDisplay}` : '-'}</td>
+                        <td class="desktop-only-col" style="text-align: right; font-weight: 500;">${formatCurrency(pos.cost)}</td>
+                        <td class="desktop-only-col" style="text-align: right; font-weight: 500;">${formatCurrency(pos.marketValue)}</td>
+                        <td class="desktop-only-col ${pl.cssClass}" style="text-align: right; font-weight: 500;">${pl.sign}${pl.valDisplay}</td>
+                        <td class="desktop-only-col ${plPercent.cssClass}" style="text-align: right; font-weight: 500;">${plPercent.sign}${plPercent.valDisplay}</td>
+                        <td class="desktop-only-col ${markPctDisplay.cssClass}" style="text-align: right; font-weight: 500;">${markPctDisplay.valDisplay !== '-' ? `${markPctDisplay.sign}${markPctDisplay.valDisplay}` : '-'}</td>
                         <td class="desktop-only-col ${dteCssClass}" style="text-align: center;">${dteDisplay}</td>
                         <td class="desktop-only-col ${deltaCssClass}" style="text-align: center;">${deltaDisplay}</td>
                         <td class="desktop-only-col" style="text-align: center;">${mprDisplay}</td>
@@ -462,7 +456,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         <!-- Mobile Only Combined Row Layout -->
                         <td class="mobile-only-card-col" colspan="12">
                             <div class="mobile-split-row header-row">
-                                <div class="split-col col-symbol">${actionBadgeHtml} <span>${pos.quantity} x ${formatOptionSymbol(pos.symbol)}</span> ${chainBtnHtml}</div>
+                                <div class="split-col col-symbol"><span>${symbolCellMobileHtml} ${pos.quantity}</span> ${chainBtnHtml} ${actionBadgeHtml}</div>
                                 <div class="split-col col-pl ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
                             </div>
                             <div class="mobile-split-row details-row">
@@ -486,14 +480,29 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
         }
 
         html += `
-            <div class="section-card account-card" style="margin-bottom: 20px; padding: 0; overflow: hidden; border-radius: 8px;">
+            <div class="section-card account-card" style="margin-bottom: 12px; padding: 0; overflow: hidden; border-radius: 6px;">
                 ${summaryBarHtml}
+                ${actionsHtml}
                 ${tableHtml}
             </div>
         `;
     });
 
     container.innerHTML = html;
+
+    // Attach row selection click listener (mimicking selected row in Schwab screenshot)
+    container.querySelectorAll('.schwab-positions-table tbody tr').forEach(tr => {
+        tr.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
+            const table = tr.closest('table');
+            if (!table) return;
+            const wasSelected = tr.classList.contains('row-selected');
+            table.querySelectorAll('tr.row-selected').forEach(r => r.classList.remove('row-selected'));
+            if (!wasSelected) {
+                tr.classList.add('row-selected');
+            }
+        });
+    });
 }
 
 
@@ -512,10 +521,10 @@ export function renderUnderlyingBanner(underlying) {
 
     container.innerHTML = `
         <div class="underlying-banner">
-            <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
                 <span class="underlying-title">${underlying.symbol}</span>
-                <span style="margin-left: 12px; font-size: 1.4rem; font-weight: 700;">${formatCurrency(underlying.price)}</span>
-                <span class="${changeClass}" style="margin-left: 8px; font-size: 1rem;">
+                <span style="font-size: 1.05rem; font-weight: 700;">${formatCurrency(underlying.price)}</span>
+                <span class="${changeClass}" style="font-size: 0.82rem; font-weight: 600;">
                     ${changeSign}${formatNumber(changeVal)} (${changeSign}${formatNumber(pctVal, 2)}%)
                 </span>
             </div>
@@ -589,12 +598,12 @@ export function renderOptionChainTable(contracts) {
 
     container.innerHTML = _buildTable([
         { label: 'Strike', cls: 'text-right' },
-        { label: 'Mark',   cls: 'text-right' },
-        { label: 'Delta',  cls: 'text-center' },
-        { label: 'MPR',    cls: 'text-center' },
+        { label: 'Mark', cls: 'text-right' },
+        { label: 'Delta', cls: 'text-center' },
+        { label: 'MPR', cls: 'text-center' },
         { label: 'Strike %', cls: 'text-center' },
-        { label: 'BE %',   cls: 'text-right' },
-        { label: 'IV',     cls: 'text-right' },
+        { label: 'BE %', cls: 'text-right' },
+        { label: 'IV', cls: 'text-right' },
     ], rowsHtml);
 }
 
@@ -653,14 +662,14 @@ export function renderBoxes(boxes) {
     }).join('');
 
     container.innerHTML = _buildTable([
-        { label: 'Size',       cls: 'text-center' },
-        { label: 'BTO PUT',    cls: 'text-right' },
-        { label: 'STO PUT',    cls: 'text-right' },
-        { label: 'STO CALL',   cls: 'text-right' },
-        { label: 'BTO CALL',   cls: 'text-right' },
+        { label: 'Size', cls: 'text-center' },
+        { label: 'BTO PUT', cls: 'text-right' },
+        { label: 'STO PUT', cls: 'text-right' },
+        { label: 'STO CALL', cls: 'text-right' },
+        { label: 'BTO CALL', cls: 'text-right' },
         { label: 'Net Credit', cls: 'text-right' },
-        { label: 'Ann. Rate',  cls: 'text-right' },
-        { label: 'Liquidity',  cls: 'text-right' },
+        { label: 'Ann. Rate', cls: 'text-right' },
+        { label: 'Liquidity', cls: 'text-right' },
     ], rowsHtml);
 }
 
@@ -785,9 +794,9 @@ export function renderTransactions(transactions) {
         { label: 'Type' },
         { label: 'Symbol' },
         { label: 'Asset' },
-        { label: 'Effect',     cls: 'text-center' },
-        { label: 'Qty',        cls: 'text-right' },
-        { label: 'Price',      cls: 'text-right' },
+        { label: 'Effect', cls: 'text-center' },
+        { label: 'Qty', cls: 'text-right' },
+        { label: 'Price', cls: 'text-right' },
         { label: 'Net Amount', cls: 'text-right' },
     ], rowsHtml);
 }
@@ -908,12 +917,12 @@ export function renderRealized(realizedList) {
         const grandTotalDisplay = grandTotal !== 0 ? grandTotalFmt.valDisplay : '—';
 
         pivotContainer.innerHTML = `
-            <div class="section-card" style="margin-bottom: 20px;">
-                <h3 style="margin-bottom: 12px;">Monthly P/L by Symbol</h3>
+            <div class="section-card" style="margin-bottom: 10px; padding: 10px 14px;">
+                <h3 style="margin-bottom: 8px; font-size: 1.05rem;">Monthly P/L by Symbol</h3>
                 ${_buildTable(
-                    [{ label: 'Month' }, ...symbols.map(sym => ({ label: sym, cls: 'text-right' })), { label: 'Total', cls: 'text-right' }],
-                    rows + `<tr style="border-top: 2px solid var(--border-color); font-weight:600;"><td>Total</td>${totalCells}<td class="text-right font-bold ${grandTotalFmt.cssClass}">${grandTotalDisplay}</td></tr>`
-                )}
+            [{ label: 'Month' }, ...symbols.map(sym => ({ label: sym, cls: 'text-right' })), { label: 'Total', cls: 'text-right' }],
+            rows + `<tr style="border-top: 2px solid var(--border-color); font-weight:600;"><td>Total</td>${totalCells}<td class="text-right font-bold ${grandTotalFmt.cssClass}">${grandTotalDisplay}</td></tr>`
+        )}
             </div>
         `;
 
@@ -925,11 +934,11 @@ export function renderRealized(realizedList) {
     let legendHtml = '';
     if (accounts.length > 0) {
         legendHtml = `
-            <div class="account-legend-bar" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.78rem;">
+            <div class="account-legend-bar" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; padding: 4px 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.76rem;">
                 <span style="font-weight: 600; color: var(--text-secondary);">Accounts:</span>
                 ${accounts.map(acc => `
                     <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 500; color: var(--text-primary);">
-                        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${accColorMap[acc]};"></span>
+                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${accColorMap[acc]};"></span>
                         Account ${acc}
                     </span>
                 `).join('')}
@@ -978,11 +987,11 @@ export function renderRealized(realizedList) {
     container.innerHTML = legendHtml + _buildTable([
         { label: 'Account' },
         { label: 'Open Date' },
-        { label: 'Open Price',   cls: 'text-right' },
+        { label: 'Open Price', cls: 'text-right' },
         { label: 'Close Date' },
-        { label: 'Close Price',  cls: 'text-right' },
+        { label: 'Close Price', cls: 'text-right' },
         { label: 'Symbol' },
-        { label: 'Qty',          cls: 'text-right' },
+        { label: 'Qty', cls: 'text-right' },
         { label: 'Realized P/L', cls: 'text-right' },
     ], rowsHtml);
 }

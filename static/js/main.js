@@ -234,14 +234,32 @@ document.getElementById('btn-reset-realized')?.addEventListener('click', () => {
 
 
 // =====================================================================================
-// --- ROLL CHAIN MODAL DELEGATION ---
+// --- GLOBAL CLICK & COLLAPSIBLE DELEGATION ---
 // =====================================================================================
 document.addEventListener('click', (e) => {
+    // Roll Chain / Option Actions Button
     const chainBtn = e.target.closest('.btn-icon-chain');
     if (chainBtn) {
         e.preventDefault();
         const symbol = chainBtn.getAttribute('data-symbol');
         if (symbol) fetchAndShowRollChain(symbol);
+        return;
+    }
+
+    // Equity ticker '···' button (Quick jump to Chain tab for this symbol)
+    const stockBtn = e.target.closest('.symbol-equity-wrap .btn-row-action');
+    if (stockBtn) {
+        e.preventDefault();
+        const symEl = stockBtn.parentElement.querySelector('.symbol-equity-ticker');
+        if (symEl) {
+            const sym = symEl.textContent.trim();
+            window.location.hash = 'chain';
+            const chainSymbolInput = document.getElementById('chain-symbol');
+            if (chainSymbolInput) {
+                chainSymbolInput.value = sym;
+                document.getElementById('btn-fetch-chain')?.click();
+            }
+        }
         return;
     }
 
