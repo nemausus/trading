@@ -18,6 +18,7 @@ import logging
 
 import firestore_db
 import schwab_api
+from schwab_api import SchwabAPIError
 from constants import SCHWAB_TZ, get_account_number_for_hash
 
 logger = logging.getLogger(__name__)
@@ -68,22 +69,21 @@ def fetch_transactions_raw(
         to_date:       ISO string (e.g. '2026-06-01T23:59:59-07:30').
 
     Returns:
-        List of raw transaction dicts from Schwab, or [] on error.
+        List of raw transaction dicts from Schwab.
+
+    Raises:
+        SchwabAPIError: If the Schwab API call fails.
     """
-    try:
-        data = schwab_api.get_transactions(
-            access_token,
-            account_hash,
-            start_date=from_date,
-            end_date=to_date,
-        )
-        if not isinstance(data, list):
-            logger.error("Unexpected response shape from transactions API: %s", type(data))
-            return []
-        return data
-    except Exception as exc:
-        logger.error("Failed to fetch transactions for account %s: %s", account_hash, exc)
+    data = schwab_api.get_transactions(
+        access_token,
+        account_hash,
+        start_date=from_date,
+        end_date=to_date,
+    )
+    if not isinstance(data, list):
+        logger.error("Unexpected response shape from transactions API: %s", type(data))
         return []
+    return data
 
 
 def sync_transactions(uid: str, access_token: str, account_hash: str) -> dict:

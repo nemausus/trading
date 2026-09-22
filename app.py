@@ -13,6 +13,7 @@ from flask_limiter.util import get_remote_address
 
 import firestore_db
 from constants import get_all_account_hashes, get_secondary_account_hash
+from schwab_api import SchwabAPIError
 from schwab_auth import SchwabAuthManager
 import schwab_portfolio
 import schwab_transactions
@@ -228,6 +229,9 @@ def schwab_accounts(decoded_token, access_token):
         raw_accounts = schwab_portfolio.fetch_accounts_raw(access_token)
         parsed_data = schwab_portfolio.process_accounts_data(raw_accounts, access_token)
         return jsonify(parsed_data)
+    except SchwabAPIError as e:
+        app.logger.error("Schwab API error fetching accounts for user %s: %s", uid, e)
+        return jsonify({'error': 'Schwab API unavailable'}), 502
     except Exception as e:
         app.logger.error("Error fetching Schwab accounts for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to retrieve Schwab accounts'}), 502
@@ -256,6 +260,9 @@ def schwab_chain(decoded_token, access_token):
         return jsonify(chain_data)
     except ValueError as ve:
         return jsonify({'error': str(ve)}), 400
+    except SchwabAPIError as e:
+        app.logger.error("Schwab API error fetching chain for user %s symbol %s: %s", uid, symbol, e)
+        return jsonify({'error': f'Schwab API unavailable for {symbol}'}), 502
     except Exception as e:
         app.logger.error("Error fetching option chain for user %s symbol %s: %s", uid, symbol, e)
         return jsonify({'error': f'Failed to retrieve option chain for {symbol}'}), 502
@@ -282,6 +289,9 @@ def schwab_boxes(decoded_token, access_token):
     try:
         boxes = schwab_portfolio.fetch_spx_boxes(access_token, from_date, to_date, sizes)
         return jsonify({'boxes': boxes})
+    except SchwabAPIError as e:
+        app.logger.error("Schwab API error fetching SPX boxes for user %s: %s", uid, e)
+        return jsonify({'error': 'Schwab API unavailable'}), 502
     except Exception as e:
         app.logger.error("Error fetching SPX boxes for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to retrieve SPX box spreads'}), 502
@@ -306,6 +316,9 @@ def schwab_sync_transactions(decoded_token, access_token):
             realized_pl.process_account_realized_pl(uid, acc_hash)
             results.append(result)
         return jsonify({'results': results})
+    except SchwabAPIError as e:
+        app.logger.error("Schwab API error syncing transactions for user %s: %s", uid, e)
+        return jsonify({'error': 'Schwab API unavailable'}), 502
     except Exception as e:
         app.logger.error("Error syncing transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to sync transactions'}), 502

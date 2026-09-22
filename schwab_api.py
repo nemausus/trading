@@ -29,6 +29,18 @@ SCHWAB_TRADER_BASE_URL = "https://api.schwabapi.com/trader/v1"
 
 
 # ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
+
+class SchwabAPIError(Exception):
+    """Raised when a Schwab API HTTP call fails.
+
+    Wraps the underlying requests.HTTPError so callers only need to import
+    and catch this one type rather than anything from the requests library.
+    """
+
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
@@ -241,17 +253,21 @@ def schwab_request(
 ) -> dict | list:
     """Make an HTTP request to the Schwab backend with unified logging.
 
-    Logs the request, executes the call, validates status via raise_for_status(),
-    and returns parsed JSON response content.
+    Logs the request, executes the call, and returns parsed JSON.
+    Raises SchwabAPIError on any HTTP or network failure.
     """
     logging.warning("Making Schwab API %s request to %s (params=%s)", method, url, params)
 
-    resp = requests.request(
-        method.upper(), url,
-        headers=headers, params=params, data=data,
-        timeout=timeout, **kwargs,
-    )
-    resp.raise_for_status()
+    try:
+        resp = requests.request(
+            method.upper(), url,
+            headers=headers, params=params, data=data,
+            timeout=timeout, **kwargs,
+        )
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        raise SchwabAPIError(f"{method.upper()} {url} failed: {e}") from e
+
     ret = resp.json()
     # _save_response_dump(url, ret)
     return ret

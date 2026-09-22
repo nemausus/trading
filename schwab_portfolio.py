@@ -4,6 +4,7 @@ import logging
 
 from constants import SCHWAB_TZ
 import schwab_api
+from schwab_api import SchwabAPIError
 
 # ---------------------------------------------------------------------------
 # Module-level constants
@@ -143,21 +144,14 @@ class OptionSymbol:
 # ---------------------------------------------------------------------------
 
 def fetch_quotes(access_token: str, symbols: list) -> dict:
-    """Fetch real-time quotes for *symbols* in chunks of 200."""
+    """Fetch real-time quotes for *symbols*."""
     if not symbols:
         return {}
 
-    quotes: dict = {}
-    for i in range(0, len(symbols), 200):
-        chunk = symbols[i:i + 200]
-        try:
-            data = schwab_api.get_quotes(access_token, chunk)
-            if isinstance(data, dict):
-                quotes.update(data)
-        except Exception as e:
-            logging.error("Failed to fetch quotes: %s", e)
+    assert len(symbols) < 100, f"Too many symbols to fetch at once: {len(symbols)}"
 
-    return quotes
+    data = schwab_api.get_quotes(access_token, symbols)
+    return data if isinstance(data, dict) else {}
 
 
 def fetch_active_orders(access_token: str, account_nums: list) -> list:
@@ -199,7 +193,7 @@ def fetch_active_orders(access_token: str, account_nums: list) -> list:
                         'duration':  duration,
                         'orderType': order_type,
                     })
-        except Exception as e:
+        except SchwabAPIError as e:
             logging.error("Error fetching orders for account %s: %s", acc_num, e)
 
     return active_orders
@@ -310,18 +304,13 @@ def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CAL
         'chain': [],
         'totalContracts': 0
     }
-    try:
-        data = schwab_api.get_option_chains(
-            access_token, symbol,
-            contract_type=ct,
-            from_date=from_date,
-            to_date=to_date,
-            include_underlying_quote=True,
-        )
-    except Exception as e:
-        logging.error("Network error fetching chains: %s", e)
-        return empty
-
+    data = schwab_api.get_option_chains(
+        access_token, symbol,
+        contract_type=ct,
+        from_date=from_date,
+        to_date=to_date,
+        include_underlying_quote=True,
+    )
     underlying_data = data.get('underlying', {})
     stock_price = float(underlying_data.get('last', 0.0) or underlying_data.get('mark', 0.0) or 0.0)
 
@@ -358,19 +347,13 @@ def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CAL
 
 def fetch_spx_boxes(access_token: str, from_date: str | None, to_date: str | None, sizes: list[int] | None = None) -> list[dict]:
     """Fetch SPX option chains and identify box spreads."""
-    try:
-        data = schwab_api.get_option_chains(
-            access_token, '$SPX',
-            contract_type='ALL',
-            from_date=from_date,
-            to_date=to_date,
-            include_underlying_quote=False,
-        )
-    except Exception as e:
-        logging.error("Network error fetching SPX chains: %s", e)
-        return []
-    if data is None:
-        return []
+    data = schwab_api.get_option_chains(
+        access_token, '$SPX',
+        contract_type='ALL',
+        from_date=from_date,
+        to_date=to_date,
+        include_underlying_quote=False,
+    )
 
     calls_map = data.get('callExpDateMap', {})
     puts_map = data.get('putExpDateMap', {})
