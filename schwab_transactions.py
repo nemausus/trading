@@ -17,17 +17,14 @@ import datetime
 import logging
 
 import firestore_db
+import schwab_api
 from constants import SCHWAB_TZ, get_account_number_for_hash
-from schwab_api import schwab_request
-from schwab_portfolio import _schwab_headers
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
-TRADER_API_BASE_URL = "https://api.schwabapi.com/trader/v1"
 
 # Earliest date to backfill from when no stored transactions exist.
 DEFAULT_FROM_DATE = "2026-01-01T00:00:00-07:30"
@@ -73,12 +70,13 @@ def fetch_transactions_raw(
     Returns:
         List of raw transaction dicts from Schwab, or [] on error.
     """
-    url = f"{TRADER_API_BASE_URL}/accounts/{account_hash}/transactions"
-    headers = _schwab_headers(access_token)
-    params = {"startDate": from_date, "endDate": to_date}
-
     try:
-        data = schwab_request("GET", url, headers=headers, params=params)
+        data = schwab_api.get_transactions(
+            access_token,
+            account_hash,
+            start_date=from_date,
+            end_date=to_date,
+        )
         if not isinstance(data, list):
             logger.error("Unexpected response shape from transactions API: %s", type(data))
             return []

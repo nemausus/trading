@@ -74,11 +74,11 @@ def _make_account(acc_num, positions,
 class TestOptionSymbol(unittest.TestCase):
 
     def test_parse_call(self):
-        sym = sp.OptionSymbol.parse_symbol('AAPL  260821C00295000')
+        sym = sp.OptionSymbol.parse_symbol('AAPL  271231C00295000')
         self.assertEqual(sym.underlying_symbol, 'AAPL')
         self.assertEqual(sym.contract_type, 'C')
         self.assertEqual(sym.strike_price, '295.00')
-        self.assertEqual(sym.expiration_date, datetime.date(2026, 8, 21))
+        self.assertEqual(sym.expiration_date, datetime.date(2027, 12, 31))
 
     def test_parse_put(self):
         sym = sp.OptionSymbol.parse_symbol('NVDA  261219P00200000')
@@ -124,7 +124,7 @@ class TestGetOptionMultiplier(unittest.TestCase):
         self.assertEqual(sp.get_option_multiplier('AAPL'), 1)
 
     def test_option(self):
-        self.assertEqual(sp.get_option_multiplier('AAPL  260821C00295000'), 100)
+        self.assertEqual(sp.get_option_multiplier('AAPL  271231C00295000'), 100)
 
     def test_four_char_equity(self):
         self.assertEqual(sp.get_option_multiplier('HOOD'), 1)
@@ -141,8 +141,8 @@ class TestGetOptionMultiplier(unittest.TestCase):
 class TestParseExpirationDate(unittest.TestCase):
 
     def test_valid(self):
-        self.assertEqual(sp._parse_expiration_date('260821'),
-                         datetime.date(2026, 8, 21))
+        self.assertEqual(sp._parse_expiration_date('271231'),
+                         datetime.date(2027, 12, 31))
 
     def test_invalid(self):
         with self.assertRaises(ValueError):
@@ -185,7 +185,7 @@ class TestProcessAccountsPositions(unittest.TestCase):
 
     def test_short_option_position(self):
         # Short call: shortQuantity=1, shortOpenProfitLoss=50 (gain)
-        sym = 'AAPL  260821C00295000'
+        sym = 'AAPL  271231C00295000'
         pos = _make_option_pos(sym, short_qty=1, avg_price=5.0,
                                market_value=-400.0, short_pl=100.0)
         account = _make_account('ACC1', [pos])
@@ -301,7 +301,7 @@ class TestCSP(unittest.TestCase):
         self.assertAlmostEqual(s['CSP'], 0.0)
 
     def test_short_call_not_counted_as_csp(self):
-        sym = 'AAPL  260821C00295000'
+        sym = 'AAPL  271231C00295000'
         pos = _make_option_pos(sym, short_qty=1, avg_price=5.0,
                                market_value=-500.0, short_pl=0.0)
         account = _make_account('ACC1', [pos])
@@ -337,7 +337,7 @@ class TestTodoList(unittest.TestCase):
         """100 shares of AAPL + 1 short call → fully covered, no Todo."""
         equity = _make_equity_pos('AAPL', long_qty=100, avg_price=200.0,
                                   market_value=20000.0)
-        call = _make_option_pos('AAPL  260821C00295000', short_qty=1,
+        call = _make_option_pos('AAPL  271231C00295000', short_qty=1,
                                 market_value=-500.0, short_pl=0.0)
         account = _make_account('ACC1', [equity, call])
         result = self._run([account])
@@ -349,7 +349,7 @@ class TestTodoList(unittest.TestCase):
         """200 shares of AAPL + 1 short call → 1 contract still uncovered."""
         equity = _make_equity_pos('AAPL', long_qty=200, avg_price=200.0,
                                   market_value=40000.0)
-        call = _make_option_pos('AAPL  260821C00295000', short_qty=1,
+        call = _make_option_pos('AAPL  271231C00295000', short_qty=1,
                                 market_value=-500.0, short_pl=0.0)
         account = _make_account('ACC1', [equity, call])
         result = self._run([account])
@@ -370,7 +370,7 @@ class TestTodoList(unittest.TestCase):
 
     def test_long_call_counted_as_long(self):
         """A long call option (1 contract) counts as 1 unit toward longs."""
-        call = _make_option_pos('AAPL  260821C00295000', long_qty=1,
+        call = _make_option_pos('AAPL  271231C00295000', long_qty=1,
                                 market_value=500.0, long_pl=0.0)
         account = _make_account('ACC1', [call])
         result = self._run([account])
@@ -399,7 +399,7 @@ class TestMPRAndDelta(unittest.TestCase):
             return sp.process_accounts_data(accounts_json, 'fake_token')
 
     def test_delta_set_from_quotes(self):
-        sym = 'AAPL  260821C00295000'
+        sym = 'AAPL  271231C00295000'
         pos = _make_option_pos(sym, short_qty=1, market_value=-500.0, short_pl=0.0)
         account = _make_account('ACC1', [pos])
         quotes = self._make_quotes(sym, bid=6.0, underlying=290.0, delta=0.35)
@@ -410,7 +410,7 @@ class TestMPRAndDelta(unittest.TestCase):
 
     def test_mpr_call_otm(self):
         """OTM call: timeValue = bid (all extrinsic), MPR = bid*3000/dte/underlying."""
-        sym = 'AAPL  260821C00295000'
+        sym = 'AAPL  271231C00295000'
         pos = _make_option_pos(sym, short_qty=1, market_value=-500.0, short_pl=0.0)
         account = _make_account('ACC1', [pos])
 
@@ -427,7 +427,7 @@ class TestMPRAndDelta(unittest.TestCase):
 
     def test_mpr_itm_call_removes_intrinsic(self):
         """ITM call: intrinsic = underlying - strike is subtracted from bid."""
-        sym = 'AAPL  260821C00200000'  # strike 200, underlying 250 → ITM
+        sym = 'AAPL  271231C00200000'  # strike 200, underlying 250 → ITM
         pos = _make_option_pos(sym, short_qty=1, market_value=-5000.0, short_pl=0.0)
         account = _make_account('ACC1', [pos])
 
@@ -565,10 +565,10 @@ class TestAccountSummary(unittest.TestCase):
         """Test STO rule for uncovered stocks and BTC rule for sold calls (P/L% >= 60% or delta < 0.10)."""
         equity_pos = _make_equity_pos('AAPL', long_qty=100, market_value=20000.0)
         # Short call with >60% gain (sold for $500, marketValue=-$100 => P/L=$400 => P/L%=80%)
-        winning_call = _make_option_pos('AAPL  260821C00295000', short_qty=1, avg_price=5.0,
+        winning_call = _make_option_pos('AAPL  271231C00295000', short_qty=1, avg_price=5.0,
                                         market_value=-100.0, short_pl=400.0)
         # Short call with low delta < 0.10 (delta 0.05, <60% gain)
-        low_delta_call = _make_option_pos('NVDA  260821C00300000', short_qty=1, avg_price=5.0,
+        low_delta_call = _make_option_pos('NVDA  271231C00300000', short_qty=1, avg_price=5.0,
                                           market_value=-400.0, short_pl=100.0)
 
         account = _make_account('ACC1', [equity_pos, winning_call, low_delta_call])
@@ -576,8 +576,8 @@ class TestAccountSummary(unittest.TestCase):
         quotes = {
             'AAPL': {'quote': {'markPercentChange': 1.25}},
             'NVDA': {'quote': {'markPercentChange': -0.50}},
-            'AAPL  260821C00295000': {'quote': {'delta': 0.20}},
-            'NVDA  260821C00300000': {'quote': {'delta': 0.05}},
+            'AAPL  271231C00295000': {'quote': {'delta': 0.20}},
+            'NVDA  271231C00300000': {'quote': {'delta': 0.05}},
         }
 
         with patch.object(sp, 'fetch_quotes', return_value=quotes), \
@@ -587,8 +587,8 @@ class TestAccountSummary(unittest.TestCase):
         summary = result['summaries'][0]
         todo_text = summary['Todo']
 
-        self.assertIn('BTC 1x AAPL  260821C00295000 (0.20,', todo_text)
-        self.assertIn('BTC 1x NVDA  260821C00300000 (0.05,', todo_text)
+        self.assertIn('BTC 1x AAPL  271231C00295000 (0.20,', todo_text)
+        self.assertIn('BTC 1x NVDA  271231C00300000 (0.05,', todo_text)
 
     def test_todo_actions_uncovered_sto(self):
         """Test STO rule triggers for uncovered stock position."""
@@ -606,12 +606,12 @@ class TestAccountSummary(unittest.TestCase):
 
     def test_todo_actions_rollout(self):
         """Test ROLLOUT rule triggers when sold call delta > 0.50."""
-        short_call = _make_option_pos('AAPL  260821C00295000', short_qty=1, avg_price=5.0,
+        short_call = _make_option_pos('AAPL  271231C00295000', short_qty=1, avg_price=5.0,
                                        market_value=-500.0, short_pl=0.0)
         account = _make_account('ACC1', [short_call])
 
         quotes = {
-            'AAPL  260821C00295000': {
+            'AAPL  271231C00295000': {
                 'quote': {
                     'delta': 0.65,
                     'bidPrice': 5.0,
@@ -625,7 +625,7 @@ class TestAccountSummary(unittest.TestCase):
             result = sp.process_accounts_data([account], 'fake_token')
 
         summary = result['summaries'][0]
-        self.assertIn('ROLLOUT 1x AAPL  260821C00295000 (0.65,', summary['Todo'])
+        self.assertIn('ROLLOUT 1x AAPL  271231C00295000 (0.65,', summary['Todo'])
 
 
 # ---------------------------------------------------------------------------
@@ -642,7 +642,7 @@ class TestPositionSort(unittest.TestCase):
     def test_equities_before_options_in_sort(self):
         """Equities have dte=-1, options have dte>0; positions sorted by (acc, dte, sym)."""
         equity = _make_equity_pos('AAPL', long_qty=100, market_value=20000.0)
-        call = _make_option_pos('AAPL  260821C00295000', short_qty=1,
+        call = _make_option_pos('AAPL  271231C00295000', short_qty=1,
                                 market_value=-500.0, short_pl=0.0)
         account = _make_account('ACC1', [equity, call])
         result = self._run([account])
@@ -651,7 +651,7 @@ class TestPositionSort(unittest.TestCase):
         self.assertEqual(len(positions), 2)
         # dte=-1 (equity) sorts before dte>0 (option)
         self.assertEqual(positions[0]['symbol'], 'AAPL')
-        self.assertEqual(positions[1]['symbol'], 'AAPL  260821C00295000')
+        self.assertEqual(positions[1]['symbol'], 'AAPL  271231C00295000')
 
 
 # ---------------------------------------------------------------------------
@@ -669,7 +669,7 @@ class TestFetchOptionChain(unittest.TestCase):
             'callExpDateMap': {
                 '2026-08-21:50': {
                     '200.0': [{
-                        'symbol': 'AAPL  260821C00200000',
+                        'symbol': 'AAPL  271231C00200000',
                         'expirationDate': '2026-08-21T00:00:00.000+00:00',
                         'daysToExpiration': 50,
                         'strikePrice': 200.0,
@@ -694,7 +694,7 @@ class TestFetchOptionChain(unittest.TestCase):
         self.assertEqual(len(res['chain']), 1)
 
         opt = res['chain'][0]
-        self.assertEqual(opt['symbol'], 'AAPL  260821C00200000')
+        self.assertEqual(opt['symbol'], 'AAPL  271231C00200000')
         self.assertEqual(opt['contractType'], 'CALL')
         self.assertEqual(opt['strikePrice'], 200.0)
         self.assertEqual(opt['dte'], 50)
@@ -758,7 +758,7 @@ class TestEnrichQuotes(unittest.TestCase):
 
     def test_enrich_quotes_mark_percent_change(self):
         stock_pos = {'symbol': 'AAPL', 'quantity': 100, 'cost': 10000.0, 'P/L': 500.0}
-        option_pos = {'symbol': 'AAPL  260821C00295000', 'quantity': -1, 'cost': -500.0, 'P/L': 100.0}
+        option_pos = {'symbol': 'AAPL  271231C00295000', 'quantity': -1, 'cost': -500.0, 'P/L': 100.0}
         positions = [stock_pos, option_pos]
 
         quotes = {
@@ -768,7 +768,7 @@ class TestEnrichQuotes(unittest.TestCase):
                     'markPercentChange': 1.25
                 }
             },
-            'AAPL  260821C00295000': {
+            'AAPL  271231C00295000': {
                 'quote': {
                     'delta': 0.45,
                     'bidPrice': 5.0,

@@ -3,11 +3,9 @@ import os
 import datetime
 import base64
 import logging
-import requests
 from cryptography.fernet import Fernet
 
 import firestore_db
-from constants import SCHWAB_REQUEST_TIMEOUT
 from schwab_api import schwab_request
 
 class SchwabAuthManager:
@@ -25,13 +23,13 @@ class SchwabAuthManager:
         self.client_secret = os.environ.get('SCHWAB_CLIENT_SECRET')
         self.redirect_uri = os.environ.get('SCHWAB_REDIRECT_URI')
 
-    def encrypt_tokens(self, tokens: dict) -> str:
+    def _encrypt_tokens(self, tokens: dict) -> str:
         """Encrypts token dictionary using AES-256 Fernet encryption."""
         serialized = json.dumps(tokens)
         encrypted = self.fernet.encrypt(serialized.encode())
         return encrypted.decode()
 
-    def decrypt_tokens(self, encrypted_str: str) -> dict:
+    def _decrypt_tokens(self, encrypted_str: str) -> dict:
         """Decrypts token string back into a dictionary."""
         decrypted = self.fernet.decrypt(encrypted_str.encode())
         return json.loads(decrypted.decode())
@@ -41,7 +39,7 @@ class SchwabAuthManager:
         if 'retrieved_at' not in tokens:
             tokens['retrieved_at'] = datetime.datetime.now().isoformat()
 
-        encrypted_data = self.encrypt_tokens(tokens)
+        encrypted_data = self._encrypt_tokens(tokens)
         firestore_db.save_user_schwab_credentials(uid, encrypted_data)
 
     def get_user_tokens(self, uid: str) -> dict | None:
@@ -51,7 +49,7 @@ class SchwabAuthManager:
             return None
 
         try:
-            return self.decrypt_tokens(encrypted_data)
+            return self._decrypt_tokens(encrypted_data)
         except Exception as e:
             logging.error("Failed to decrypt Schwab tokens for user %s: %s", uid, e)
             return None
@@ -60,7 +58,7 @@ class SchwabAuthManager:
         """Removes the Schwab credentials from the user's Firestore document."""
         firestore_db.delete_user_schwab_credentials(uid)
 
-    def is_access_token_expired(self, tokens: dict) -> bool:
+    def _is_access_token_expired(self, tokens: dict) -> bool:
         """Checks if the access token is close to expiration (with 5-minute buffer)."""
         if 'retrieved_at' not in tokens or 'expires_in' not in tokens:
             return True
@@ -99,7 +97,7 @@ class SchwabAuthManager:
         if not tokens:
             return None
 
-        if not self.is_access_token_expired(tokens):
+        if not self._is_access_token_expired(tokens):
             return tokens.get('access_token')
 
         refresh_token = tokens.get('refresh_token')

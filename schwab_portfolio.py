@@ -1,10 +1,9 @@
 from constants import get_account_hash
 import datetime
 import logging
-import requests
 
-from constants import SCHWAB_REQUEST_TIMEOUT, SCHWAB_TZ
-from schwab_api import schwab_request
+from constants import SCHWAB_TZ
+import schwab_api
 
 # ---------------------------------------------------------------------------
 # Module-level constants
@@ -39,9 +38,7 @@ _MPR_ANNUALIZATION_FACTOR = 3000.0
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _schwab_headers(access_token: str) -> dict:
-    """Return standard Schwab Bearer auth headers for API calls."""
-    return {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+
 
 
 def _fval(d: dict, key: str, default: float = 0.0) -> float:
@@ -150,18 +147,11 @@ def fetch_quotes(access_token: str, symbols: list) -> dict:
     if not symbols:
         return {}
 
-    headers = _schwab_headers(access_token)
     quotes: dict = {}
-
     for i in range(0, len(symbols), 200):
-        chunk = ",".join(symbols[i:i + 200])
+        chunk = symbols[i:i + 200]
         try:
-            data = schwab_request(
-                "GET",
-                "https://api.schwabapi.com/marketdata/v1/quotes",
-                headers=headers,
-                params={'symbols': chunk},
-            )
+            data = schwab_api.get_quotes(access_token, chunk)
             if isinstance(data, dict):
                 quotes.update(data)
         except Exception as e:
@@ -171,22 +161,21 @@ def fetch_quotes(access_token: str, symbols: list) -> dict:
 
 
 def fetch_active_orders(access_token: str, account_nums: list) -> list:
-    """Fetch open (no closeTime) orders for every account in *account_hashes*."""
-    headers = _schwab_headers(access_token)
+    """Fetch open (no closeTime) orders for every account in *account_nums*."""
     from_date = to_iso_datetime_str(
         (datetime.datetime.now(SCHWAB_TZ) - datetime.timedelta(days=7)).date().isoformat()
     )
+    to_date = datetime.datetime.now(SCHWAB_TZ).isoformat()
     active_orders: list = []
 
     for acc_num in account_nums:
         acc_hash = get_account_hash(acc_num)
         try:
-            orders_data = schwab_request(
-                "GET",
-                f"https://api.schwabapi.com/trader/v1/accounts/{acc_hash}/orders",
-                headers=headers,
-                params={'fromEnteredTime': from_date,
-                        'toEnteredTime': datetime.datetime.now(SCHWAB_TZ).isoformat()},
+            orders_data = schwab_api.get_orders(
+                access_token,
+                acc_hash,
+                from_entered_time=from_date,
+                to_entered_time=to_date,
             )
             if not isinstance(orders_data, list):
                 continue
@@ -194,9 +183,9 @@ def fetch_active_orders(access_token: str, account_nums: list) -> list:
             for order in orders_data:
                 if order.get('closeTime') is not None:
                     continue
-                price     = order.get('price')
-                status    = INS_MAP.get(order.get('status'), order.get('status'))
-                duration  = INS_MAP.get(order.get('duration'), order.get('duration'))
+                price      = order.get('price')
+                status     = INS_MAP.get(order.get('status'), order.get('status'))
+                duration   = INS_MAP.get(order.get('duration'), order.get('duration'))
                 order_type = INS_MAP.get(order.get('orderType'), order.get('orderType'))
 
                 for leg in order.get('orderLegCollection', []):
@@ -301,15 +290,7 @@ def _validate_chain_params(symbol: str, min_dte: int | None, max_dte: int | None
         raise ValueError(f"min_delta ({min_delta}) cannot be greater than max_delta ({max_delta}).")
 
 
-def _fetch_chains(access_token: str, params: dict) -> dict | None:
-    """GET /marketdata/v1/chains and return parsed JSON, or None on error."""
-    headers = _schwab_headers(access_token)
-    url = "https://api.schwabapi.com/marketdata/v1/chains"
-    try:
-        return schwab_request("GET", url, headers=headers, params=params)
-    except requests.exceptions.RequestException as e:
-        logging.error("Network error fetching chains: %s", e)
-        return None
+
 
 
 def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CALL',
@@ -322,23 +303,23 @@ def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CAL
     from_date = _offset_date(today, min_dte)
     to_date = _offset_date(today, max_dte)
 
-    params = {
-        'symbol': symbol,
-        'contractType': contract_type if contract_type in ('CALL', 'PUT', 'ALL') else 'ALL',
-        'includeUnderlyingQuote': True
-    }
-    if from_date:
-        params['fromDate'] = from_date
-    if to_date:
-        params['toDate'] = to_date
+    ct = contract_type if contract_type in ('CALL', 'PUT', 'ALL') else 'ALL'
 
     empty = {
         'underlying': {'symbol': symbol, 'price': 0.0, 'change': 0.0, 'percentChange': 0.0},
         'chain': [],
         'totalContracts': 0
     }
-    data = _fetch_chains(access_token, params)
-    if data is None:
+    try:
+        data = schwab_api.get_option_chains(
+            access_token, symbol,
+            contract_type=ct,
+            from_date=from_date,
+            to_date=to_date,
+            include_underlying_quote=True,
+        )
+    except Exception as e:
+        logging.error("Network error fetching chains: %s", e)
         return empty
 
     underlying_data = data.get('underlying', {})
@@ -377,17 +358,17 @@ def fetch_option_chain(access_token: str, symbol: str, contract_type: str = 'CAL
 
 def fetch_spx_boxes(access_token: str, from_date: str | None, to_date: str | None, sizes: list[int] | None = None) -> list[dict]:
     """Fetch SPX option chains and identify box spreads."""
-    params = {
-        'symbol': '$SPX',
-        'contractType': 'ALL',
-        'includeUnderlyingQuote': False
-    }
-    if from_date:
-        params['fromDate'] = from_date
-    if to_date:
-        params['toDate'] = to_date
-
-    data = _fetch_chains(access_token, params)
+    try:
+        data = schwab_api.get_option_chains(
+            access_token, '$SPX',
+            contract_type='ALL',
+            from_date=from_date,
+            to_date=to_date,
+            include_underlying_quote=False,
+        )
+    except Exception as e:
+        logging.error("Network error fetching SPX chains: %s", e)
+        return []
     if data is None:
         return []
 
@@ -477,18 +458,10 @@ def fetch_spx_boxes(access_token: str, from_date: str | None, to_date: str | Non
 # Network helpers — accounts
 # ---------------------------------------------------------------------------
 
-SCHWAB_TRADER_BASE_URL = "https://api.schwabapi.com/trader/v1"
-
 
 def fetch_accounts_raw(access_token: str) -> list:
     """Fetch raw account data (with positions) from the Schwab Trader API."""
-    headers = _schwab_headers(access_token)
-    return schwab_request(
-        "GET",
-        f"{SCHWAB_TRADER_BASE_URL}/accounts",
-        headers=headers,
-        params={"fields": "positions"},
-    )
+    return schwab_api.get_accounts(access_token, fields="positions")
 
 
 # ---------------------------------------------------------------------------
