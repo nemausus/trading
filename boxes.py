@@ -7,8 +7,6 @@ Fetches SPX option chains and identifies synthetic box spreads,
 returning the top results sorted by liquidity.
 """
 
-import logging
-
 import schwab_api
 from chain import _parse_exp_map
 
@@ -17,7 +15,6 @@ from chain import _parse_exp_map
 # Module-level constants
 # ---------------------------------------------------------------------------
 
-_SPX_BOX_ROUNDING = 10_000.0
 _DEFAULT_SIZES = [100, 200, 500, 1000]
 _TOP_N_RESULTS = 15
 

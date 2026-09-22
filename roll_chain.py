@@ -6,7 +6,7 @@ from raw Schwab transaction records.
 """
 
 import logging
-from portfolio import _base_symbol
+from option_symbol import base_symbol
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ def extract_underlying_symbol(symbol: str) -> str:
     """
     if not symbol:
         return ""
-    return _base_symbol(symbol).strip().upper()
+    return base_symbol(symbol).strip().upper()
 
 
 def filter_transactions_by_underlying(txns: list[dict], underlying_symbol: str) -> list[dict]:

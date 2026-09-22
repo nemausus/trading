@@ -18,7 +18,6 @@ import logging
 
 import firestore_db
 import schwab_api
-from schwab_api import SchwabAPIError
 from constants import SCHWAB_TZ, get_account_number_for_hash
 
 logger = logging.getLogger(__name__)

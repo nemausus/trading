@@ -8,8 +8,13 @@ import unittest
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from option_symbol import OptionSymbol, _parse_expiration_date
-import portfolio
+from option_symbol import (
+    OptionSymbol,
+    _parse_expiration_date,
+    get_option_multiplier,
+    is_option,
+    base_symbol,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -60,23 +65,30 @@ class TestOptionSymbol(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# get_option_multiplier
+# get_option_multiplier, is_option, base_symbol
 # ---------------------------------------------------------------------------
 
-class TestGetOptionMultiplier(unittest.TestCase):
+class TestOptionSymbolHelpers(unittest.TestCase):
 
     def test_equity(self):
-        self.assertEqual(portfolio.get_option_multiplier('AAPL'), 1)
+        self.assertEqual(get_option_multiplier('AAPL'), 1)
+        self.assertFalse(is_option('AAPL'))
+        self.assertEqual(base_symbol('AAPL'), 'AAPL')
 
     def test_option(self):
-        self.assertEqual(portfolio.get_option_multiplier('AAPL  271231C00295000'), 100)
+        self.assertEqual(get_option_multiplier('AAPL  271231C00295000'), 100)
+        self.assertTrue(is_option('AAPL  271231C00295000'))
+        self.assertEqual(base_symbol('AAPL  271231C00295000'), 'AAPL')
 
     def test_four_char_equity(self):
-        self.assertEqual(portfolio.get_option_multiplier('HOOD'), 1)
+        self.assertEqual(get_option_multiplier('HOOD'), 1)
+        self.assertFalse(is_option('HOOD'))
+        self.assertEqual(base_symbol('HOOD'), 'HOOD')
 
     def test_five_char(self):
         # 5-char symbols like "GOOGL" are equities — multiplier should be 1
-        self.assertEqual(portfolio.get_option_multiplier('GOOGL'), 100)
+        self.assertEqual(get_option_multiplier('GOOGL'), 100)
+
 
 
 # ---------------------------------------------------------------------------

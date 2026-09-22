@@ -12,7 +12,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 import firestore_db
-from constants import get_all_account_hashes, get_secondary_account_hash
+from constants import get_all_account_hashes
 from schwab_api import SchwabAPIError
 from schwab_auth import SchwabAuthManager
 import portfolio

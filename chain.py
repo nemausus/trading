@@ -8,19 +8,14 @@ returning a structured response ready for the frontend.
 """
 
 import datetime
-import logging
 
-from constants import SCHWAB_TZ
+from constants import SCHWAB_TZ, _fval
 import schwab_api
 
 
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
-
-def _fval(d: dict, key: str, default: float = 0.0) -> float:
-    """Safely read a float from *d*, treating None and missing as *default*."""
-    return float(d.get(key, default) or default)
 
 
 def _offset_date(today: datetime.date, days: int | None) -> str | None:

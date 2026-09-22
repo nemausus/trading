@@ -1,17 +1,23 @@
-from constants import get_account_hash
 import datetime
 import logging
 
-from constants import SCHWAB_TZ
+from constants import SCHWAB_TZ, get_account_hash, _fval
 import schwab_api
 from schwab_api import SchwabAPIError
-from option_symbol import OptionSymbol, _parse_expiration_date
+from option_symbol import (
+    OptionSymbol,
+    _parse_expiration_date,
+    is_option,
+    get_option_multiplier,
+    base_symbol,
+)
+
+# Backward-compatibility alias
+_base_symbol = base_symbol
 
 # ---------------------------------------------------------------------------
 # Module-level constants
 # ---------------------------------------------------------------------------
-
-OPTION_MULTIPLIER = 100
 
 # Instruction abbreviations shared by fetch_active_orders and callers
 INS_MAP = {
@@ -36,32 +42,9 @@ _ROLLOUT_DELTA_HIGH_THRESHOLD = 0.50
 _MPR_ANNUALIZATION_FACTOR = 3000.0
 
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-
-
-def _fval(d: dict, key: str, default: float = 0.0) -> float:
-    """Safely read a float from *d*, treating None and missing as *default*."""
-    return float(d.get(key, default) or default)
-
-
-def is_option(symbol: str) -> bool:
-    """Return True if *symbol* looks like an option (>4 characters)."""
-    return len(symbol) > 4
-
-
-def get_option_multiplier(symbol: str) -> int:
-    """Return 100 for options, 1 for equities."""
-    return OPTION_MULTIPLIER if is_option(symbol) else 1
-
-
-def _base_symbol(symbol: str) -> str:
-    """Extract the underlying ticker from an option or equity symbol."""
-    return symbol if not is_option(symbol) else symbol.split(' ')[0].rstrip()
 
 
 def to_iso_datetime_str(d: str | None) -> str:

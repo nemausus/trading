@@ -18,6 +18,11 @@ SCHWAB_TZ: datetime.timezone = datetime.timezone(
     -datetime.timedelta(hours=7, minutes=30)
 )
 
+
+def _fval(d: dict, key: str, default: float = 0.0) -> float:
+    """Safely read a float from *d*, treating None and missing as *default*."""
+    return float(d.get(key, default) or default)
+
 def _get_account_hash(env_var: str) -> str:
     """Returns the account hash from environment variables."""
     account_hash = os.environ.get(env_var)

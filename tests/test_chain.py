@@ -4,12 +4,11 @@ Unit tests for chain.py.
 Run with:  python -m unittest tests/test_chain.py -v
 """
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import chain
-from schwab_api import SchwabAPIError
 
 
 class TestFetchOptionChain(unittest.TestCase):

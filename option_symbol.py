@@ -8,6 +8,25 @@ import datetime
 from constants import SCHWAB_TZ
 
 
+# Standard contract size for equity/index options
+OPTION_MULTIPLIER = 100
+
+
+def is_option(symbol: str) -> bool:
+    """Return True if *symbol* looks like an option (>4 characters)."""
+    return len(symbol) > 4
+
+
+def get_option_multiplier(symbol: str) -> int:
+    """Return 100 for options, 1 for equities."""
+    return OPTION_MULTIPLIER if is_option(symbol) else 1
+
+
+def base_symbol(symbol: str) -> str:
+    """Extract the underlying ticker from an option or equity symbol."""
+    return symbol if not is_option(symbol) else symbol.split(' ')[0].rstrip()
+
+
 def _parse_expiration_date(expiration_date: str) -> datetime.date:
     try:
         dt = datetime.datetime.strptime(expiration_date, '%y%m%d')
