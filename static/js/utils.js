@@ -68,6 +68,23 @@ export function getPLPercentFormatting(plPercent, decimals = 2) {
     };
 }
 
+export function getTradeTypeBadgeClass(tradeType) {
+    switch (tradeType) {
+        case 'Call Short':
+            return 'badge-pill badge-pill--green';
+        case 'Call Long':
+            return 'badge-pill badge-pill--blue';
+        case 'Put Short':
+            return 'badge-pill badge-pill--amber';
+        case 'Put Long':
+            return 'badge-pill badge-pill--red';
+        case 'Stock':
+            return 'badge-pill badge-pill--blue';
+        default:
+            return 'badge-pill';
+    }
+}
+
 export function getSymbolBadgeClass(symbol) {
     return 'symbol-text';
 }

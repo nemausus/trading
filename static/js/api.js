@@ -396,6 +396,7 @@ export async function fetchRealized() {
             // Apply default filters
             const symbolInput = document.getElementById('realized-symbol');
             const minDateInput = document.getElementById('realized-min-date');
+            const typeSelect = document.getElementById('realized-type');
 
             // Default minDate is 1st January of current year
             const currentYear = new Date().getFullYear();
@@ -407,8 +408,9 @@ export async function fetchRealized() {
             const symbolVal = symbolInput ? symbolInput.value.trim().toUpperCase() : 'ALL';
             const minDateVal = minDateInput ? minDateInput.value : defaultMinDate;
             const accountVal = accountSelect ? accountSelect.value : 'ALL';
+            const typeVal = typeSelect ? typeSelect.value : 'ALL';
 
-            applyRealizedFilters(symbolVal, minDateVal, accountVal);
+            applyRealizedFilters(symbolVal, minDateVal, accountVal, typeVal);
         } else {
             const errMsg = data.error || 'Failed to load realized transactions';
             if (data.error === 'No primary account hash found') {
@@ -425,7 +427,7 @@ export async function fetchRealized() {
     }
 }
 
-export function applyRealizedFilters(symbol, minDate, accountNum) {
+export function applyRealizedFilters(symbol, minDate, accountNum, tradeType) {
     let filtered = allRealized;
 
     // Filter by symbol if not "ALL" and not empty
@@ -441,6 +443,11 @@ export function applyRealizedFilters(symbol, minDate, accountNum) {
     // Filter by accountNumber if not "ALL" and not empty
     if (accountNum && accountNum !== 'ALL') {
         filtered = filtered.filter(r => String(r.accountNumber) === String(accountNum));
+    }
+
+    // Filter by tradeType if not "ALL" and not empty
+    if (tradeType && tradeType !== 'ALL') {
+        filtered = filtered.filter(r => r.trade_type === tradeType);
     }
 
     renderRealized(filtered);

@@ -244,6 +244,66 @@ def _realized_pl_collection(db, uid: str, account_hash: str):
     return _account_subcollection(db, uid, account_hash, 'realized_pl')
 
 
+def _categorize_realized_trade(doc: dict) -> str:
+    """Categorize a realized trade record into one of the standard types:
+    1) Stock
+    2) Call Short (sold call option to open and bought to close)
+    3) Call Long (bought call option to open and sold to close)
+    4) Put Short (sold put option to open and bought to close)
+    5) Put Long (bought put option to open and sold to close)
+    Or 'Margin Interest' for interest charges.
+    """
+    symbol = (doc.get('symbol') or '').strip()
+    if not symbol:
+        return 'Stock'
+
+    sym_upper = symbol.upper()
+    if sym_upper in ('MARGIN INTEREST', 'INTEREST', 'MARGIN'):
+        return 'Margin Interest'
+
+    # Check for option symbol
+    contract_type = None
+    if len(symbol) >= 15:
+        rest = symbol[6:].strip()
+        c_idx = rest.find('C')
+        p_idx = rest.find('P')
+        if c_idx >= 6 and rest[:c_idx].isdigit():
+            contract_type = 'C'
+        elif p_idx >= 6 and rest[:p_idx].isdigit():
+            contract_type = 'P'
+
+    if not contract_type:
+        parts = symbol.split()
+        if len(parts) == 4 and parts[3].upper() in ('C', 'P') and '/' in parts[1]:
+            contract_type = parts[3].upper()
+
+    if not contract_type:
+        return 'Stock'
+
+    sl = (doc.get('sl') or '').lower()
+    if sl == 'short':
+        return 'Call Short' if contract_type == 'C' else 'Put Short'
+    elif sl == 'long':
+        return 'Call Long' if contract_type == 'C' else 'Put Long'
+
+    # Deduce from open price (buy_price), close price (sell_price), and P/L
+    buy_price = float(doc.get('buy_price') or 0.0)
+    sell_price = float(doc.get('sell_price') or 0.0)
+    pl = float(doc.get('P/L') or 0.0)
+
+    delta = sell_price - buy_price
+    if delta > 0:
+        is_short = (pl < 0)
+    elif delta < 0:
+        is_short = (pl > 0)
+    else:
+        is_short = (pl >= 0)
+
+    if contract_type == 'C':
+        return 'Call Short' if is_short else 'Call Long'
+    return 'Put Short' if is_short else 'Put Long'
+
+
 def get_realized_pl_transactions(
     uid: str,
     account_hash: str,
@@ -260,6 +320,7 @@ def get_realized_pl_transactions(
     for doc in docs:
         data = doc.to_dict()
         data.pop('created_at', None)
+        data['trade_type'] = data.get('trade_type') or _categorize_realized_trade(data)
         results.append(data)
     return results
 

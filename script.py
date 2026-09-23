@@ -200,7 +200,7 @@ def handle_realized_command(
         print("No realized P/L records found.")
         return
 
-    header = f"{'Record ID':<30} {'Account':<8} {'Symbol':<24} {'Buy Date':<10} {'Buy Price':>10} {'Sell Date':<10} {'Sell Price':>10} {'Amount':>8} {'P/L ($)':>12}"
+    header = f"{'Record ID':<30} {'Account':<8} {'Type':<12} {'Symbol':<24} {'Buy Date':<10} {'Buy Price':>10} {'Sell Date':<10} {'Sell Price':>10} {'Amount':>8} {'P/L ($)':>12}"
     print(header)
     print("-" * len(header))
 
@@ -208,6 +208,7 @@ def handle_realized_command(
     for r in records:
         rec_id = str(r.get('id', 'N/A'))[:30]
         acc_num = r.get('accountNumber', 'N/A')
+        trade_type = r.get('trade_type', 'N/A')[:12]
         sym = r.get('symbol', 'N/A')[:24]
         buy_date = r.get('buy_date', '')[:10]
         buy_price = r.get('buy_price', 0.0)
@@ -217,9 +218,170 @@ def handle_realized_command(
         pl = r.get('P/L', 0.0)
         total_pl += pl
 
-        print(f"{rec_id:<30} {acc_num:<8} {sym:<24} {buy_date:<10} {buy_price:>10.2f} {sell_date:<10} {sell_price:>10.2f} {amount:>8.2f} {pl:>12.2f}")
+        print(f"{rec_id:<30} {acc_num:<8} {trade_type:<12} {sym:<24} {buy_date:<10} {buy_price:>10.2f} {sell_date:<10} {sell_price:>10.2f} {amount:>8.2f} {pl:>12.2f}")
 
     print(f"\nTotal Realized P/L: ${total_pl:,.2f} across {len(records)} record(s).")
+
+
+def _is_option_symbol(symbol: str) -> bool:
+    """Determine whether a symbol represents an option contract rather than a stock.
+
+    Matches standard OCC symbols (e.g. 'NVDA  260821C00210000') and human-readable
+    option notations (e.g. 'META 1/23/26 655C'), while excluding equities and interest.
+
+    Args:
+        symbol: Ticker or OCC option string.
+
+    Returns:
+        True if symbol represents an option contract, False otherwise.
+    """
+    symbol = (symbol or '').strip()
+    if not symbol or symbol.upper() in ('MARGIN INTEREST', 'INTEREST', 'MARGIN'):
+        return False
+
+    if len(symbol) >= 15:
+        rest = symbol[6:].strip()
+        c_idx = rest.find('C')
+        p_idx = rest.find('P')
+        if c_idx >= 6 and rest[:c_idx].isdigit():
+            return True
+        if p_idx >= 6 and rest[:p_idx].isdigit():
+            return True
+
+    parts = symbol.split()
+    if len(parts) == 4 and parts[3].upper() in ('C', 'P') and '/' in parts[1]:
+        return True
+
+    return False
+
+
+def _is_exception_record(doc_id: str, doc_data: dict) -> bool:
+    """Check if record matches the explicit META 1/23/26 655C trade exception.
+
+    Exception details:
+        Opened: 2025-12-31 at $19.20
+        Closed: 2026-01-23 at $7.99
+        Contract: META 1/23/26 655C
+
+    Args:
+        doc_id: Firestore document ID.
+        doc_data: Firestore document dictionary.
+
+    Returns:
+        True if this record is the protected META exception, False otherwise.
+    """
+    if '2025-12-31' in doc_id and '2026-01-23' in doc_id and '655' in doc_id:
+        return True
+
+    buy_date = str(doc_data.get('buy_date') or '')[:10]
+    sell_date = str(doc_data.get('sell_date') or doc_data.get('close_date') or '')[:10]
+    symbol = str(doc_data.get('symbol') or '')
+
+    if buy_date == '2025-12-31' and sell_date == '2026-01-23' and 'META' in symbol and '655' in symbol:
+        return True
+
+    return False
+
+
+def handle_fix_realized_command(
+    uid: str,
+    account_hashes: list[str],
+    start_date: str = '2026-01-01',
+    end_date: str = '2026-08-18',
+    dry_run: bool = False,
+) -> None:
+    """Fix realized transactions for options by swapping buy_price and sell_price (close_price).
+
+    Args:
+        uid: Firebase user ID.
+        account_hashes: Target account hashes.
+        start_date: Inclusive start close date (YYYY-MM-DD).
+        end_date: Inclusive end close date (YYYY-MM-DD).
+        dry_run: If True, preview candidates without committing changes to Firestore.
+    """
+    db = firestore_db.get_db()
+    total_candidates = 0
+    total_updated = 0
+    total_skipped_exception = 0
+    total_skipped_stock = 0
+    total_skipped_date = 0
+
+    mode_label = "[DRY RUN - PREVIEW ONLY]" if dry_run else "[LIVE UPDATE]"
+    print(f"=== {mode_label} Fixing Realized Option Transactions ===")
+    print(f"Target Date Range: {start_date} to {end_date} (inclusive)")
+    print(f"Target Accounts: {len(account_hashes)} account(s)\n")
+
+    for acc_hash in account_hashes:
+        acc_num = constants.get_account_number_for_hash(acc_hash) or acc_hash
+        col = firestore_db._realized_pl_collection(db, uid, acc_hash)
+        docs = list(col.stream())
+        print(f"Account {acc_num}: Retrieved {len(docs)} total realized record(s) from Firestore.")
+
+        updates = []
+        for doc in docs:
+            d = doc.to_dict()
+            doc_id = doc.id
+            close_date = str(d.get('sell_date') or d.get('close_date') or '')[:10]
+            symbol = d.get('symbol', '')
+
+            if not (start_date <= close_date <= end_date):
+                total_skipped_date += 1
+                continue
+
+            if not _is_option_symbol(symbol):
+                total_skipped_stock += 1
+                continue
+
+            if _is_exception_record(doc_id, d):
+                print(f"  [PROTECTED EXCEPTION] Skipping {doc_id} ({symbol}, close date: {close_date})")
+                total_skipped_exception += 1
+                continue
+
+            total_candidates += 1
+            old_buy = float(d.get('buy_price') or 0.0)
+            old_close = float(d.get('sell_price') or 0.0)
+
+            new_buy = old_close
+            new_close = old_buy
+
+            payload = {
+                'buy_price': new_buy,
+                'sell_price': new_close,
+            }
+
+            updates.append((doc.reference, doc_id, symbol, close_date, old_buy, new_buy, old_close, new_close, payload))
+
+        if updates:
+            header = f"{'Doc ID':<58} {'Symbol':<24} {'Close Date':<12} {'Buy Price (Old -> New)':<26} {'Close Price (Old -> New)':<26}"
+            print(f"\n{header}")
+            print("-" * len(header))
+
+            for _, doc_id, sym, c_date, old_b, new_b, old_c, new_c, _ in updates:
+                buy_change = f"${old_b:.2f} -> ${new_b:.2f}"
+                close_change = f"${old_c:.2f} -> ${new_c:.2f}"
+                print(f"{doc_id:<58} {sym:<24} {c_date:<12} {buy_change:<26} {close_change:<26}")
+
+            if not dry_run:
+                batch_size = 500
+                for i in range(0, len(updates), batch_size):
+                    batch = db.batch()
+                    chunk = updates[i:i + batch_size]
+                    for doc_ref, _, _, _, _, _, _, _, payload in chunk:
+                        batch.set(doc_ref, payload, merge=True)
+                    batch.commit()
+                total_updated += len(updates)
+                print(f"\nSuccessfully committed {len(updates)} record update(s) to Firestore for account {acc_num}.")
+            else:
+                print(f"\n[DRY RUN] Would update {len(updates)} record(s) for account {acc_num}. No writes performed.")
+        else:
+            print(f"Account {acc_num}: No option records matched criteria for update.")
+
+    print(f"\nSummary:")
+    print(f"  Option candidates to fix : {total_candidates}")
+    print(f"  Records updated          : {total_updated} {'(DRY RUN)' if dry_run else ''}")
+    print(f"  Exceptions preserved     : {total_skipped_exception}")
+    print(f"  Stocks excluded          : {total_skipped_stock}")
+    print(f"  Outside date window      : {total_skipped_date}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -260,6 +422,36 @@ def build_parser() -> argparse.ArgumentParser:
     realized_parser.add_argument('--limit', type=int, default=100, help="Maximum number of realized records to return (default: 100).")
     realized_parser.add_argument('--json', action='store_true', help="Output results in JSON format.")
 
+    # fix-realized subcommand
+    fix_parser = subparsers.add_parser(
+        'fix-realized',
+        aliases=['fix_realized', 'fix-realized-txns'],
+        help="Fix realized option transactions by swapping buy_price and sell_price (close_price)."
+    )
+    fix_parser.add_argument(
+        '--account',
+        dest='sub_account',
+        default=None,
+        help="Account number suffix (default: 'acc2')."
+    )
+    fix_parser.add_argument(
+        '--start-date',
+        type=str,
+        default='2026-01-01',
+        help="Start close date (inclusive, YYYY-MM-DD, default: 2026-01-01)."
+    )
+    fix_parser.add_argument(
+        '--end-date',
+        type=str,
+        default='2026-08-18',
+        help="End close date (inclusive, YYYY-MM-DD, default: 2026-08-18)."
+    )
+    fix_parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help="Preview transactions that would be fixed without updating Firestore."
+    )
+
     return parser
 
 
@@ -268,9 +460,17 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
+    account_input = args.account
+    if args.command in ('fix-realized', 'fix_realized', 'fix-realized-txns'):
+        sub_acc = getattr(args, 'sub_account', None)
+        if sub_acc:
+            account_input = sub_acc
+        elif account_input == 'all':
+            account_input = 'acc2'
+
     try:
         uid = resolve_uid(args.uid)
-        account_hashes = resolve_account_hashes(args.account)
+        account_hashes = resolve_account_hashes(account_input)
     except Exception as err:
         print(f"Error: {err}", file=sys.stderr)
         sys.exit(1)
@@ -291,6 +491,14 @@ def main() -> None:
             limit=args.limit,
             symbol_filter=args.symbol,
             output_json=args.json,
+        )
+    elif args.command in ('fix-realized', 'fix_realized', 'fix-realized-txns'):
+        handle_fix_realized_command(
+            uid=uid,
+            account_hashes=account_hashes,
+            start_date=args.start_date,
+            end_date=args.end_date,
+            dry_run=args.dry_run,
         )
     else:
         parser.print_help()

@@ -1,7 +1,8 @@
 import {
     formatCurrency, formatPercent, formatNumber,
     baseUnderlying, sortPositionsGrouped, isOption,
-    getPLFormatting, getPLPercentFormatting, getSymbolBadgeClass, formatOptionSymbol
+    getPLFormatting, getPLPercentFormatting, getSymbolBadgeClass,
+    formatOptionSymbol, getTradeTypeBadgeClass
 } from './utils.js';
 
 export let lastPositions = [];
@@ -949,6 +950,8 @@ export function renderRealized(realizedList) {
     let rowsHtml = realizedList.map(r => {
         const symbol = r.symbol || '—';
         const symbolBadgeClass = getSymbolBadgeClass(symbol);
+        const tradeType = r.trade_type || '—';
+        const typeBadgeClass = getTradeTypeBadgeClass(tradeType);
         const plFormat = getPLFormatting(r['P/L'] || 0);
         const accNumber = r.accountNumber || '—';
         const accColor = accColorMap[accNumber] || 'var(--accent-blue)';
@@ -959,6 +962,7 @@ export function renderRealized(realizedList) {
                 <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">
                     <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${accColor}; margin-right: 6px;"></span>${accNumber}
                 </td>
+                <td class="desktop-only-col"><span class="${typeBadgeClass}">${tradeType}</span></td>
                 <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.buy_date)}</td>
                 <td class="desktop-only-col" style="text-align:right;">${formatCurrency(r.buy_price)}</td>
                 <td class="desktop-only-col" style="color:var(--text-secondary); font-size:0.82rem;">${_shortDate(r.sell_date)}</td>
@@ -968,10 +972,10 @@ export function renderRealized(realizedList) {
                 <td class="desktop-only-col ${plFormat.cssClass}" style="text-align:right; font-weight:600;">${plFormat.sign}${plFormat.valDisplay}</td>
 
                 <!-- Mobile Only Combined Row Layout -->
-                <td class="mobile-only-card-col" colspan="8">
+                <td class="mobile-only-card-col" colspan="9">
                     <div class="mobile-split-row header-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 4px;">
                         <div class="split-col col-symbol" style="flex: 1 1 auto; overflow: hidden; min-width: 0;">
-                            <span>${formatNumber(r.amount, 0)} &times; <span class="${symbolBadgeClass}">${formatOptionSymbol(symbol)}</span></span>
+                            <span><span class="${typeBadgeClass}" style="margin-right: 6px;">${tradeType}</span> ${formatNumber(r.amount, 0)} &times; <span class="${symbolBadgeClass}">${formatOptionSymbol(symbol)}</span></span>
                         </div>
                         <div class="split-col ${plFormat.cssClass}" style="flex: 0 0 auto; text-align: right; font-weight: 700; min-width: max-content; margin-left: 8px;">${plFormat.sign}${plFormat.valDisplay}</div>
                     </div>
@@ -986,6 +990,7 @@ export function renderRealized(realizedList) {
 
     container.innerHTML = legendHtml + _buildTable([
         { label: 'Account' },
+        { label: 'Type' },
         { label: 'Open Date' },
         { label: 'Open Price', cls: 'text-right' },
         { label: 'Close Date' },
