@@ -1054,8 +1054,8 @@ tr.row-put:hover td {
     .chain-filter-bar {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px 10px;
-        padding: 12px 10px;
+        gap: 6px 8px;
+        padding: 6px 8px;
         width: 100%;
         box-sizing: border-box;
     }
@@ -1064,13 +1064,13 @@ tr.row-put:hover td {
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        gap: 4px;
+        gap: 2px;
         min-width: 0;
         width: 100%;
     }
 
     .filter-group label {
-        font-size: 0.72rem;
+        font-size: 0.70rem;
         font-weight: 600;
         color: var(--text-secondary);
         text-transform: uppercase;
@@ -1089,11 +1089,11 @@ tr.row-put:hover td {
         width: 100% !important;
         max-width: 100% !important;
         min-width: 0 !important;
-        height: 38px !important;
-        font-size: 16px !important; /* 16px avoids iOS Safari unwanted auto-zoom */
+        height: 26px !important;
+        font-size: 0.78rem !important;
         font-weight: 500;
-        padding: 6px 10px !important;
-        border-radius: 6px !important;
+        padding: 2px 6px !important;
+        border-radius: 4px !important;
         border: 1px solid var(--border-color);
         background-color: #ffffff;
         box-sizing: border-box !important;
@@ -1108,20 +1108,20 @@ tr.row-put:hover td {
         grid-column: 1 / -1;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         width: 100%;
         margin-left: 0;
-        margin-top: 4px;
+        margin-top: 2px;
         justify-content: stretch;
     }
 
     .filter-actions button {
         flex: 1;
-        height: 38px !important;
-        font-size: 0.86rem !important;
+        height: 26px !important;
+        font-size: 0.78rem !important;
         font-weight: 600 !important;
-        border-radius: 6px !important;
-        padding: 0 12px !important;
+        border-radius: 4px !important;
+        padding: 2px 8px !important;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1132,16 +1132,16 @@ tr.row-put:hover td {
     .quick-presets {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 4px;
         align-items: center;
         width: 100%;
     }
 
     .preset-btn {
-        padding: 5px 10px;
-        font-size: 0.8rem;
-        min-height: 30px;
-        border-radius: 5px;
+        padding: 2px 8px;
+        font-size: 0.76rem;
+        min-height: 24px;
+        border-radius: 4px;
     }
 
     .underlying-banner {
@@ -1468,17 +1468,18 @@ tr.row-put:hover td {
 @media (max-width: 480px) {
     .chain-filter-bar {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px 8px;
-        padding: 10px 8px;
+        gap: 5px 6px;
+        padding: 5px 6px;
     }
 
     .filter-actions {
-        gap: 6px;
+        gap: 5px;
     }
 
     .filter-actions button {
-        font-size: 0.82rem !important;
-        padding: 0 8px !important;
+        font-size: 0.76rem !important;
+        padding: 2px 6px !important;
+        height: 26px !important;
     }
 
 
