@@ -421,13 +421,14 @@ def process_accounts_data(accounts_json: list, access_token: str) -> dict:
         maint  = bal.get('maintenanceRequirement', 0.0)
         equity = bal.get('equity', 0.0)
 
-        # Net = LongStock * f - Box + Cash - Margin
-        # MarginReq = LongStock * f * .25 + Box * 1.25
-        # LongStock * f - Box + Cash - Margin = LongStock * f * .25 + Box * 1.25
-        # f (.75 * LongStock) = 2.25 * Box - Cash + Margin
-        # f = (2.25 * Box - Cash + Margin) / (.75 * LongStock)
         stock = sum([p['marketValue'] for p in account_positions if p['assetType'] != 'OPTION'])
-        down_factor = (2.25 * abs(box_loan) - abs(cash) + abs(margin)) / stock
+
+        # Net = LongStock * f - Box + Cash - Margin
+        # MarginReq = LongStock * f * .3 + Box * 1.25
+        # LongStock * f - Box + Cash - Margin = LongStock * f * .3 + Box * 1.25
+        # f (.7 * LongStock) = 2.25 * Box - Cash + Margin
+        # f = (2.25 * Box - Cash + Margin) / (.7 * LongStock)
+        down_factor = (2.25 * abs(box_loan) - abs(cash) + abs(margin)) / stock / 0.7
         risk = 100 - down_factor * 100
 
         account_summaries.append({
