@@ -2,6 +2,7 @@ import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from '.
 import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData, fetchRealized, applyRealizedFilters, fetchAndShowRollChain, submitOrder, fetchOptionChainRaw } from './api.js';
 import { showView, clearDashboard, renderPositions, lastPositions, closeRollChainModal, openOrderModal, closeOrderModal, renderOptionChainTable, renderRollCandidatesTable } from './ui.js';
 import { baseUnderlying, isPutOption, formatOptionSymbol } from './utils.js';
+import { initStockPage, loadStockData, onStocksTabActivated, resizeStockChart } from './stocks/stock-page.js';
 
 // Parse URL params on load
 const urlParams = new URLSearchParams(window.location.search);
@@ -56,6 +57,9 @@ document.getElementById('btn-refresh-data')?.addEventListener('click', () => {
         case 'portfolio':
             fetchSchwabPortfolio();
             break;
+        case 'stocks':
+            loadStockData();
+            break;
         case 'chain':
             fetchOptionChain();
             break;
@@ -81,22 +85,25 @@ document.getElementById('btn-refresh-data')?.addEventListener('click', () => {
 // --- HEADER TAB NAVIGATION ---
 // =====================================================================================
 const tabBtnPortfolio = document.getElementById('tab-btn-portfolio');
+const tabBtnStocks = document.getElementById('tab-btn-stocks');
 const tabBtnChain = document.getElementById('tab-btn-chain');
 const tabBtnBox = document.getElementById('tab-btn-box');
 const tabBtnRealized = document.getElementById('tab-btn-realized');
 const tabBtnTransactions = document.getElementById('tab-btn-transactions');
 const tabContentPortfolio = document.getElementById('tab-content-portfolio');
+const tabContentStocks = document.getElementById('tab-content-stocks');
 const tabContentChain = document.getElementById('tab-content-chain');
 const tabContentBox = document.getElementById('tab-content-box');
 const tabContentRealized = document.getElementById('tab-content-realized');
 const tabContentTransactions = document.getElementById('tab-content-transactions');
 
-const allTabBtns = [tabBtnPortfolio, tabBtnChain, tabBtnBox, tabBtnRealized, tabBtnTransactions];
-const allTabContents = [tabContentPortfolio, tabContentChain, tabContentBox, tabContentRealized, tabContentTransactions];
+const allTabBtns = [tabBtnPortfolio, tabBtnStocks, tabBtnChain, tabBtnBox, tabBtnRealized, tabBtnTransactions];
+const allTabContents = [tabContentPortfolio, tabContentStocks, tabContentChain, tabContentBox, tabContentRealized, tabContentTransactions];
 
 // Map of hash fragment -> { btn, content } for each tab
 const TAB_MAP = {
     portfolio:    { btn: tabBtnPortfolio,    content: tabContentPortfolio },
+    stocks:       { btn: tabBtnStocks,       content: tabContentStocks },
     chain:        { btn: tabBtnChain,        content: tabContentChain },
     box:          { btn: tabBtnBox,          content: tabContentBox },
     realized:     { btn: tabBtnRealized,     content: tabContentRealized },
@@ -127,7 +134,9 @@ function navigateToTab(tabKey) {
     const entry = TAB_MAP[currentTabKey];
     switchTab(entry.btn, entry.content, currentTabKey);
 
-    if (currentTabKey === 'transactions') {
+    if (currentTabKey === 'stocks') {
+        onStocksTabActivated();
+    } else if (currentTabKey === 'transactions') {
         if (!txnsLoaded) {
             txnsLoaded = true;
             fetchTransactions();
@@ -152,13 +161,16 @@ window.addEventListener('hashchange', () => {
     navigateToTab(hash || 'portfolio');
 });
 
-if (tabBtnPortfolio && tabBtnChain && tabBtnBox && tabBtnRealized && tabBtnTransactions) {
+if (tabBtnPortfolio && tabBtnStocks && tabBtnChain && tabBtnBox && tabBtnRealized && tabBtnTransactions) {
     tabBtnPortfolio.addEventListener('click',    () => navigateToTab('portfolio'));
+    tabBtnStocks.addEventListener('click',       () => navigateToTab('stocks'));
     tabBtnChain.addEventListener('click',        () => navigateToTab('chain'));
     tabBtnBox.addEventListener('click',          () => navigateToTab('box'));
     tabBtnRealized.addEventListener('click',     () => navigateToTab('realized'));
     tabBtnTransactions.addEventListener('click', () => navigateToTab('transactions'));
 }
+
+window.addEventListener('resize', resizeStockChart);
 
 
 // =====================================================================================

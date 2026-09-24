@@ -143,3 +143,33 @@ export function formatOptionSymbol(symbol) {
     return s;
 }
 
+/**
+ * Format a volume number into a compact human-readable string (e.g. 1.23M, 45.6K).
+ * @param {number|null} vol - Volume value.
+ * @returns {string}
+ */
+export function formatVolume(vol) {
+    if (vol == null || isNaN(vol) || !vol) return '—';
+    if (vol >= 1e9) return (vol / 1e9).toFixed(2) + 'B';
+    if (vol >= 1e6) return (vol / 1e6).toFixed(2) + 'M';
+    if (vol >= 1e3) return (vol / 1e3).toFixed(1) + 'K';
+    return vol.toLocaleString();
+}
+
+/**
+ * Compute price change and percentage from current and previous close.
+ * @param {number} currentClose - Current bar close price.
+ * @param {number} prevClose - Previous bar close price (fallback reference).
+ * @returns {{ change: number, pctChange: number, isPositive: boolean, sign: string }}
+ */
+export function computePriceChange(currentClose, prevClose) {
+    const change = currentClose - prevClose;
+    const pctChange = prevClose !== 0 ? (change / prevClose) * 100 : 0;
+    const isPositive = change >= 0;
+    return {
+        change,
+        pctChange,
+        isPositive,
+        sign: isPositive ? '+' : '',
+    };
+}

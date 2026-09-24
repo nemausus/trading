@@ -26,6 +26,7 @@ import transactions
 import realized
 import roll_chain
 import orders
+import stocks
 
 
 schwab_auth = SchwabAuthManager()
@@ -84,7 +85,8 @@ csp = {
     'default-src': '\'self\'',
     'script-src': [
         '\'self\'',
-        'https://www.gstatic.com'
+        'https://www.gstatic.com',
+        'https://unpkg.com'
     ],
     'style-src': [
         '\'self\'',
@@ -273,6 +275,28 @@ def schwab_chain(decoded_token, access_token):
     except Exception as e:
         app.logger.error("Error fetching option chain for user %s symbol %s: %s", uid, symbol, e)
         return jsonify({'error': f'Failed to retrieve option chain for {symbol}'}), 502
+
+
+@app.route('/api/schwab/stocks/<ticker>/history')
+@limiter.limit("30 per minute")
+@require_firebase_auth
+@require_schwab_token
+def stock_history(decoded_token, access_token, ticker):
+    uid = decoded_token['uid']
+    period = request.args.get('period', '1Y')
+    interval = request.args.get('interval', '1D')
+
+    try:
+        data = stocks.fetch_stock_history(access_token, ticker, period=period, interval=interval)
+        return jsonify(data)
+    except ValueError as ve:
+        return jsonify({'error': str(ve)}), 400
+    except SchwabAPIError as e:
+        app.logger.error("Schwab API error fetching history for user %s ticker %s: %s", uid, ticker, e)
+        return jsonify({'error': f'Schwab API error for {ticker}'}), 502
+    except Exception as e:
+        app.logger.error("Unexpected error fetching history for user %s ticker %s: %s", uid, ticker, e)
+        return jsonify({'error': f'Failed to retrieve stock history for {ticker}'}), 502
 
 
 @app.route('/api/schwab/boxes')

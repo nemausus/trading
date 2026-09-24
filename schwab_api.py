@@ -141,6 +141,70 @@ def get_option_chains(
     )
 
 
+def get_price_history(
+    access_token: str,
+    symbol: str,
+    *,
+    period_type: str | None = None,
+    period: int | None = None,
+    frequency_type: str | None = None,
+    frequency: int | None = None,
+    start_date: int | None = None,
+    end_date: int | None = None,
+    need_extended_hours_data: bool = False,
+    need_previous_close: bool = False,
+) -> dict:
+    """Fetch historical candlestick price data for a symbol.
+
+    Args:
+        access_token:             Valid Schwab Bearer access token.
+        symbol:                   Security ticker (e.g. 'AAPL').
+        period_type:              'day', 'month', 'year', 'ytd'.
+        period:                   Number of periods.
+        frequency_type:           'minute', 'daily', 'weekly', 'monthly'.
+        frequency:                Granularity frequency (e.g. 1, 5, 15, 30).
+        start_date:               Epoch time in milliseconds.
+        end_date:                 Epoch time in milliseconds.
+        need_extended_hours_data: Whether to include extended hours data.
+        need_previous_close:      Whether to include previous close price.
+
+    Returns:
+        Raw Schwab price history response dict containing candles.
+
+    Raises:
+        ValueError: If access_token or symbol is missing.
+    """
+    if not access_token:
+        raise ValueError("get_price_history: 'access_token' is required.")
+    if not symbol:
+        raise ValueError("get_price_history: 'symbol' is required.")
+
+    params: dict = {"symbol": symbol}
+    if period_type is not None:
+        params["periodType"] = period_type
+    if period is not None:
+        params["period"] = period
+    if frequency_type is not None:
+        params["frequencyType"] = frequency_type
+    if frequency is not None:
+        params["frequency"] = frequency
+    if start_date is not None:
+        params["startDate"] = start_date
+    if end_date is not None:
+        params["endDate"] = end_date
+    if need_extended_hours_data:
+        params["needExtendedHoursData"] = "true"
+    if need_previous_close:
+        params["needPreviousClose"] = "true"
+
+    return schwab_request(
+        "GET",
+        f"{SCHWAB_MARKETDATA_BASE_URL}/pricehistory",
+        headers=_headers(access_token),
+        params=params,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Trader / Accounts endpoints
 # ---------------------------------------------------------------------------

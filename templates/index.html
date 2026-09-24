@@ -11,6 +11,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Custom Style Sheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.6">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/stocks.css') }}?v=1.0">
+    <!-- TradingView Lightweight Charts -->
+    <script src="https://unpkg.com/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"
+            integrity="sha384-KkYqTZlM13Zya6fVUF3IGCBOQ1ehFeJVVgxaVvD/0MebineF9EI8Jkd3NnWNChqN"
+            crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -41,6 +46,7 @@
                 <div class="header-left">
                     <nav class="header-nav">
                         <button id="tab-btn-portfolio" class="nav-tab active">Portfolio</button>
+                        <button id="tab-btn-stocks" class="nav-tab">Stocks</button>
                         <button id="tab-btn-chain" class="nav-tab">Chain</button>
                         <button id="tab-btn-box" class="nav-tab">Box</button>
                         <button id="tab-btn-realized" class="nav-tab">Realized</button>
@@ -147,6 +153,9 @@
                     </div>
                 </div>
             </div>
+
+            <!-- TAB: STOCKS CONTENT -->
+            {% include 'stocks.html' %}
 
             <!-- TAB 3: BOX SPREADS CONTENT -->
             <div id="tab-content-box" class="tab-content">
