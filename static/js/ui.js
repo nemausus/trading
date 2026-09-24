@@ -2,7 +2,7 @@ import {
     formatCurrency, formatPercent, formatNumber,
     baseUnderlying, sortPositionsGrouped, isOption,
     getPLFormatting, getPLPercentFormatting, getSymbolBadgeClass,
-    formatOptionSymbol, getTradeTypeBadgeClass
+    formatOptionSymbol, getTradeTypeBadgeClass, isCallOption, isPutOption
 } from './utils.js';
 
 export let lastPositions = [];
@@ -364,16 +364,6 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                     deltaCssClass = Math.abs(pos.delta) < 0.50 ? 'val-positive' : 'val-negative';
                 }
 
-                const actionStr = pos.action
-                let actionBadgeHtml = '';
-                if (actionStr) {
-                    let actionTypeClass = 'action-type-sto';
-                    if (actionStr.startsWith('BTC')) actionTypeClass = 'action-type-btc';
-                    else if (actionStr.startsWith('ROLL')) actionTypeClass = 'action-type-roll';
-                    const badgeLabel = actionStr.split(' ')[0];
-                    actionBadgeHtml = `<span class="badge-action-inline ${actionTypeClass}">${badgeLabel}</span>`;
-                }
-
                 let pendingOrdersDesktopHtml = '';
                 let pendingOrdersMobileHtml = '';
 
@@ -419,7 +409,6 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         <div class="symbol-equity-wrap">
                             <span class="symbol-equity-ticker">${pos.symbol}</span>
                             <button class="btn-row-action" title="Stock Options">···</button>
-                            ${actionBadgeHtml}
                         </div>
                     `;
                 } else {
@@ -427,19 +416,29 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                     symbolCellDesktopHtml = `
                         <div class="symbol-option-wrap">
                             <span class="symbol-option-ticker">${formatOptionSymbol(pos.symbol)}</span>
-                            <button class="btn-row-action btn-icon-chain" data-symbol="${pos.symbol}" title="Option Actions / Roll Chain">···</button>
-                            ${actionBadgeHtml}
+                            <button class="btn-row-action btn-option-menu-trigger" data-symbol="${pos.symbol}" data-account="${pos.accountNumber}" data-qty="${pos.quantity}" data-cost="${pos['cost/share'] || 0}" data-val="${pos['value/share'] || 0}" title="Option Actions">···</button>
                         </div>
                     `;
                 }
 
-                const chainBtnHtml = isOpt ? `<button class="btn-icon-chain" data-symbol="${pos.symbol}" title="View Roll Chain">🔗</button>` : '';
                 const symbolCellMobileHtml = !isOpt
                     ? `<span class="symbol-equity-ticker">${pos.symbol}</span>`
                     : `<span class="symbol-option-ticker">${formatOptionSymbol(pos.symbol)}</span>`;
 
+                let stripeClass = '';
+                if (pos.action) {
+                    const actUpper = String(pos.action).toUpperCase().trim();
+                    if (actUpper.startsWith('ROLL')) {
+                        stripeClass = 'row-stripe-roll';
+                    } else if (actUpper.startsWith('BTC')) {
+                        stripeClass = 'row-stripe-btc';
+                    } else if (actUpper.startsWith('STO')) {
+                        stripeClass = 'row-stripe-sto';
+                    }
+                }
+
                 tableHtml += `
-                    <tr class="${rowTypeClass} ${groupStartClass} ${groupEndClass}">
+                    <tr class="${rowTypeClass} ${groupStartClass} ${groupEndClass} ${stripeClass}" ${pos.action ? `title="Recommended Action: ${pos.action}"` : ''}>
                         <!-- Desktop Columns -->
                         <td class="desktop-only-col ${cellIndentClass}" data-label="Symbol">${symbolCellDesktopHtml}</td>
                         <td class="desktop-only-col" style="text-align: right; font-weight: 500;">${pos.quantity}</td>
@@ -457,7 +456,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         <!-- Mobile Only Combined Row Layout -->
                         <td class="mobile-only-card-col" colspan="12">
                             <div class="mobile-split-row header-row">
-                                <div class="split-col col-symbol"><span>${symbolCellMobileHtml} ${pos.quantity}</span> ${chainBtnHtml} ${actionBadgeHtml}</div>
+                                <div class="split-col col-symbol"><span>${symbolCellMobileHtml} ${pos.quantity}</span> ${isOpt ? `<button class="btn-row-action btn-option-menu-trigger" data-symbol="${pos.symbol}" data-account="${pos.accountNumber}" data-qty="${pos.quantity}" data-cost="${pos['cost/share'] || 0}" data-val="${pos['value/share'] || 0}" title="Option Actions">···</button>` : ''}</div>
                                 <div class="split-col col-pl ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
                             </div>
                             <div class="mobile-split-row details-row">
@@ -540,10 +539,39 @@ export function renderOptionChainTable(contracts) {
         return;
     }
 
+    let displayContracts = contracts;
+    let rollBannerHtml = '';
+
+    if (window.activeRollFilter && window.activeRollFilter.targetMark > 0) {
+        const targetMark = window.activeRollFilter.targetMark;
+        const targetSymbol = window.activeRollFilter.targetSymbol;
+        const tolerance = Math.max(0.75, targetMark * 0.35);
+
+        const filtered = contracts.filter(opt => {
+            const m = (opt.mark !== undefined && opt.mark !== null) ? Number(opt.mark) : 0;
+            return Math.abs(m - targetMark) <= tolerance;
+        });
+
+        if (filtered.length > 0) {
+            displayContracts = filtered;
+        } else {
+            // Sort by price proximity and take closest 15
+            const sorted = [...contracts].sort((a, b) => Math.abs((Number(a.mark) || 0) - targetMark) - Math.abs((Number(b.mark) || 0) - targetMark));
+            displayContracts = sorted.slice(0, 15);
+        }
+
+        rollBannerHtml = `
+            <div class="roll-filter-banner">
+                <span>🔄 <strong>Roll View for ${formatOptionSymbol(targetSymbol)}</strong>: Showing ${displayContracts.length} contracts near current mark <strong>$${targetMark.toFixed(2)}</strong> (minimal credit/debit).</span>
+                <button id="btn-clear-roll-filter" class="btn-clear-roll">Show All Contracts</button>
+            </div>
+        `;
+    }
+
     let prevDte = null;
     let dteGroupIndex = 0;
 
-    let rowsHtml = contracts.map((opt, index) => {
+    let rowsHtml = displayContracts.map((opt, index) => {
         const deltaDisplay = opt.delta !== 0 ? formatNumber(opt.delta, 2) : '-';
         const ivDisplay = opt.volatility ? formatNumber(opt.volatility, 1) + '%' : '-';
         const mprDisplay = opt.mpr ? formatPercent(opt.mpr) : '-';
@@ -556,6 +584,19 @@ export function renderOptionChainTable(contracts) {
         const beChangeClass = beChangeVal >= 0 ? 'val-positive' : 'val-negative';
         const beChangeSign = beChangeVal >= 0 ? '+' : '';
 
+        // Calculate prefilled Buy/Sell limit prices
+        // Buy order: (mark + bid) / 2
+        // Sell order: (mark + ask) / 2
+        const markVal = (opt.mark !== undefined && opt.mark !== null) ? Number(opt.mark) : 0;
+        const bidVal = (opt.bid !== undefined && opt.bid !== null) ? Number(opt.bid) : 0;
+        const askVal = (opt.ask !== undefined && opt.ask !== null) ? Number(opt.ask) : 0;
+
+        const buyLimit = (bidVal > 0) ? (markVal + bidVal) / 2 : markVal;
+        const sellLimit = (askVal > 0) ? (markVal + askVal) / 2 : markVal;
+
+        const buyPriceFormatted = buyLimit >= 1.0 ? buyLimit.toFixed(2) : buyLimit.toFixed(4);
+        const sellPriceFormatted = sellLimit >= 1.0 ? sellLimit.toFixed(2) : sellLimit.toFixed(4);
+
         const isNewGroup = opt.dte !== prevDte;
         let dteGroupHeaderHtml = '';
         if (isNewGroup) {
@@ -565,7 +606,7 @@ export function renderOptionChainTable(contracts) {
             prevDte = opt.dte;
             dteGroupHeaderHtml = `
                 <tr class="dte-group-row">
-                    <td colspan="7">
+                    <td colspan="8">
                         <div class="dte-header-content">
                             <span class="dte-group-pill">${opt.dte} DTE</span>
                             <span class="dte-group-date">Expiration: <strong>${opt.expirationDate}</strong></span>
@@ -576,13 +617,12 @@ export function renderOptionChainTable(contracts) {
         }
 
         const isGroupStart = isNewGroup;
-        const isGroupEnd = (index === contracts.length - 1 || contracts[index + 1].dte !== opt.dte);
+        const isGroupEnd = (index === displayContracts.length - 1 || displayContracts[index + 1].dte !== opt.dte);
         const groupStartClass = isGroupStart ? 'group-start-row' : '';
         const groupEndClass = isGroupEnd ? 'group-end-row' : '';
 
         const rowBgClass = (dteGroupIndex % 2 === 0) ? 'dte-bg-group-0' : 'dte-bg-group-1';
         const contractTypeClass = opt.contractType === 'CALL' ? 'row-call' : 'row-put';
-        const contractTypeBadge = opt.contractType === 'CALL' ? '<span class="badge-call">CALL</span>' : '<span class="badge-put">PUT</span>';
 
         return dteGroupHeaderHtml + `
             <tr class="${rowBgClass} ${contractTypeClass}">
@@ -593,11 +633,15 @@ export function renderOptionChainTable(contracts) {
                 <td style="text-align: center;" class="${changeClass}">${changeSign}${formatNumber(changeVal, 2)}%</td>
                 <td style="text-align: right;" class="${beChangeClass}">${beChangeSign}${formatNumber(beChangeVal, 2)}%</td>
                 <td style="text-align: right;">${ivDisplay}</td>
+                <td class="chain-actions-cell">
+                    <button class="btn-trade-buy" data-symbol="${opt.symbol}" data-action="BTO" data-price="${buyPriceFormatted}" data-mark="${markVal}" data-bid="${bidVal}" data-ask="${askVal}">Buy</button>
+                    <button class="btn-trade-sell" data-symbol="${opt.symbol}" data-action="STO" data-price="${sellPriceFormatted}" data-mark="${markVal}" data-bid="${bidVal}" data-ask="${askVal}">Sell</button>
+                </td>
             </tr>
         `;
     }).join('');
 
-    container.innerHTML = _buildTable([
+    container.innerHTML = rollBannerHtml + _buildTable([
         { label: 'Strike', cls: 'text-right' },
         { label: 'Mark', cls: 'text-right' },
         { label: 'Delta', cls: 'text-center' },
@@ -605,6 +649,7 @@ export function renderOptionChainTable(contracts) {
         { label: 'Strike %', cls: 'text-center' },
         { label: 'BE %', cls: 'text-right' },
         { label: 'IV', cls: 'text-right' },
+        { label: 'Action', cls: 'text-center' },
     ], rowsHtml);
 }
 
@@ -1096,5 +1141,247 @@ export function closeRollChainModal() {
 }
 
 
+export function renderRollCandidatesTable(candidates, rollContext, selectedSymbol = '') {
+    const container = document.getElementById('roll-chain-candidates-container');
+    if (!container) return;
 
+    if (!candidates || candidates.length === 0) {
+        container.innerHTML = `<div class="no-data-msg" style="padding: 16px;"><p>No matching option contracts found for roll.</p></div>`;
+        return;
+    }
+
+    const rowsHtml = candidates.map(c => {
+        const isSelected = (selectedSymbol && c.symbol === selectedSymbol);
+        const candMark = (c.mark !== undefined && c.mark !== null && !isNaN(c.mark))
+            ? Number(c.mark)
+            : ((Number(c.bid || 0) + Number(c.ask || 0)) / 2);
+
+        const currentMark = Number(rollContext.mark || 0);
+        const netDiff = candMark - currentMark; // Positive = Credit, Negative = Debit
+
+        let diffBadgeHtml = '';
+        if (netDiff >= 0) {
+            diffBadgeHtml = `<span class="roll-diff-badge roll-diff-credit">+$${netDiff.toFixed(2)} Credit</span>`;
+        } else {
+            diffBadgeHtml = `<span class="roll-diff-badge roll-diff-debit">-$${Math.abs(netDiff).toFixed(2)} Debit</span>`;
+        }
+
+        const expDisplay = `${c.expirationDate || ''} (${c.dte !== undefined ? c.dte : '-'}d)`;
+        const strikeDisplay = `$${Number(c.strikePrice || 0).toFixed(2)}`;
+        const markDisplay = `$${candMark.toFixed(2)}`;
+        const bidAskDisplay = `${c.bid !== undefined ? `$${Number(c.bid).toFixed(2)}` : '-'} / ${c.ask !== undefined ? `$${Number(c.ask).toFixed(2)}` : '-'}`;
+        const deltaDisplay = (c.delta !== undefined && c.delta !== 0) ? Number(c.delta).toFixed(2) : '-';
+
+        return `
+            <tr class="roll-candidate-row ${isSelected ? 'selected-roll-candidate' : ''}"
+                data-symbol="${c.symbol}"
+                data-mark="${candMark}"
+                data-diff="${netDiff}"
+                data-exp="${c.expirationDate || ''}"
+                data-strike="${c.strikePrice || 0}">
+                <td style="font-weight: 500;">${expDisplay}</td>
+                <td style="text-align: right; font-weight: 600;">${strikeDisplay}</td>
+                <td style="text-align: right; font-weight: 600; color: var(--text-primary);">${markDisplay}</td>
+                <td style="text-align: right; color: var(--text-secondary); font-size: 0.74rem;">${bidAskDisplay}</td>
+                <td style="text-align: center;">${deltaDisplay}</td>
+                <td style="text-align: right;">${diffBadgeHtml}</td>
+                <td style="text-align: center;">
+                    <button type="button" class="btn-select-target" data-symbol="${c.symbol}">
+                        ${isSelected ? '✓ Selected' : 'Select'}
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <table class="roll-candidates-table">
+            <thead>
+                <tr>
+                    <th>Exp (DTE)</th>
+                    <th style="text-align: right;">Strike</th>
+                    <th style="text-align: right;">Mark</th>
+                    <th style="text-align: right;">Bid / Ask</th>
+                    <th style="text-align: center;">&Delta;</th>
+                    <th style="text-align: right;">Net Diff</th>
+                    <th style="text-align: center;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rowsHtml}
+            </tbody>
+        </table>
+    `;
+}
+
+
+export function openOrderModal(params = {}) {
+    const modal = document.getElementById('order-modal');
+    if (!modal) return;
+
+    const isRollMode = (params.mode === 'roll');
+    const modalCard = modal.querySelector('.order-modal-card');
+    if (modalCard) {
+        if (isRollMode) modalCard.classList.add('roll-mode');
+        else modalCard.classList.remove('roll-mode');
+    }
+
+    const singleSection = document.getElementById('order-single-section');
+    const rollSection = document.getElementById('order-roll-section');
+
+    const symbol = params.symbol || '';
+    const badgeEl = document.getElementById('modal-order-badge');
+    if (badgeEl) badgeEl.textContent = symbol ? formatOptionSymbol(symbol) : '';
+
+    const symbolInput = document.getElementById('order-symbol');
+    if (symbolInput) symbolInput.value = symbol;
+
+    const statusEl = document.getElementById('order-status-msg');
+    if (statusEl) {
+        statusEl.className = 'order-status-msg hidden';
+        statusEl.innerHTML = '';
+    }
+
+    const accNums = new Set();
+    (lastPositions || []).forEach(p => {
+        if (p.accountNumber) accNums.add(String(p.accountNumber));
+    });
+    if (accNums.size === 0) {
+        accNums.add('primary');
+        accNums.add('secondary');
+    }
+
+    if (isRollMode) {
+        if (singleSection) singleSection.classList.add('hidden');
+        if (rollSection) rollSection.classList.remove('hidden');
+
+        const titleEl = document.getElementById('modal-order-title');
+        if (titleEl) titleEl.textContent = 'Roll Option';
+
+        const submitBtn = document.getElementById('btn-order-submit');
+        if (submitBtn) submitBtn.textContent = 'Submit Roll Order';
+
+        // Setup Leg 1
+        const closeActionEl = document.getElementById('roll-close-action');
+        if (closeActionEl) closeActionEl.textContent = 'BTC';
+        const closeSymbolEl = document.getElementById('roll-close-symbol');
+        if (closeSymbolEl) closeSymbolEl.textContent = formatOptionSymbol(symbol);
+        const closeMarkEl = document.getElementById('roll-close-mark');
+        const markVal = Number(params.mark || 0);
+        if (closeMarkEl) closeMarkEl.textContent = markVal > 0 ? `Mark: ~$${markVal.toFixed(2)}` : 'Mark: -';
+
+        // Reset Leg 2
+        const openSymbolEl = document.getElementById('roll-open-symbol');
+        if (openSymbolEl) openSymbolEl.textContent = 'Select target from table below';
+        const openMarkEl = document.getElementById('roll-open-mark');
+        if (openMarkEl) openMarkEl.textContent = 'Mark: -';
+        const targetInput = document.getElementById('roll-target-symbol');
+        if (targetInput) targetInput.value = '';
+
+        // Reset price and hint
+        const rollPriceEl = document.getElementById('roll-price');
+        if (rollPriceEl) rollPriceEl.value = '';
+        const rollPriceHint = document.getElementById('roll-price-hint');
+        if (rollPriceHint) rollPriceHint.textContent = 'Select a target contract below to auto-calculate Net Credit/Debit';
+
+        // Accounts dropdown
+        const rollAccEl = document.getElementById('roll-account');
+        if (rollAccEl) {
+            rollAccEl.innerHTML = '';
+            accNums.forEach(acc => {
+                const opt = document.createElement('option');
+                opt.value = acc;
+                opt.textContent = `Account ${acc}`;
+                if (String(acc) === String(params.account)) opt.selected = true;
+                rollAccEl.appendChild(opt);
+            });
+        }
+
+        // Quantity
+        const rollQtyEl = document.getElementById('roll-quantity');
+        if (rollQtyEl) rollQtyEl.value = params.quantity || 1;
+
+        // Duration
+        const rollDurEl = document.getElementById('roll-duration');
+        if (rollDurEl) rollDurEl.value = params.duration || 'GOOD_TILL_CANCEL';
+
+        // Order Type
+        const rollOrderType = document.getElementById('roll-order-type');
+        if (rollOrderType) rollOrderType.value = 'NET_CREDIT';
+
+    } else {
+        if (singleSection) singleSection.classList.remove('hidden');
+        if (rollSection) rollSection.classList.add('hidden');
+
+        const instruction = params.instruction || 'BTO';
+        const quantity = params.quantity || 1;
+        const price = (params.price !== undefined && params.price !== null) ? params.price : '';
+        const duration = params.duration || 'GOOD_TILL_CANCEL';
+        const account = params.account || '';
+
+        const titleEl = document.getElementById('modal-order-title');
+        if (titleEl) {
+            const actionLabels = {
+                'BTO': 'Buy to Open (BTO)',
+                'STO': 'Sell to Open (STO)',
+                'BTC': 'Buy to Close (BTC)',
+                'STC': 'Sell to Close (STC)',
+                'BUY': 'Buy Stock',
+                'SELL': 'Sell Stock'
+            };
+            titleEl.textContent = actionLabels[instruction] || 'Place Order';
+        }
+
+        const submitBtn = document.getElementById('btn-order-submit');
+        if (submitBtn) submitBtn.textContent = 'Submit Order';
+
+        const instructionEl = document.getElementById('order-instruction');
+        if (instructionEl) instructionEl.value = instruction;
+
+        const qtyEl = document.getElementById('order-quantity');
+        if (qtyEl) qtyEl.value = quantity;
+
+        const priceEl = document.getElementById('order-price');
+        if (priceEl) priceEl.value = price;
+
+        const durationEl = document.getElementById('order-duration');
+        if (durationEl) durationEl.value = duration;
+
+        // Populate accounts dropdown
+        const accEl = document.getElementById('order-account');
+        if (accEl) {
+            accEl.innerHTML = '';
+            accNums.forEach(acc => {
+                const opt = document.createElement('option');
+                opt.value = acc;
+                opt.textContent = `Account ${acc}`;
+                if (String(acc) === String(account)) opt.selected = true;
+                accEl.appendChild(opt);
+            });
+        }
+
+        // Price hint text
+        const hintEl = document.getElementById('order-price-hint');
+        if (hintEl) {
+            if (params.mark !== undefined) {
+                const bidStr = params.bid && Number(params.bid) > 0 ? `$${Number(params.bid).toFixed(2)}` : '-';
+                const askStr = params.ask && Number(params.ask) > 0 ? `$${Number(params.ask).toFixed(2)}` : '-';
+                const markStr = params.mark && Number(params.mark) > 0 ? `$${Number(params.mark).toFixed(2)}` : '-';
+                hintEl.textContent = `Bid: ${bidStr} | Mark: ${markStr} | Ask: ${askStr}`;
+            } else if (params.buyPrice !== undefined && Number(params.buyPrice) > 0) {
+                hintEl.textContent = `Open Cost: $${Number(params.buyPrice).toFixed(2)} (Target 30%: $${Number(price).toFixed(2)})`;
+            } else {
+                hintEl.textContent = '';
+            }
+        }
+    }
+
+    modal.classList.remove('hidden');
+}
+
+
+export function closeOrderModal() {
+    const modal = document.getElementById('order-modal');
+    if (modal) modal.classList.add('hidden');
+}
 

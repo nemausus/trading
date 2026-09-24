@@ -207,6 +207,97 @@ class TestScriptCLI(unittest.TestCase):
         )
         mock_batch.commit.assert_called_once()
 
+    def test_build_parser_order(self):
+        parser = script.build_parser()
+
+        args = parser.parse_args([
+            'order',
+            '-s', 'AAPL  260821C00205000',
+            '-q', '2',
+            '-p', '3.50',
+            '-i', 'BTC',
+            '--preview',
+        ])
+        self.assertEqual(args.command, 'order')
+        self.assertEqual(args.symbol, 'AAPL  260821C00205000')
+        self.assertEqual(args.quantity, 2.0)
+        self.assertEqual(args.price, '3.50')
+        self.assertEqual(args.instruction, 'BTC')
+        self.assertTrue(args.preview)
+
+        args_alias = parser.parse_args([
+            'place-order',
+            '-s', 'NVDA',
+            '-q', '10',
+            '-i', 'BUY',
+            '--order-type', 'MARKET',
+        ])
+        self.assertEqual(args_alias.command, 'place-order')
+        self.assertEqual(args_alias.symbol, 'NVDA')
+        self.assertEqual(args_alias.order_type, 'MARKET')
+
+    @patch('script.SchwabAuthManager')
+    @patch('script.orders.execute_order')
+    @patch('script.orders.build_single_order')
+    @patch('script.constants.get_account_number_for_hash', return_value='acc1')
+    def test_handle_order_command(self, mock_acc_num, mock_build, mock_execute, mock_auth_cls):
+        mock_auth = MagicMock()
+        mock_auth.refresh_user_tokens_if_needed.return_value = 'valid_token'
+        mock_auth_cls.return_value = mock_auth
+
+        mock_build.return_value = {'orderType': 'LIMIT', 'orderLegCollection': []}
+        mock_execute.return_value = {'orderValidationResult': 'SUCCESS'}
+
+        # Test preview
+        with patch('sys.stdout'):
+            script.handle_order_command(
+                uid='uid1',
+                account_hash='hash123',
+                symbol='AAPL  260821C00205000',
+                quantity=1,
+                instruction='BTC',
+                price='2.50',
+                preview=True,
+            )
+        mock_build.assert_called_once_with(
+            symbol='AAPL  260821C00205000',
+            quantity=1,
+            instruction='BTC',
+            price='2.50',
+            order_type='LIMIT',
+            duration='GTC',
+            session='NORMAL',
+        )
+        mock_execute.assert_called_once_with(
+            access_token='valid_token',
+            account='hash123',
+            order_payload=mock_build.return_value,
+            preview=True,
+        )
+
+        mock_build.reset_mock()
+        mock_execute.reset_mock()
+        mock_execute.return_value = {'success': True, 'orderId': 123456, 'location': '/orders/123456'}
+
+        # Test place live
+        with patch('sys.stdout'):
+            script.handle_order_command(
+                uid='uid1',
+                account_hash='hash123',
+                symbol='AAPL  260821C00205000',
+                quantity=1,
+                instruction='BTC',
+                price='2.50',
+                preview=False,
+            )
+        mock_execute.assert_called_once_with(
+            access_token='valid_token',
+            account='hash123',
+            order_payload=mock_build.return_value,
+            preview=False,
+        )
+
 
 if __name__ == '__main__':
     unittest.main()
+

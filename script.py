@@ -24,8 +24,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from roll_chain import extract_underlying_symbol
+from schwab_auth import SchwabAuthManager
 import constants
 import firestore_db
+import orders
 
 
 def resolve_uid(uid_arg: str | None) -> str:
@@ -384,6 +386,66 @@ def handle_fix_realized_command(
     print(f"  Outside date window      : {total_skipped_date}")
 
 
+def handle_order_command(
+    uid: str,
+    account_hash: str,
+    symbol: str,
+    quantity: float,
+    instruction: str,
+    price: str | None,
+    preview: bool,
+    order_type: str = 'LIMIT',
+    duration: str = 'GTC',
+    session: str = 'NORMAL',
+) -> None:
+    """Submit or preview an order on Charles Schwab via the CLI."""
+    schwab_auth = SchwabAuthManager()
+    access_token = schwab_auth.refresh_user_tokens_if_needed(uid)
+    if not access_token:
+        print(f"Error: Schwab account not connected or failed to refresh token for user {uid}.", file=sys.stderr)
+        sys.exit(1)
+
+    acc_num = constants.get_account_number_for_hash(account_hash) or "unknown"
+    action_label = "Previewing" if preview else "Placing"
+    print(f"\n{action_label} order for account {acc_num} ({account_hash[:10]}...):")
+    print(f"  Symbol      : {symbol}")
+    print(f"  Quantity    : {quantity}")
+    print(f"  Instruction : {instruction}")
+    print(f"  Price       : {price or 'MARKET'}")
+    print(f"  Type        : {order_type}")
+    print(f"  Duration    : {duration}")
+    print(f"  Session     : {session}")
+
+    try:
+        order_payload = orders.build_single_order(
+            symbol=symbol,
+            quantity=quantity,
+            instruction=instruction,
+            price=price,
+            order_type=order_type,
+            duration=duration,
+            session=session,
+        )
+
+        res = orders.execute_order(
+            access_token=access_token,
+            account=account_hash,
+            order_payload=order_payload,
+            preview=preview,
+        )
+
+        if preview:
+            print("\nPreview Evaluation Result:")
+            print(json.dumps(res, indent=2))
+        else:
+            print(f"\nSuccessfully placed order! Order ID: {res.get('orderId')}")
+            if res.get('location'):
+                print(f"Location: {res['location']}")
+    except Exception as e:
+        print(f"\nOrder failed: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct argument parser for the CLI script."""
     parser = argparse.ArgumentParser(
@@ -452,6 +514,62 @@ def build_parser() -> argparse.ArgumentParser:
         help="Preview transactions that would be fixed without updating Firestore."
     )
 
+    # order subcommand
+    order_parser = subparsers.add_parser(
+        'order',
+        aliases=['place-order', 'preview-order'],
+        help="Place or preview an order on Charles Schwab."
+    )
+    order_parser.add_argument(
+        '-s', '--symbol',
+        type=str,
+        required=True,
+        help="Ticker or OCC option symbol (e.g. AAPL, 'AAPL  260821C00205000')."
+    )
+    order_parser.add_argument(
+        '-q', '--quantity',
+        type=float,
+        required=True,
+        help="Order quantity (number of contracts or shares)."
+    )
+    order_parser.add_argument(
+        '-p', '--price',
+        type=str,
+        default=None,
+        help="Limit price for the order (required for LIMIT orders)."
+    )
+    order_parser.add_argument(
+        '-i', '--instruction',
+        type=str,
+        required=True,
+        choices=['BTO', 'BTC', 'STO', 'STC', 'BUY', 'SELL', 'SELL_SHORT', 'BUY_TO_COVER'],
+        help="Order instruction (e.g. BTC, STO, BTO, STC, BUY, SELL)."
+    )
+    order_parser.add_argument(
+        '--preview',
+        action='store_true',
+        help="Preview the order instead of submitting live."
+    )
+    order_parser.add_argument(
+        '--order-type', '--type',
+        dest='order_type',
+        default='LIMIT',
+        choices=['LIMIT', 'MARKET', 'NET_DEBIT', 'NET_CREDIT'],
+        help="Order type (default: LIMIT)."
+    )
+    order_parser.add_argument(
+        '--duration',
+        default='GTC',
+        choices=['GTC', 'DAY', 'FOK', 'IOC'],
+        help="Order duration (default: GTC)."
+    )
+    order_parser.add_argument(
+        '--session',
+        default='NORMAL',
+        choices=['NORMAL', 'AM', 'PM', 'SEAMLESS'],
+        help="Trading session (default: NORMAL)."
+    )
+
     return parser
 
 
@@ -499,6 +617,21 @@ def main() -> None:
             start_date=args.start_date,
             end_date=args.end_date,
             dry_run=args.dry_run,
+        )
+    elif args.command in ('order', 'place-order', 'preview-order'):
+        is_preview = args.preview or (args.command == 'preview-order')
+        target_account = account_hashes[0] if account_hashes else constants.get_primary_account_hash()
+        handle_order_command(
+            uid=uid,
+            account_hash=target_account,
+            symbol=args.symbol,
+            quantity=args.quantity,
+            instruction=args.instruction,
+            price=args.price,
+            preview=is_preview,
+            order_type=args.order_type,
+            duration=args.duration,
+            session=args.session,
         )
     else:
         parser.print_help()

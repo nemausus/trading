@@ -33,7 +33,7 @@ INS_MAP = {
 _SPX_BOX_ROUNDING = 10_000.0
 
 # Tickers excluded from the uncovered-long (Todo) list
-_TODO_EXCLUDE = frozenset(('QQQM', 'VTI', 'SPX'))
+_TODO_EXCLUDE = frozenset(('QQQM', 'VTI', 'SPX', 'SNOW'))
 
 # Strategy thresholds for action recommendations
 _BTC_PROFIT_TAKE_PCT = 60.0
@@ -428,8 +428,11 @@ def process_accounts_data(accounts_json: list, access_token: str) -> dict:
         # LongStock * f - Box + Cash - Margin = LongStock * f * .3 + Box * 1.25
         # f (.7 * LongStock) = 2.25 * Box - Cash + Margin
         # f = (2.25 * Box - Cash + Margin) / (.7 * LongStock)
-        down_factor = (2.25 * abs(box_loan) - abs(cash) + abs(margin)) / stock / 0.7
-        risk = 100 - down_factor * 100
+        if stock > 0:
+            down_factor = (2.25 * abs(box_loan) - abs(cash) + abs(margin)) / stock / 0.7
+            risk = 100 - down_factor * 100
+        else:
+            risk = 100.0
 
         account_summaries.append({
             'accountNumber': acc_num,

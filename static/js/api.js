@@ -477,3 +477,47 @@ export async function fetchAndShowRollChain(symbol) {
     }
 }
 
+
+export async function submitOrder(orderData) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Please sign in first.");
+
+    const token = await user.getIdToken();
+    const response = await fetch('/api/schwab/order', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(orderData)
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+        throw new Error(result.error || `Failed to ${orderData.preview ? 'preview' : 'place'} order`);
+    }
+    return result;
+}
+
+
+export async function fetchOptionChainRaw(symbol, contractType = 'CALL') {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Please sign in first.");
+
+    const token = await user.getIdToken();
+    const query = new URLSearchParams({
+        symbol: symbol.trim().toUpperCase(),
+        contractType: contractType.toUpperCase()
+    });
+
+    const response = await fetch(`/api/schwab/chain?${query.toString()}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.error || `Failed to fetch chain for ${symbol}`);
+    }
+    return data;
+}
+
+

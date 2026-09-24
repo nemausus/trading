@@ -5,6 +5,10 @@ import datetime
 import urllib.parse
 from functools import wraps
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from flask import Flask, render_template, request, jsonify, redirect, make_response
 from firebase_admin import auth
 from flask_talisman import Talisman
@@ -21,6 +25,7 @@ import boxes
 import transactions
 import realized
 import roll_chain
+import orders
 
 
 schwab_auth = SchwabAuthManager()
@@ -379,6 +384,66 @@ def schwab_get_roll_chain(decoded_token):
         return jsonify({'error': 'Failed to generate roll chain'}), 502
 
 
+@app.route('/api/schwab/order', methods=['POST'])
+@app.route('/api/schwab/orders', methods=['POST'])
+@limiter.limit("10 per minute")
+@require_firebase_auth
+@require_schwab_token
+def schwab_place_order(decoded_token, access_token):
+    uid = decoded_token['uid']
+    data = request.get_json(silent=True)
+    if not data or not isinstance(data, dict):
+        return jsonify({'error': 'Request body must be a valid JSON object.'}), 400
 
+    account = data.get('account')
+    preview = bool(data.get('preview', False))
 
+    try:
+        if 'order' in data and isinstance(data['order'], dict):
+            order_payload = data['order']
+        elif data.get('roll') or (data.get('close_symbol') and data.get('open_symbol')):
+            order_payload = orders.build_roll_order(
+                close_symbol=data.get('close_symbol') or data.get('symbol'),
+                open_symbol=data.get('open_symbol') or data.get('target_symbol'),
+                quantity=data.get('quantity'),
+                close_instruction=data.get('closeInstruction') or 'BUY_TO_CLOSE',
+                open_instruction=data.get('openInstruction') or 'SELL_TO_OPEN',
+                price=data.get('price'),
+                order_type=data.get('orderType') or 'NET_CREDIT',
+                duration=data.get('duration') or 'GOOD_TILL_CANCEL',
+                session=data.get('session') or 'NORMAL',
+            )
+        else:
+            order_payload = orders.build_single_order(
+                symbol=data.get('symbol'),
+                quantity=data.get('quantity'),
+                instruction=data.get('instruction'),
+                price=data.get('price'),
+                order_type=data.get('orderType') or 'LIMIT',
+                duration=data.get('duration') or 'GOOD_TILL_CANCEL',
+                session=data.get('session') or 'NORMAL',
+            )
 
+        if preview:
+            result = orders.preview_order(
+                access_token=access_token,
+                account=account,
+                order_payload=order_payload,
+            )
+        else:
+            result = orders.place_order(
+                access_token=access_token,
+                account=account,
+                order_payload=order_payload,
+            )
+
+        status_code = 200 if preview else 201
+        return jsonify(result), status_code
+    except ValueError as ve:
+        return jsonify({'error': str(ve)}), 400
+    except SchwabAPIError as e:
+        app.logger.error("Schwab API error placing order for user %s: %s", uid, e)
+        return jsonify({'error': 'Schwab API unavailable'}), 502
+    except Exception as e:
+        app.logger.error("Error placing order for user %s: %s", uid, e)
+        return jsonify({'error': 'Failed to place order'}), 500

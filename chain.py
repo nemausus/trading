@@ -97,6 +97,8 @@ def _parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) 
                     'expirationDate': exp_date,
                     'dte': dte,
                     'mark': mark,
+                    'bid': bid,
+                    'ask': ask,
                     'delta': delta,
                     'volatility': volatility,
                     'openInterest': open_interest,

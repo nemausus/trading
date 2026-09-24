@@ -445,20 +445,22 @@ class TestAccountSummary(unittest.TestCase):
             self.assertIn(field, s, f"Missing summary field: {field}")
 
     def test_risk_formula(self):
-        """Risk = 100 + 2250 * box_loan / equity / 7."""
-        spx_pos = _make_option_pos('SPX   261219C05000000', long_qty=1,
-                                   market_value=10000.0, long_pl=0.0)
-        account = _make_account('ACC1', [spx_pos], equity=100000.0)
-        result = self._run([account])
+        """Risk = 100 - down_factor * 100 where down_factor = (2.25*box - cash + margin) / stock / 0.7."""
+        stock_pos = _make_equity_pos('AAPL', long_qty=100, market_value=20000.0)
+        account = _make_account('ACC1', [stock_pos], cash=0.0, margin=0.0, equity=100000.0)
+        # SPX box loan mocked via box_loan
+        with patch.object(sp, '_group_spx', return_value=([], 10000.0)):
+            result = self._run([account])
         s = result['summaries'][0]
 
-        expected_risk = 100.0 + (2250.0 * 10000.0) / 100000.0 / 7.0
+        expected_down_factor = (2.25 * 10000.0) / 20000.0 / 0.7
+        expected_risk = 100.0 - expected_down_factor * 100.0
         self.assertAlmostEqual(s['Risk'], expected_risk, places=4)
 
     def test_risk_no_box_loan(self):
-        """With no SPX positions, risk should be exactly 100.0."""
+        """With no SPX positions and zero cash/margin, risk should be exactly 100.0."""
         pos = _make_equity_pos('AAPL', long_qty=100, market_value=20000.0)
-        account = _make_account('ACC1', [pos], equity=20000.0)
+        account = _make_account('ACC1', [pos], cash=0.0, margin=0.0, equity=20000.0)
         result = self._run([account])
         self.assertAlmostEqual(result['summaries'][0]['Risk'], 100.0)
 

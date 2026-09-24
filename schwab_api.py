@@ -14,6 +14,7 @@ Auth-related calls (token exchange / refresh) remain in ``schwab_auth.py``.
 from datetime import datetime
 import json
 import logging
+import re
 
 import requests
 
@@ -238,6 +239,98 @@ def get_transactions(
     )
 
 
+def place_order(
+    access_token: str,
+    account_hash: str,
+    order_payload: dict,
+) -> dict:
+    """Place an order for a specific account.
+
+    Args:
+        access_token:  Valid Schwab Bearer access token.
+        account_hash:  Encrypted Schwab account hash.
+        order_payload: Full Schwab order dictionary.
+
+    Returns:
+        Dict with 'success', 'orderId' (if extracted from Location header),
+        'location' (if present), and original 'order'.
+
+    Raises:
+        ValueError:    If account_hash or order_payload are missing.
+        SchwabAPIError: If the Schwab API request fails.
+    """
+    if not access_token:
+        raise ValueError("place_order: 'access_token' is required.")
+    if not account_hash:
+        raise ValueError("place_order: 'account_hash' is required.")
+    if not order_payload or not isinstance(order_payload, dict):
+        raise ValueError("place_order: 'order_payload' must be a non-empty dict.")
+
+    resp = schwab_request(
+        "POST",
+        f"{SCHWAB_TRADER_BASE_URL}/accounts/{account_hash}/orders",
+        headers=_headers(access_token),
+        params={"accountNumber": account_hash},
+        json=order_payload,
+        return_response=True,
+    )
+
+    location = resp.headers.get("Location") or resp.headers.get("location")
+    order_id = None
+    if location:
+        m = re.search(r"/accounts/(\w+)/orders/(\d+)", location)
+        if m:
+            order_id = int(m.group(2))
+
+    res: dict = {
+        "success": True,
+        "orderId": order_id,
+        "location": location,
+        "order": order_payload,
+    }
+    if resp.text and resp.text.strip():
+        try:
+            res["response"] = resp.json()
+        except Exception:
+            res["raw"] = resp.text
+    return res
+
+
+def preview_order(
+    access_token: str,
+    account_hash: str,
+    order_payload: dict,
+) -> dict:
+    """Preview/simulate an order for a specific account without executing it.
+
+    Args:
+        access_token:  Valid Schwab Bearer access token.
+        account_hash:  Encrypted Schwab account hash.
+        order_payload: Full Schwab order dictionary.
+
+    Returns:
+        Parsed JSON evaluation dictionary from Schwab previewOrder endpoint.
+
+    Raises:
+        ValueError:    If account_hash or order_payload are missing.
+        SchwabAPIError: If the Schwab API request fails.
+    """
+    if not access_token:
+        raise ValueError("preview_order: 'access_token' is required.")
+    if not account_hash:
+        raise ValueError("preview_order: 'account_hash' is required.")
+    if not order_payload or not isinstance(order_payload, dict):
+        raise ValueError("preview_order: 'order_payload' must be a non-empty dict.")
+
+    return schwab_request(
+        "POST",
+        f"{SCHWAB_TRADER_BASE_URL}/accounts/{account_hash}/previewOrder",
+        headers=_headers(access_token),
+        params={"accountNumber": account_hash},
+        json=order_payload,
+    )
+
+
 # ---------------------------------------------------------------------------
 # HTTP transport (shared by all gateway functions above)
 # ---------------------------------------------------------------------------
@@ -249,11 +342,13 @@ def schwab_request(
     params: dict | None = None,
     data: dict | None = None,
     timeout: tuple[int, int] = SCHWAB_REQUEST_TIMEOUT,
+    return_response: bool = False,
     **kwargs
-) -> dict | list:
+) -> dict | list | requests.Response:
     """Make an HTTP request to the Schwab backend with unified logging.
 
-    Logs the request, executes the call, and returns parsed JSON.
+    Logs the request, executes the call, and returns parsed JSON (or Response object
+    if return_response=True).
     Raises SchwabAPIError on any HTTP or network failure.
     """
     logging.warning("Making Schwab API %s request to %s (params=%s)", method, url, params)
@@ -267,6 +362,12 @@ def schwab_request(
         resp.raise_for_status()
     except requests.RequestException as e:
         raise SchwabAPIError(f"{method.upper()} {url} failed: {e}") from e
+
+    if return_response:
+        return resp
+
+    if not resp.text or not resp.text.strip():
+        return {}
 
     ret = resp.json()
     # _save_response_dump(url, ret)

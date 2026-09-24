@@ -1185,7 +1185,7 @@ tr.row-put:hover td {
     }
 
     .mobile-card-table table {
-        border-collapse: collapse !important;
+        border-collapse: separate !important;
         border-spacing: 0 !important;
         width: 100%;
         background: transparent;
@@ -1320,6 +1320,34 @@ tr.row-put:hover td {
         border-left: 1px solid var(--border-color) !important;
         border-top-left-radius: 0 !important;
         border-top-right-radius: 0 !important;
+    }
+
+    /* Mobile Action Stripes (ROLL=yellow, BTC=green, STO=blue) */
+    #positions-container tr.row-stripe-roll,
+    #positions-container tr.group-start-row.row-stripe-roll,
+    #positions-container tr.group-end-row.row-stripe-roll,
+    #positions-container tr.row-stripe-roll:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tbody tr.row-stripe-roll:not(.group-header-row):not(.group-spacer-row),
+    .mobile-card-table tbody tr.row-stripe-roll {
+        border-left: 3.5px solid #eab308 !important;
+    }
+
+    #positions-container tr.row-stripe-btc,
+    #positions-container tr.group-start-row.row-stripe-btc,
+    #positions-container tr.group-end-row.row-stripe-btc,
+    #positions-container tr.row-stripe-btc:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tbody tr.row-stripe-btc:not(.group-header-row):not(.group-spacer-row),
+    .mobile-card-table tbody tr.row-stripe-btc {
+        border-left: 3.5px solid #10b981 !important;
+    }
+
+    #positions-container tr.row-stripe-sto,
+    #positions-container tr.group-start-row.row-stripe-sto,
+    #positions-container tr.group-end-row.row-stripe-sto,
+    #positions-container tr.row-stripe-sto:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tbody tr.row-stripe-sto:not(.group-header-row):not(.group-spacer-row),
+    .mobile-card-table tbody tr.row-stripe-sto {
+        border-left: 3.5px solid #3b82f6 !important;
     }
 
     #box-container tr.group-start-row:not(:first-child) {
@@ -1908,4 +1936,461 @@ details.account-actions-section[open] .actions-collapsible-bar .actions-toggle-l
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 12px 14px;
+}
+
+/* --- Chain Trade Buttons --- */
+.chain-actions-cell {
+    white-space: nowrap;
+    text-align: center;
+}
+
+.btn-trade-buy, .btn-trade-sell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-radius: 4px;
+    cursor: pointer;
+    line-height: 1.2;
+    transition: all 0.15s ease-in-out;
+}
+
+.btn-trade-buy {
+    background-color: rgba(37, 99, 235, 0.08);
+    color: #1d4ed8;
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    margin-right: 4px;
+}
+
+.btn-trade-buy:hover {
+    background-color: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+}
+
+.btn-trade-sell {
+    background-color: rgba(225, 29, 72, 0.08);
+    color: #be123c;
+    border: 1px solid rgba(225, 29, 72, 0.3);
+}
+
+.btn-trade-sell:hover {
+    background-color: #e11d48;
+    color: #ffffff;
+    border-color: #e11d48;
+}
+
+/* --- Floating Options Context Menu --- */
+.option-context-menu {
+    position: fixed;
+    z-index: 3000;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    min-width: 140px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.option-context-menu.hidden {
+    display: none;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 12px;
+    border: none;
+    background: transparent;
+    border-radius: 5px;
+    font-size: 0.80rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.context-menu-item:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--accent-blue);
+}
+
+.context-menu-icon {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+/* --- Roll Filter Banner --- */
+.roll-filter-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 8px 14px;
+    margin-bottom: 12px;
+    font-size: 0.82rem;
+    color: #1e40af;
+    gap: 12px;
+}
+
+.roll-filter-banner .btn-clear-roll {
+    background: #ffffff;
+    border: 1px solid #93c5fd;
+    color: #1d4ed8;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+
+.roll-filter-banner .btn-clear-roll:hover {
+    background: #dbeafe;
+}
+
+/* --- Order Placement Modal --- */
+.order-modal-card {
+    max-width: 480px;
+    width: 95vw;
+}
+
+.order-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+@media (max-width: 540px) {
+    .order-form-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+}
+
+.order-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.order-form-group label {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.order-input, .order-select {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 0.86rem;
+    color: var(--text-primary);
+    background: #ffffff;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
+}
+
+.order-input:focus, .order-select:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.order-field-hint {
+    font-size: 0.70rem;
+    color: var(--text-secondary);
+    min-height: 14px;
+}
+
+.order-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-order-submit {
+    padding: 6px 16px;
+    font-size: 0.84rem;
+}
+
+.order-status-msg {
+    margin-top: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.80rem;
+    line-height: 1.4;
+}
+
+.order-status-msg.hidden {
+    display: none;
+}
+
+.order-status-msg.success {
+    background-color: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+}
+
+.order-status-msg.error {
+    background-color: #fff1f2;
+    border: 1px solid #fecdd3;
+    color: #9f1239;
+}
+
+.order-status-msg.preview-info {
+    background-color: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
+/* --- Vertical Action Stripes for Portfolio Rows --- */
+.row-stripe-roll > td:first-child {
+    border-left: 3.5px solid #eab308 !important;
+}
+.row-stripe-btc > td:first-child {
+    border-left: 3.5px solid #10b981 !important;
+}
+.row-stripe-sto > td:first-child {
+    border-left: 3.5px solid #3b82f6 !important;
+}
+
+@media (max-width: 900px) {
+    #positions-container tr.row-stripe-roll,
+    #positions-container tr.group-start-row.row-stripe-roll,
+    #positions-container tr.group-end-row.row-stripe-roll,
+    #positions-container tr.row-stripe-roll:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tbody tr.row-stripe-roll:not(.group-header-row):not(.group-spacer-row),
+    .mobile-card-table tbody tr.row-stripe-roll {
+        border-left: 3.5px solid #eab308 !important;
+    }
+    #positions-container tr.row-stripe-btc,
+    #positions-container tr.group-start-row.row-stripe-btc,
+    #positions-container tr.group-end-row.row-stripe-btc,
+    #positions-container tr.row-stripe-btc:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tbody tr.row-stripe-btc:not(.group-header-row):not(.group-spacer-row),
+    .mobile-card-table tbody tr.row-stripe-btc {
+        border-left: 3.5px solid #10b981 !important;
+    }
+    #positions-container tr.row-stripe-sto,
+    #positions-container tr.group-start-row.row-stripe-sto,
+    #positions-container tr.group-end-row.row-stripe-sto,
+    #positions-container tr.row-stripe-sto:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tbody tr.row-stripe-sto:not(.group-header-row):not(.group-spacer-row),
+    .mobile-card-table tbody tr.row-stripe-sto {
+        border-left: 3.5px solid #3b82f6 !important;
+    }
+}
+
+/* --- Roll Mode Order Placement Modal Styling --- */
+.order-modal-card.roll-mode {
+    max-width: 780px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.order-modal-card.roll-mode .modal-body {
+    overflow-y: auto;
+    max-height: calc(90vh - 70px);
+}
+
+.roll-legs-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+}
+
+.roll-leg-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.roll-leg-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.leg-tag-close {
+    color: #dc2626;
+}
+
+.leg-tag-open {
+    color: var(--accent-blue);
+}
+
+.roll-leg-content {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.roll-leg-action {
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+.roll-leg-close .roll-leg-action {
+    background: rgba(16, 185, 129, 0.15);
+    color: #059669;
+}
+
+.roll-leg-open .roll-leg-action {
+    background: rgba(37, 99, 235, 0.15);
+    color: #2563eb;
+}
+
+.roll-leg-symbol {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.roll-leg-mark {
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+}
+
+.roll-legs-arrow {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    padding: 0 4px;
+}
+
+.roll-chain-picker-wrap {
+    margin-top: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+.roll-chain-picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.roll-candidates-container {
+    max-height: 240px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.roll-candidates-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+}
+
+.roll-candidates-table th {
+    position: sticky;
+    top: 0;
+    background: #f1f5f9;
+    z-index: 2;
+    padding: 6px 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.roll-candidate-row {
+    cursor: pointer;
+    transition: background 0.15s;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.roll-candidate-row:hover {
+    background-color: #f8fafc;
+}
+
+.roll-candidate-row.selected-roll-candidate {
+    background-color: #eff6ff !important;
+    border-left: 3.5px solid var(--accent-blue) !important;
+}
+
+.roll-diff-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.roll-diff-credit {
+    background: rgba(16, 185, 129, 0.15);
+    color: #059669;
+}
+
+.roll-diff-debit {
+    background: rgba(234, 179, 8, 0.15);
+    color: #b45309;
+}
+
+.btn-select-target {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: #ffffff;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-primary);
+    transition: all 0.15s;
+}
+
+.btn-select-target:hover,
+.roll-candidate-row.selected-roll-candidate .btn-select-target {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+}
+
+@media (max-width: 600px) {
+    .roll-legs-summary {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+    .roll-legs-arrow {
+        align-self: center;
+        transform: rotate(90deg);
+        padding: 0;
+    }
+    .roll-candidates-container {
+        max-height: 200px;
+    }
 }

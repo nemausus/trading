@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Custom Style Sheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.3">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.6">
 </head>
 
 <body>
@@ -294,12 +294,188 @@
             </div>
         </div>
 
+        <!-- Order Placement / Preview Modal Popup -->
+        <div id="order-modal" class="modal-overlay hidden">
+            <div class="modal-card order-modal-card">
+                <div class="modal-header">
+                    <div class="modal-title-group">
+                        <h3 id="modal-order-title">Place Order</h3>
+                        <span id="modal-order-badge" class="symbol-badge"></span>
+                    </div>
+                    <button id="modal-order-close" class="modal-close-btn" title="Close">&times;</button>
+                </div>
+                <div id="modal-order-body" class="modal-body">
+                    <form id="order-form" onsubmit="return false;">
+                        <input type="hidden" id="order-symbol" value="">
+
+                        <!-- Single Leg Order Section -->
+                        <div id="order-single-section" class="order-single-section">
+                            <div class="order-form-grid">
+                                <!-- Account selection -->
+                                <div class="order-form-group">
+                                    <label for="order-account">Account</label>
+                                    <select id="order-account" class="order-select"></select>
+                                </div>
+
+                                <!-- Instruction -->
+                                <div class="order-form-group">
+                                    <label for="order-instruction">Order Action</label>
+                                    <select id="order-instruction" class="order-select">
+                                        <option value="BTO">BTO (Buy to Open)</option>
+                                        <option value="STO">STO (Sell to Open)</option>
+                                        <option value="BTC">BTC (Buy to Close)</option>
+                                        <option value="STC">STC (Sell to Close)</option>
+                                        <option value="BUY">BUY (Stock)</option>
+                                        <option value="SELL">SELL (Stock)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Quantity -->
+                                <div class="order-form-group">
+                                    <label for="order-quantity">Quantity</label>
+                                    <input type="number" id="order-quantity" class="order-input" min="1" step="1" value="1" required>
+                                </div>
+
+                                <!-- Order Type -->
+                                <div class="order-form-group">
+                                    <label for="order-type">Order Type</label>
+                                    <select id="order-type" class="order-select">
+                                        <option value="LIMIT" selected>Limit</option>
+                                        <option value="MARKET">Market</option>
+                                    </select>
+                                </div>
+
+                                <!-- Limit Price -->
+                                <div class="order-form-group" id="group-order-price">
+                                    <label for="order-price">Limit Price ($)</label>
+                                    <input type="number" id="order-price" class="order-input" step="0.01" min="0" placeholder="0.00" required>
+                                    <div id="order-price-hint" class="order-field-hint"></div>
+                                </div>
+
+                                <!-- Duration -->
+                                <div class="order-form-group">
+                                    <label for="order-duration">Duration</label>
+                                    <select id="order-duration" class="order-select">
+                                        <option value="GOOD_TILL_CANCEL" selected>GTC (Good Till Cancel)</option>
+                                        <option value="DAY">Day</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Two-Leg Roll Order Section -->
+                        <div id="order-roll-section" class="order-roll-section hidden">
+                            <!-- Roll Legs Summary Card -->
+                            <div class="roll-legs-summary">
+                                <div class="roll-leg-box roll-leg-close">
+                                    <span class="roll-leg-tag leg-tag-close">Leg 1: Close Current</span>
+                                    <div class="roll-leg-content">
+                                        <span class="roll-leg-action" id="roll-close-action">BTC</span>
+                                        <span class="roll-leg-symbol" id="roll-close-symbol">-</span>
+                                        <span class="roll-leg-mark" id="roll-close-mark">Mark: -</span>
+                                    </div>
+                                </div>
+                                <div class="roll-legs-arrow">➔</div>
+                                <div class="roll-leg-box roll-leg-open" id="roll-open-box">
+                                    <span class="roll-leg-tag leg-tag-open">Leg 2: Open Target</span>
+                                    <div class="roll-leg-content">
+                                        <span class="roll-leg-action" id="roll-open-action">STO</span>
+                                        <span class="roll-leg-symbol" id="roll-open-symbol">Select target from table below</span>
+                                        <span class="roll-leg-mark" id="roll-open-mark">Mark: -</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <input type="hidden" id="roll-target-symbol" value="">
+
+                            <!-- Roll Form Inputs -->
+                            <div class="order-form-grid" style="margin-top: 10px;">
+                                <div class="order-form-group">
+                                    <label for="roll-account">Account</label>
+                                    <select id="roll-account" class="order-select"></select>
+                                </div>
+                                <div class="order-form-group">
+                                    <label for="roll-quantity">Quantity</label>
+                                    <input type="number" id="roll-quantity" class="order-input" min="1" step="1" value="1" required>
+                                </div>
+                                <div class="order-form-group">
+                                    <label for="roll-order-type">Net Price Type</label>
+                                    <select id="roll-order-type" class="order-select">
+                                        <option value="NET_CREDIT" selected>Net Credit</option>
+                                        <option value="NET_DEBIT">Net Debit</option>
+                                    </select>
+                                </div>
+                                <div class="order-form-group">
+                                    <label for="roll-price">Net Limit Price ($)</label>
+                                    <input type="number" id="roll-price" class="order-input" step="0.01" min="0" placeholder="0.00" required>
+                                    <div id="roll-price-hint" class="order-field-hint"></div>
+                                </div>
+                                <div class="order-form-group">
+                                    <label for="roll-duration">Duration</label>
+                                    <select id="roll-duration" class="order-select">
+                                        <option value="GOOD_TILL_CANCEL" selected>GTC (Good Till Cancel)</option>
+                                        <option value="DAY">Day</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Filtered Chain for Target Selection -->
+                            <div class="roll-chain-picker-wrap">
+                                <div class="roll-chain-picker-header">
+                                    <div>
+                                        <h4 style="margin: 0; font-size: 0.86rem; font-weight: 600;">Choose Target Option from Chain</h4>
+                                        <div style="font-size: 0.74rem; color: var(--text-secondary);">Filtered for minimal credit/debit roll near current mark</div>
+                                    </div>
+                                    <div class="roll-chain-picker-controls">
+                                        <select id="roll-chain-expiry-filter" class="order-select" style="font-size: 0.76rem; padding: 3px 6px;">
+                                            <option value="later" selected>Later Expirations (Recommended)</option>
+                                            <option value="all">All Expirations</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div id="roll-chain-candidates-container" class="roll-candidates-container">
+                                    <div class="no-data-msg" style="padding: 16px;"><p>Loading options chain...</p></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Feedback / Result alert box -->
+                        <div id="order-status-msg" class="order-status-msg hidden"></div>
+
+                        <!-- Action Buttons -->
+                        <div class="order-modal-actions">
+                            <button type="button" id="btn-order-preview" class="btn-toggle">Preview</button>
+                            <button type="button" id="btn-order-submit" class="btn-action-refresh btn-order-submit">Submit Order</button>
+                            <button type="button" id="btn-order-cancel" class="btn-toggle">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Options Context Menu -->
+        <div id="option-context-menu" class="option-context-menu hidden">
+            <button class="context-menu-item" id="context-menu-close-action" data-action="close">
+                <span class="context-menu-icon">⚡</span>
+                <span class="context-menu-label" id="context-menu-close-label">BTC</span>
+            </button>
+            <button class="context-menu-item" id="context-menu-roll-action" data-action="roll">
+                <span class="context-menu-icon">🔄</span>
+                <span class="context-menu-label">Roll</span>
+            </button>
+            <button class="context-menu-item" id="context-menu-history-action" data-action="history">
+                <span class="context-menu-icon">📜</span>
+                <span class="context-menu-label">Roll History</span>
+            </button>
+        </div>
+
         </main>
 
     </div>
 
     <!-- Firebase SDKs and main.js -->
-    <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v=2.1"></script>
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v=2.2"></script>
 </body>
 
 </html>

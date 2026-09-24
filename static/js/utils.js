@@ -24,6 +24,18 @@ export function isOption(symbol) {
     return s.length > 6 || (s.includes(' ') && s.length > 4) || /\d{6}[CP]\d+/.test(s);
 }
 
+export function isCallOption(symbol) {
+    if (!isOption(symbol)) return false;
+    const clean = symbol.replace(/\s+/g, '');
+    return /[0-9]{6}C[0-9]{8}/.test(clean);
+}
+
+export function isPutOption(symbol) {
+    if (!isOption(symbol)) return false;
+    const clean = symbol.replace(/\s+/g, '');
+    return /[0-9]{6}P[0-9]{8}/.test(clean);
+}
+
 export function baseUnderlying(symbol) {
     if (!symbol) return '';
     const s = symbol.trim();
