@@ -6,15 +6,9 @@ Schwab orders, conforming to the schemas in ~/schwab_client.
 """
 
 import logging
-import re
 from typing import Any
 
-from constants import (
-    get_account_hash,
-    get_primary_account_hash,
-    get_secondary_account_hash,
-    get_all_account_hashes,
-)
+from constants import get_account_hash
 import schwab_api
 
 
@@ -65,23 +59,7 @@ SESSION_MAP = {
     "SEAMLESS": "SEAMLESS",
 }
 
-# OCC option symbol regex: 6-digit YYMMDD date, C or P, 8-digit strike
-_OCC_REGEX = re.compile(r"\d{6}[CP]\d{8}$")
-
-
-# ---------------------------------------------------------------------------
-# Private formatting and validation helpers
-# ---------------------------------------------------------------------------
-
-def _is_occ_option_symbol(symbol: str) -> bool:
-    """Return True if symbol matches the OCC option symbol pattern.
-
-    OCC format: TICKER + YYMMDD + C/P + 8-digit strike price.
-    Example: 'AAPL  260821C00205000'
-    """
-    if not symbol or len(symbol) < 15:
-        return False
-    return bool(_OCC_REGEX.search(symbol.replace(" ", "")))
+from option_symbol import is_option as _is_occ_option_symbol
 
 
 def format_price(price: float | str | int) -> str:
@@ -139,31 +117,6 @@ def _validate_quantity(quantity) -> float:
     if qty <= 0:
         raise ValueError(f"Order quantity must be positive, got {quantity}")
     return qty
-
-
-def resolve_account_hash(account: str | None) -> str:
-    """Resolve an account identifier (alias, suffix, or full hash) to a full Schwab account hash.
-
-    Args:
-        account: Account alias ('ind', 'ira', 'primary', 'secondary'), suffix ('acc2', 'acc1'),
-                 or full 64-char account hash. Defaults to primary account hash if None.
-    """
-    if not account:
-        return get_primary_account_hash()
-
-    acc_str = str(account).strip()
-    acc_lower = acc_str.lower()
-
-    if acc_lower in ("ind", "primary", "individual"):
-        return get_primary_account_hash()
-    if acc_lower in ("ira", "secondary", "roth"):
-        return get_secondary_account_hash()
-
-    configured_hashes = get_all_account_hashes()
-    if acc_str in configured_hashes:
-        return acc_str
-
-    return get_account_hash(acc_str)
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +299,7 @@ def build_roll_order(
 
 def execute_order(
     access_token: str,
-    account: str | None = None,
+    account_number: str,
     order_payload: dict | None = None,
     *,
     preview: bool = False,
@@ -355,7 +308,7 @@ def execute_order(
 
     Args:
         access_token:  Valid Schwab Bearer access token.
-        account:       Account alias, suffix, or hash.
+        account_number: Account number.
         order_payload: Pre-constructed order dict (required).
         preview:       If True, preview the order without executing.
 
@@ -368,7 +321,10 @@ def execute_order(
     if order_payload is None:
         raise ValueError("execute_order: 'order_payload' is required.")
 
-    account_hash = resolve_account_hash(account)
+    if account_number is None:
+        raise ValueError("execute_order: 'account_number' is required.")
+
+    account_hash = get_account_hash(account_number)
     action = "Previewing" if preview else "Submitting live"
     logging.info("%s order for account %s: %s", action, account_hash, order_payload)
 
@@ -378,17 +334,17 @@ def execute_order(
 
 def place_order(
     access_token: str,
-    account: str | None = None,
+    account_number: str,
     order_payload: dict | None = None,
 ) -> dict:
     """Prepare and submit a live order to the Charles Schwab Trader API."""
-    return execute_order(access_token, account, order_payload, preview=False)
+    return execute_order(access_token, account_number, order_payload, preview=False)
 
 
 def preview_order(
     access_token: str,
-    account: str | None = None,
+    account_number: str,
     order_payload: dict | None = None,
 ) -> dict:
     """Preview an order with the Charles Schwab Trader API without executing it."""
-    return execute_order(access_token, account, order_payload, preview=True)
+    return execute_order(access_token, account_number, order_payload, preview=True)

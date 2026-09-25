@@ -4,6 +4,7 @@ option_symbol.py
 Parsing and representation of Schwab OCC option symbols.
 """
 import datetime
+import re
 
 from constants import SCHWAB_TZ
 
@@ -11,10 +12,25 @@ from constants import SCHWAB_TZ
 # Standard contract size for equity/index options
 OPTION_MULTIPLIER = 100
 
+# OCC option symbol regex: 6-digit YYMMDD date, C or P, 8-digit strike price
+_OCC_REGEX = re.compile(r"\d{6}[CP]\d{8}$")
+
 
 def is_option(symbol: str) -> bool:
-    """Return True if *symbol* looks like an option (>4 characters)."""
-    return len(symbol) > 4
+    """Return True if *symbol* represents an option contract (OCC or human-readable format)."""
+    if not symbol or not isinstance(symbol, str):
+        return False
+    s = symbol.strip()
+    if not s or s.upper() in ('MARGIN INTEREST', 'INTEREST', 'MARGIN'):
+        return False
+    # Check OCC format (ignoring spaces, e.g. 'AAPL  271231C00295000')
+    if len(s) >= 15 and _OCC_REGEX.search(s.replace(" ", "")):
+        return True
+    # Check human-readable format (e.g. 'META 1/23/26 655 C' or 'META 09/11/2026 39.00 C')
+    parts = s.split()
+    if len(parts) == 4 and parts[3].upper() in ('C', 'P') and '/' in parts[1]:
+        return True
+    return False
 
 
 def get_option_multiplier(symbol: str) -> int:
@@ -24,7 +40,12 @@ def get_option_multiplier(symbol: str) -> int:
 
 def base_symbol(symbol: str) -> str:
     """Extract the underlying ticker from an option or equity symbol."""
-    return symbol if not is_option(symbol) else symbol.split(' ')[0].rstrip()
+    if not symbol or not isinstance(symbol, str):
+        return ""
+    s = symbol.strip()
+    if not is_option(s):
+        return s
+    return s.split()[0].rstrip()
 
 
 def _parse_expiration_date(expiration_date: str) -> datetime.date:

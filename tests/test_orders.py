@@ -91,21 +91,6 @@ class TestOrders(unittest.TestCase):
         with self.assertRaises(ValueError):
             orders.build_single_order(symbol="AAPL", quantity=1, instruction="BUY", order_type="LIMIT")
 
-    @patch("orders.get_all_account_hashes", return_value=["HASH_PRI", "HASH_SEC"])
-    @patch("orders.get_primary_account_hash", return_value="HASH_PRI")
-    @patch("orders.get_secondary_account_hash", return_value="HASH_SEC")
-    @patch("orders.get_account_hash", return_value="HASH_SUFFIX")
-    def test_resolve_account_hash(self, mock_hash, mock_sec, mock_pri, mock_all):
-        self.assertEqual(orders.resolve_account_hash(None), "HASH_PRI")
-        self.assertEqual(orders.resolve_account_hash("ind"), "HASH_PRI")
-        self.assertEqual(orders.resolve_account_hash("primary"), "HASH_PRI")
-        self.assertEqual(orders.resolve_account_hash("ira"), "HASH_SEC")
-        self.assertEqual(orders.resolve_account_hash("secondary"), "HASH_SEC")
-
-        res = orders.resolve_account_hash("acc2")
-        self.assertEqual(res, "HASH_SUFFIX")
-        mock_hash.assert_called_once_with("acc2")
-
     @patch("orders.schwab_api.place_order")
     @patch("orders.resolve_account_hash", return_value="HASH_TEST")
     def test_place_order_service(self, mock_resolve, mock_api_place):

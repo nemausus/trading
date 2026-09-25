@@ -8,10 +8,10 @@ and realized P/L records stored in Firestore outside of the web application.
 Reuses firestore_db.py, constants.py, and realized.py services directly.
 
 Usage examples:
-    python script.py --account acc2 txns --limit 100
-    python script.py --account primary realized --limit 50
+    python script.py --account ira txns --limit 100
+    python script.py --account ind realized --limit 50
     python script.py --account all txns --unprocessed
-    python script.py --account acc1 realized --json
+    python script.py --account ind realized --json
 """
 
 import argparse
@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 # Ensure environment variables from .env are loaded at startup
 load_dotenv()
 
+from option_symbol import is_option as _is_option_symbol
 from roll_chain import extract_underlying_symbol
 from schwab_auth import SchwabAuthManager
 import constants
@@ -64,8 +65,7 @@ def resolve_account_hashes(account_input: str | None) -> list[str]:
     """Resolve account argument into a list of encrypted account hashes.
 
     Args:
-        account_input: Account suffix ('acc2', 'acc1'), alias ('primary', 'secondary',
-            'ira', 'ind', 'all'), or full account hash string.
+        account_input: 'ira', 'ind', 'all'
 
     Returns:
         List of matching account hash strings.
@@ -73,16 +73,7 @@ def resolve_account_hashes(account_input: str | None) -> list[str]:
     if not account_input or account_input.lower() == 'all':
         return constants.get_all_account_hashes()
 
-    acc_lower = account_input.lower().strip()
-    if acc_lower in ('primary', 'ind'):
-        return [constants.get_primary_account_hash()]
-    if acc_lower in ('secondary', 'ira', 'roth'):
-        return [constants.get_secondary_account_hash()]
-
-    try:
-        return [constants.get_account_hash(account_input)]
-    except ValueError:
-        return [account_input]
+    return [constants.accounts.get(account_input).hash]
 
 
 def handle_txns_command(
@@ -225,36 +216,6 @@ def handle_realized_command(
     print(f"\nTotal Realized P/L: ${total_pl:,.2f} across {len(records)} record(s).")
 
 
-def _is_option_symbol(symbol: str) -> bool:
-    """Determine whether a symbol represents an option contract rather than a stock.
-
-    Matches standard OCC symbols (e.g. 'NVDA  260821C00210000') and human-readable
-    option notations (e.g. 'META 1/23/26 655C'), while excluding equities and interest.
-
-    Args:
-        symbol: Ticker or OCC option string.
-
-    Returns:
-        True if symbol represents an option contract, False otherwise.
-    """
-    symbol = (symbol or '').strip()
-    if not symbol or symbol.upper() in ('MARGIN INTEREST', 'INTEREST', 'MARGIN'):
-        return False
-
-    if len(symbol) >= 15:
-        rest = symbol[6:].strip()
-        c_idx = rest.find('C')
-        p_idx = rest.find('P')
-        if c_idx >= 6 and rest[:c_idx].isdigit():
-            return True
-        if p_idx >= 6 and rest[:p_idx].isdigit():
-            return True
-
-    parts = symbol.split()
-    if len(parts) == 4 and parts[3].upper() in ('C', 'P') and '/' in parts[1]:
-        return True
-
-    return False
 
 
 def _is_exception_record(doc_id: str, doc_data: dict) -> bool:
@@ -429,7 +390,7 @@ def handle_order_command(
 
         res = orders.execute_order(
             access_token=access_token,
-            account=account_hash,
+            account_number=acc_num,
             order_payload=order_payload,
             preview=preview,
         )
@@ -451,25 +412,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Administrative CLI tool for querying Firestore transactions and realized P/L data."
     )
-    parser.add_argument(
-        '--account',
-        type=str,
-        default='all',
-        help="Account number suffix (e.g. 'acc2', 'acc1'), alias ('primary', 'secondary', 'all'), or full hash."
+    parser.add_argument( '--account', type=str, default='all', choices=['all', 'ind', 'ira'], help="Account name" )
+    parser.add_argument( '-s', '--symbol', type=str, help="Filter by ticker or underlying symbol (e.g. NVDA, IBIT)."
     )
-    parser.add_argument(
-        '--symbol',
-        '-s',
-        type=str,
-        default=None,
-        help="Filter by ticker or underlying symbol (e.g. NVDA, IBIT)."
-    )
-    parser.add_argument(
-        '--uid',
-        type=str,
-        default=None,
-        help="Firebase User ID (auto-discovered from Firestore if omitted)."
-    )
+    parser.add_argument( '--uid', type=str, help="Firebase User ID (auto-discovered from Firestore if omitted).")
 
     subparsers = parser.add_subparsers(dest='command', required=True, help="Subcommand to execute")
 
@@ -480,21 +426,14 @@ def build_parser() -> argparse.ArgumentParser:
     txns_parser.add_argument('--json', action='store_true', help="Output results in JSON format.")
 
     # realized subcommand
-    realized_parser = subparsers.add_parser('realized', aliases=['realized-pl'], help="List realized P/L records from Firestore.")
+    realized_parser = subparsers.add_parser('realized', help="List realized P/L records from Firestore.")
     realized_parser.add_argument('--limit', type=int, default=100, help="Maximum number of realized records to return (default: 100).")
     realized_parser.add_argument('--json', action='store_true', help="Output results in JSON format.")
 
     # fix-realized subcommand
     fix_parser = subparsers.add_parser(
         'fix-realized',
-        aliases=['fix_realized', 'fix-realized-txns'],
         help="Fix realized option transactions by swapping buy_price and sell_price (close_price)."
-    )
-    fix_parser.add_argument(
-        '--account',
-        dest='sub_account',
-        default=None,
-        help="Account number suffix (default: 'acc2')."
     )
     fix_parser.add_argument(
         '--start-date',
@@ -515,11 +454,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     # order subcommand
-    order_parser = subparsers.add_parser(
-        'order',
-        aliases=['place-order', 'preview-order'],
-        help="Place or preview an order on Charles Schwab."
-    )
+    order_parser = subparsers.add_parser( 'order', help="Place or preview an order on Charles Schwab." )
     order_parser.add_argument(
         '-s', '--symbol',
         type=str,
@@ -535,7 +470,6 @@ def build_parser() -> argparse.ArgumentParser:
     order_parser.add_argument(
         '-p', '--price',
         type=str,
-        default=None,
         help="Limit price for the order (required for LIMIT orders)."
     )
     order_parser.add_argument(
@@ -579,12 +513,8 @@ def main() -> None:
     args = parser.parse_args()
 
     account_input = args.account
-    if args.command in ('fix-realized', 'fix_realized', 'fix-realized-txns'):
-        sub_acc = getattr(args, 'sub_account', None)
-        if sub_acc:
-            account_input = sub_acc
-        elif account_input == 'all':
-            account_input = 'acc2'
+    if args.command == 'fix-realized':
+        assert account_input == 'ira'
 
     try:
         uid = resolve_uid(args.uid)
@@ -602,7 +532,7 @@ def main() -> None:
             symbol_filter=args.symbol,
             output_json=args.json,
         )
-    elif args.command in ('realized', 'realized-pl'):
+    elif args.command == 'realized':
         handle_realized_command(
             uid=uid,
             account_hashes=account_hashes,
@@ -610,7 +540,7 @@ def main() -> None:
             symbol_filter=args.symbol,
             output_json=args.json,
         )
-    elif args.command in ('fix-realized', 'fix_realized', 'fix-realized-txns'):
+    elif args.command == 'fix-realized':
         handle_fix_realized_command(
             uid=uid,
             account_hashes=account_hashes,
@@ -618,12 +548,12 @@ def main() -> None:
             end_date=args.end_date,
             dry_run=args.dry_run,
         )
-    elif args.command in ('order', 'place-order', 'preview-order'):
-        is_preview = args.preview or (args.command == 'preview-order')
-        target_account = account_hashes[0] if account_hashes else constants.get_primary_account_hash()
+    elif args.command == 'order':
+        is_preview = args.preview
+        assert len(account_hashes) == 1
         handle_order_command(
             uid=uid,
-            account_hash=target_account,
+            account_hash=account_hashes[0],
             symbol=args.symbol,
             quantity=args.quantity,
             instruction=args.instruction,

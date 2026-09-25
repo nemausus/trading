@@ -243,7 +243,7 @@ def schwab_accounts(decoded_token, access_token):
         return jsonify({'error': 'Schwab API unavailable'}), 502
     except Exception as e:
         app.logger.error("Error fetching Schwab accounts for user %s: %s", uid, e)
-        return jsonify({'error': 'Failed to retrieve Schwab accounts'}), 502
+        return jsonify({'error': 'Failed to retrieve Schwab accounts'}), 500
 
 
 @app.route('/api/schwab/chain')
@@ -274,7 +274,7 @@ def schwab_chain(decoded_token, access_token):
         return jsonify({'error': f'Schwab API unavailable for {symbol}'}), 502
     except Exception as e:
         app.logger.error("Error fetching option chain for user %s symbol %s: %s", uid, symbol, e)
-        return jsonify({'error': f'Failed to retrieve option chain for {symbol}'}), 502
+        return jsonify({'error': f'Failed to retrieve option chain for {symbol}'}), 500
 
 
 @app.route('/api/schwab/stocks/<ticker>/history')
@@ -296,7 +296,7 @@ def stock_history(decoded_token, access_token, ticker):
         return jsonify({'error': f'Schwab API error for {ticker}'}), 502
     except Exception as e:
         app.logger.error("Unexpected error fetching history for user %s ticker %s: %s", uid, ticker, e)
-        return jsonify({'error': f'Failed to retrieve stock history for {ticker}'}), 502
+        return jsonify({'error': f'Failed to retrieve stock history for {ticker}'}), 500
 
 
 @app.route('/api/schwab/boxes')
@@ -325,7 +325,7 @@ def schwab_boxes(decoded_token, access_token):
         return jsonify({'error': 'Schwab API unavailable'}), 502
     except Exception as e:
         app.logger.error("Error fetching SPX boxes for user %s: %s", uid, e)
-        return jsonify({'error': 'Failed to retrieve SPX box spreads'}), 502
+        return jsonify({'error': 'Failed to retrieve SPX box spreads'}), 500
 
 
 @app.route('/api/schwab/sync_transactions', methods=['POST'])
@@ -352,7 +352,7 @@ def schwab_sync_transactions(decoded_token, access_token):
         return jsonify({'error': 'Schwab API unavailable'}), 502
     except Exception as e:
         app.logger.error("Error syncing transactions for user %s: %s", uid, e)
-        return jsonify({'error': 'Failed to sync transactions'}), 502
+        return jsonify({'error': 'Failed to sync transactions'}), 500
 
 
 @app.route('/api/schwab/transactions')
@@ -367,7 +367,7 @@ def schwab_get_transactions(decoded_token):
         return jsonify({'transactions': txns})
     except Exception as e:
         app.logger.error("Error reading transactions for user %s: %s", uid, e)
-        return jsonify({'error': 'Failed to read transactions'}), 502
+        return jsonify({'error': 'Failed to read transactions'}), 500
 
 
 @app.route('/api/schwab/realized')
@@ -386,7 +386,7 @@ def schwab_get_realized(decoded_token):
         return jsonify({'realized_transactions': records})
     except Exception as e:
         app.logger.error("Error reading realized transactions for user %s: %s", uid, e)
-        return jsonify({'error': 'Failed to read transactions'}), 502
+        return jsonify({'error': 'Failed to read transactions'}), 500
 
 
 @app.route('/api/schwab/roll-chain')
@@ -405,7 +405,7 @@ def schwab_get_roll_chain(decoded_token):
         return jsonify({'roll_chain': chain_data})
     except Exception as e:
         app.logger.error("Error generating roll chain for user %s symbol %s: %s", uid, symbol, e)
-        return jsonify({'error': 'Failed to generate roll chain'}), 502
+        return jsonify({'error': 'Failed to generate roll chain'}), 500
 
 
 @app.route('/api/schwab/order', methods=['POST'])

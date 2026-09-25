@@ -154,15 +154,14 @@ def get_unprocessed_transactions(
     """
     db = get_db()
     col = _txn_collection(db, uid, account_hash)
-    docs = col.stream()
+    docs = col.where('processed', '==', False).stream()
     unprocessed = []
     for doc in docs:
         data = doc.to_dict()
-        if not data.get('processed', False):
-            if 'activityId' not in data:
-                data['activityId'] = doc.id
-            data.pop('fetched_at', None)
-            unprocessed.append(data)
+        if 'activityId' not in data:
+            data['activityId'] = doc.id
+        data.pop('fetched_at', None)
+        unprocessed.append(data)
     unprocessed.sort(key=lambda x: x.get('time', ''))
     return unprocessed[:limit]
 

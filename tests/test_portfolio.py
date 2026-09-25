@@ -272,14 +272,24 @@ class TestTodoList(unittest.TestCase):
         self.assertIn('1x', todo)
 
     def test_excluded_tickers_not_in_todo(self):
-        """QQQM, VTI, SNOW, SPX should never appear in the Todo list."""
-        for ticker in ('QQQM', 'VTI', 'SNOW'):
+        """QQQM, VTI, SPX should never appear in the Todo list."""
+        for ticker in ('QQQM', 'VTI'):
             equity = _make_equity_pos(ticker, long_qty=100, avg_price=100.0,
                                       market_value=10000.0)
             account = _make_account('ACC1', [equity])
             result = self._run([account])
             todo = result['summaries'][0]['Todo']
             self.assertNotIn(ticker, todo, f"{ticker} should be excluded from Todo")
+
+    def test_snow_included_in_todo(self):
+        """SNOW is not excluded and should appear in Todo when uncovered."""
+        equity = _make_equity_pos('SNOW', long_qty=100, avg_price=150.0,
+                                  market_value=15000.0)
+        account = _make_account('ACC1', [equity])
+        result = self._run([account])
+        todo = result['summaries'][0]['Todo']
+        self.assertIn('SNOW', todo)
+        self.assertIn('1x', todo)
 
     def test_long_call_counted_as_long(self):
         """A long call option (1 contract) counts as 1 unit toward longs."""

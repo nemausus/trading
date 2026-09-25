@@ -40,6 +40,10 @@ class SchwabAPIError(Exception):
     and catch this one type rather than anything from the requests library.
     """
 
+    def __init__(self, message: str, response: requests.Response | None = None):
+        super().__init__(message)
+        self.response = response
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -415,7 +419,7 @@ def schwab_request(
     if return_response=True).
     Raises SchwabAPIError on any HTTP or network failure.
     """
-    logging.warning("Making Schwab API %s request to %s (params=%s)", method, url, params)
+    logging.info("Making Schwab API %s request to %s (params=%s)", method, url, params)
 
     try:
         resp = requests.request(
@@ -425,7 +429,8 @@ def schwab_request(
         )
         resp.raise_for_status()
     except requests.RequestException as e:
-        raise SchwabAPIError(f"{method.upper()} {url} failed: {e}") from e
+        resp = getattr(e, 'response', None)
+        raise SchwabAPIError(f"{method.upper()} {url} failed: {e}", response=resp) from e
 
     if return_response:
         return resp

@@ -1,7 +1,7 @@
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './auth.js';
 import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData, fetchRealized, applyRealizedFilters, fetchAndShowRollChain, submitOrder, fetchOptionChainRaw } from './api.js';
 import { showView, clearDashboard, renderPositions, lastPositions, closeRollChainModal, openOrderModal, closeOrderModal, renderOptionChainTable, renderRollCandidatesTable } from './ui.js';
-import { baseUnderlying, isPutOption, formatOptionSymbol } from './utils.js';
+import { baseUnderlying, isPutOption, formatOptionSymbol, escapeHtml } from './utils.js';
 import { initStockPage, loadStockData, onStocksTabActivated, resizeStockChart } from './stocks/stock-page.js';
 
 // Parse URL params on load
@@ -703,7 +703,7 @@ async function handleOrderSubmit(preview = false) {
         }
     } catch (err) {
         console.error('Order submission error:', err);
-        showStatus(`<strong>Order Error:</strong> ${err.message}`, 'error');
+        showStatus(`<strong>Order Error:</strong> ${escapeHtml(err.message)}`, 'error');
     } finally {
         if (submitBtn) submitBtn.disabled = false;
         if (previewBtn) previewBtn.disabled = false;

@@ -12,8 +12,6 @@ import script
 class TestScriptCLI(unittest.TestCase):
 
     @patch('script.constants.get_all_account_hashes')
-    @patch('script.constants.get_primary_account_hash')
-    @patch('script.constants.get_secondary_account_hash')
     @patch('script.constants.get_account_hash')
     def test_resolve_account_hashes(self, mock_get_hash, mock_sec, mock_pri, mock_all):
         mock_all.return_value = ['hash1', 'hash2']

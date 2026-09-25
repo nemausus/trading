@@ -249,9 +249,9 @@ class TestRealizedPL(unittest.TestCase):
             tmp_path = tmp.name
 
         try:
-            records = realized_pl.load_csv_realized_pl(tmp_path)
+            records = realized_pl.load_csv_realized_pl(tmp_path, account_number='TEST_ACC')
             self.assertEqual(len(records), 1)
-            self.assertEqual(records[0]['accountNumber'], '11112222')
+            self.assertEqual(records[0]['accountNumber'], 'TEST_ACC')
             self.assertEqual(records[0]['symbol'], 'IBIT  260911C00039000')
             self.assertEqual(records[0]['buy_date'], '2026-08-21')
             self.assertEqual(records[0]['sell_date'], '2026-08-21')
@@ -267,9 +267,6 @@ class TestRealizedPL(unittest.TestCase):
     def test_load_csv_realized_pl_default_path(self):
         records = realized_pl.load_csv_realized_pl()
         self.assertIsInstance(records, list)
-        if records:
-            for rec in records:
-                self.assertEqual(rec['accountNumber'], '11112222')
 
 
     def test_categorize_realized_trade_stock(self):

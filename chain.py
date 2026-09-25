@@ -9,13 +9,17 @@ returning a structured response ready for the frontend.
 
 import datetime
 
-from constants import SCHWAB_TZ, _fval
+from constants import SCHWAB_TZ
 import schwab_api
 
 
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+def _fval(d: dict, key: str, default: float = 0.0) -> float:
+    """Safely read a float from *d*, treating None and missing as *default*."""
+    return float(d.get(key, default) or default)
 
 
 def _offset_date(today: datetime.date, days: int | None) -> str | None:
@@ -35,7 +39,7 @@ def _validate_range(name: str, value, *, lo, hi, typ) -> None:
 def _validate_chain_params(symbol: str, min_dte: int | None, max_dte: int | None,
                             min_delta: float | None, max_delta: float | None) -> None:
     """Validate DTE, Delta, and symbol parameters, raising ValueError for out-of-bounds values."""
-    if not symbol or not isinstance(symbol, str) or len(symbol) > 4:
+    if not symbol or not isinstance(symbol, str) or len(symbol) > 10:
         raise ValueError(f"Invalid symbol: '{symbol}'. Must be an alphanumeric ticker up to 10 characters.")
 
     if min_dte is not None:
@@ -53,7 +57,7 @@ def _validate_chain_params(symbol: str, min_dte: int | None, max_dte: int | None
         raise ValueError(f"min_delta ({min_delta}) cannot be greater than max_delta ({max_delta}).")
 
 
-def _parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) -> list:
+def parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) -> list:
     """Flatten a Schwab callExpDateMap / putExpDateMap into a list of option dicts."""
     contracts = []
     if not exp_map or not isinstance(exp_map, dict):
@@ -107,6 +111,10 @@ def _parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) 
                     'mpr': mpr
                 })
     return contracts
+
+
+# Backward-compatibility alias
+_parse_exp_map = parse_exp_map
 
 
 # ---------------------------------------------------------------------------

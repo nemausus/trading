@@ -2,7 +2,8 @@ import {
     formatCurrency, formatPercent, formatNumber,
     baseUnderlying, sortPositionsGrouped, isOption,
     getPLFormatting, getPLPercentFormatting, getSymbolBadgeClass,
-    formatOptionSymbol, getTradeTypeBadgeClass, isCallOption, isPutOption
+    formatOptionSymbol, getTradeTypeBadgeClass, isCallOption, isPutOption,
+    escapeHtml
 } from './utils.js';
 
 export let lastPositions = [];
@@ -1057,7 +1058,7 @@ export function renderRollChainModal(data) {
     modal.classList.remove('hidden');
 
     if (!data || data.error) {
-        bodyEl.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>${data ? data.error : 'Failed to load roll chain.'}</p></div>`;
+        bodyEl.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>${escapeHtml(data ? data.error : 'Failed to load roll chain.')}</p></div>`;
         return;
     }
 
@@ -1070,7 +1071,7 @@ export function renderRollChainModal(data) {
     if (badgeEl) badgeEl.textContent = underlying || targetSymbol;
 
     if (chain.length === 0) {
-        bodyEl.innerHTML = `<div class="no-data-msg"><p>No transaction history found for ${targetSymbol}.</p></div>`;
+        bodyEl.innerHTML = `<div class="no-data-msg"><p>No transaction history found for ${escapeHtml(targetSymbol)}.</p></div>`;
         return;
     }
 

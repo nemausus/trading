@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Earliest date to backfill from when no stored transactions exist.
-DEFAULT_FROM_DATE = "2026-01-01T00:00:00-07:30"
+DEFAULT_FROM_DATE = "2026-01-01T00:00:00-07:00"
 
 
 # ---------------------------------------------------------------------------

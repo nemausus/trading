@@ -1,7 +1,7 @@
 import datetime
 import logging
 
-from constants import SCHWAB_TZ, get_account_hash, _fval
+from constants import SCHWAB_TZ, get_account_hash
 import schwab_api
 from schwab_api import SchwabAPIError
 from option_symbol import (
@@ -14,6 +14,12 @@ from option_symbol import (
 
 # Backward-compatibility alias
 _base_symbol = base_symbol
+
+
+def _fval(d: dict, key: str, default: float = 0.0) -> float:
+    """Safely read a float from *d*, treating None and missing as *default*."""
+    return float(d.get(key, default) or default)
+
 
 # ---------------------------------------------------------------------------
 # Module-level constants
@@ -33,7 +39,7 @@ INS_MAP = {
 _SPX_BOX_ROUNDING = 10_000.0
 
 # Tickers excluded from the uncovered-long (Todo) list
-_TODO_EXCLUDE = frozenset(('QQQM', 'VTI', 'SPX', 'SNOW'))
+_TODO_EXCLUDE = frozenset(('QQQM', 'VTI', 'SPX'))
 
 # Strategy thresholds for action recommendations
 _BTC_PROFIT_TAKE_PCT = 60.0
@@ -76,7 +82,7 @@ def fetch_quotes(access_token: str, symbols: list) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def fetch_active_orders(access_token: str, account_nums: list) -> list:
+def fetch_active_orders(access_token: str, account_nums: list, account_hash_map: dict | None = None) -> list:
     """Fetch open (no closeTime) orders for every account in *account_nums*."""
     from_date = to_iso_datetime_str(
         (datetime.datetime.now(SCHWAB_TZ) - datetime.timedelta(days=7)).date().isoformat()
@@ -85,7 +91,13 @@ def fetch_active_orders(access_token: str, account_nums: list) -> list:
     active_orders: list = []
 
     for acc_num in account_nums:
-        acc_hash = get_account_hash(acc_num)
+        acc_hash = (account_hash_map or {}).get(acc_num)
+        if not acc_hash:
+            try:
+                acc_hash = get_account_hash(acc_num)
+            except (ValueError, EnvironmentError) as e:
+                logging.warning("Could not resolve account hash for account %s: %s", acc_num, e)
+                continue
         try:
             orders_data = schwab_api.get_orders(
                 access_token,
@@ -391,6 +403,7 @@ def process_accounts_data(accounts_json: list, access_token: str) -> dict:
     global_positions: list = []
     account_summaries: list = []
     account_nums: list = []
+    account_hash_map: dict = {}
 
     for account in accounts_json:
         sec = account.get('securitiesAccount', {})
@@ -398,6 +411,9 @@ def process_accounts_data(accounts_json: list, access_token: str) -> dict:
         if not acc_num:
             continue
         account_nums.append(acc_num)
+        hash_val = account.get('hashValue') or sec.get('hashValue')
+        if hash_val:
+            account_hash_map[acc_num] = hash_val
 
         # --- Parse raw positions ---
         parsed = [p for p in
@@ -463,7 +479,7 @@ def process_accounts_data(accounts_json: list, access_token: str) -> dict:
         summary['Todo'] = todo_map.get(summary['accountNumber'], '')
 
     # --- Active orders ---
-    active_orders = fetch_active_orders(access_token, account_nums)
+    active_orders = fetch_active_orders(access_token, account_nums, account_hash_map)
     global_positions.sort(key=lambda x: (x['accountNumber'], x['dte'], x['symbol']))
 
     return {

@@ -12,7 +12,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-ROTH_REALIZED_CSV_PATH = '/path/to/roth_realized_details.csv'
+ROTH_REALIZED_CSV_PATH = os.environ.get('ROTH_REALIZED_CSV_PATH', '')
 
 
 def _join_aids(aids) -> str:
@@ -290,21 +290,28 @@ def _format_csv_symbol(symbol: str) -> str:
         return symbol.strip()
 
 
-def load_csv_realized_pl(csv_path: str = ROTH_REALIZED_CSV_PATH) -> list[dict]:
+def load_csv_realized_pl(
+    csv_path: str | None = None,
+    account_number: str | None = None,
+) -> list[dict]:
     """Read and parse realized P/L transactions from Schwab export CSV file.
 
     Args:
-        csv_path: Path to the realized details CSV file.
+        csv_path: Path to the realized details CSV file (defaults to ROTH_REALIZED_CSV_PATH).
+        account_number: Target account number/suffix (defaults to SECONDARY_ACCOUNT_SUFFIX).
 
     Returns:
         List of realized P/L transaction dictionaries.
     """
-    if not os.path.exists(csv_path):
-        logger.warning("Realized P/L CSV file not found at %s", csv_path)
+    path = csv_path if csv_path is not None else ROTH_REALIZED_CSV_PATH
+    if not path or not os.path.exists(path):
+        logger.warning("Realized P/L CSV file not found at %s", path)
         return []
 
+    target_acc_num = account_number or os.environ.get('SECONDARY_ACCOUNT_SUFFIX', '')
+
     try:
-        with open(csv_path, 'r', encoding='utf-8') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             rows = list(csv.reader(f))
 
         header_idx = None
@@ -314,7 +321,7 @@ def load_csv_realized_pl(csv_path: str = ROTH_REALIZED_CSV_PATH) -> list[dict]:
                 break
 
         if header_idx is None:
-            logger.warning("Header 'Symbol' not found in CSV file %s", csv_path)
+            logger.warning("Header 'Symbol' not found in CSV file %s", path)
             return []
 
         def parse_num(val: str) -> float:
@@ -344,7 +351,7 @@ def load_csv_realized_pl(csv_path: str = ROTH_REALIZED_CSV_PATH) -> list[dict]:
             gain_loss = parse_num(row[9])
 
             records.append({
-                'accountNumber': '11112222',
+                'accountNumber': target_acc_num,
                 'amount': qty,
                 'symbol': symbol,
                 'buy_date': opened_date,
@@ -352,11 +359,11 @@ def load_csv_realized_pl(csv_path: str = ROTH_REALIZED_CSV_PATH) -> list[dict]:
                 'sell_date': closed_date,
                 'sell_price': proceeds_per_share,
                 'P/L': gain_loss,
-                'id': f"csv_11112222_{opened_date}_{closed_date}_{symbol}_{qty}"
+                'id': f"csv_{target_acc_num}_{opened_date}_{closed_date}_{symbol}_{qty}"
             })
 
         records.sort(key=lambda x: x.get('sell_date', ''), reverse=True)
         return records
     except Exception as e:
-        logger.warning("Error loading realized P/L CSV from %s: %s", csv_path, e)
+        logger.warning("Error loading realized P/L CSV from %s: %s", path, e)
         return []

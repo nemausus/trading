@@ -86,8 +86,10 @@ class TestOptionSymbolHelpers(unittest.TestCase):
         self.assertEqual(base_symbol('HOOD'), 'HOOD')
 
     def test_five_char(self):
-        # 5-char symbols like "GOOGL" are equities — multiplier should be 1
-        self.assertEqual(get_option_multiplier('GOOGL'), 100)
+        # 5-char symbols like "GOOGL" are equities — multiplier must be 1
+        self.assertEqual(get_option_multiplier('GOOGL'), 1)
+        self.assertFalse(is_option('GOOGL'))
+        self.assertEqual(base_symbol('GOOGL'), 'GOOGL')
 
 
 

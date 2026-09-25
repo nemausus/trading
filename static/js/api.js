@@ -1,5 +1,5 @@
 import { auth } from './auth.js';
-import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionChainTable, renderTransactions, renderRealized, renderRollChainModal } from './ui.js';
+import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionChainTable, renderTransactions, renderRealized, renderRollChainModal, renderBoxes } from './ui.js';
 
 export let rawChainData = { underlying: {}, chain: [] };
 
@@ -236,7 +236,6 @@ export async function fetchSPXBoxes() {
         const data = await response.json();
 
         if (response.ok) {
-            const { renderBoxes } = await import('./ui.js');
             renderBoxes(data.boxes || []);
         } else {
             const errMsg = data.error || 'Failed to fetch SPX box spreads';
@@ -277,11 +276,7 @@ export async function fetchTransactions() {
             renderTransactions(data.transactions || []);
         } else {
             const errMsg = data.error || 'Failed to load transactions';
-            if (data.error === 'No primary account hash found') {
-                container.innerHTML = `<div class="no-data-msg"><p>No transaction history found. Connect your Schwab account and click <strong>↻ Sync</strong> to import transactions.</p></div>`;
-            } else {
-                container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
-            }
+            container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
         }
     } catch (error) {
         console.error('Failed to fetch transactions:', error);
@@ -334,9 +329,7 @@ export async function syncTransactions() {
             // Refresh the table after a successful sync
             await fetchTransactions();
         } else {
-            const errMsg = data.error === 'No primary account hash found'
-                ? 'No connected Schwab account found'
-                : (data.error || 'Sync failed');
+            const errMsg = data.error || 'Sync failed';
             if (statusSpan) {
                 statusSpan.textContent = `✗ ${errMsg}`;
                 statusSpan.className = 'txn-sync-status txn-sync-err';
@@ -413,11 +406,7 @@ export async function fetchRealized() {
             applyRealizedFilters(symbolVal, minDateVal, accountVal, typeVal);
         } else {
             const errMsg = data.error || 'Failed to load realized transactions';
-            if (data.error === 'No primary account hash found') {
-                container.innerHTML = `<div class="no-data-msg"><p>No realized transactions found. Connect your Schwab account and click <strong>↻ Sync</strong> in the Transactions tab to calculate realized gains.</p></div>`;
-            } else {
-                container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
-            }
+            container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
         }
     } catch (error) {
         console.error('Failed to fetch realized transactions:', error);

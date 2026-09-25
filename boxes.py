@@ -8,7 +8,7 @@ returning the top results sorted by liquidity.
 """
 
 import schwab_api
-from chain import _parse_exp_map
+from chain import parse_exp_map
 
 
 # ---------------------------------------------------------------------------
@@ -52,8 +52,8 @@ def fetch_spx_boxes(
     )
 
     all_contracts = (
-        _parse_exp_map(data.get('callExpDateMap', {}), 0.0, 'CALL') +
-        _parse_exp_map(data.get('putExpDateMap', {}),  0.0, 'PUT')
+        parse_exp_map(data.get('callExpDateMap', {}), 0.0, 'CALL') +
+        parse_exp_map(data.get('putExpDateMap', {}),  0.0, 'PUT')
     )
 
     # Keep only monthly SPX contracts (exclude SPXW weeklies) with open interest.
