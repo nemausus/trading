@@ -178,9 +178,7 @@ def build_roll_chain(txns: list[dict], target_symbol: str) -> dict:
                         'netAmount': close_net,
                         'activityId': close_txn.get('activityId')
                     }
-                    is_same_txn = (open_txn.get('activityId') is not None and
-                                   open_txn.get('activityId') == close_txn.get('activityId'))
-                    node['roll_net_amount'] = open_net if is_same_txn else (close_net + open_net)
+                    node['roll_net_amount'] = close_net + open_net
                     break
 
         chain_nodes.append(node)
