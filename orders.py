@@ -307,21 +307,21 @@ def execute_order(
     """Submit or preview an order on the Charles Schwab Trader API.
 
     Args:
-        access_token:  Valid Schwab Bearer access token.
-        account_number: Account number.
-        order_payload: Pre-constructed order dict (required).
-        preview:       If True, preview the order without executing.
+        access_token:   Valid Schwab Bearer access token.
+        account_number: Target Schwab account number.
+        order_payload:  Pre-constructed order dict (required).
+        preview:        If True, preview the order without executing.
 
     Returns:
         Dict with order result or preview evaluation from Schwab.
 
     Raises:
-        ValueError: If order_payload is missing.
+        ValueError: If order_payload or account_number is missing.
     """
     if order_payload is None:
         raise ValueError("execute_order: 'order_payload' is required.")
 
-    if account_number is None:
+    if not account_number:
         raise ValueError("execute_order: 'account_number' is required.")
 
     account_hash = get_account_hash(account_number)

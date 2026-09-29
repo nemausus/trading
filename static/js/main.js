@@ -1,6 +1,6 @@
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './auth.js';
-import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData, fetchRealized, applyRealizedFilters, fetchAndShowRollChain, submitOrder, fetchOptionChainRaw } from './api.js';
-import { showView, clearDashboard, renderPositions, lastPositions, closeRollChainModal, openOrderModal, closeOrderModal, renderOptionChainTable, renderRollCandidatesTable } from './ui.js';
+import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, applyTransactionFilters, rawChainData, fetchRealized, applyRealizedFilters, fetchAndShowRollChain, submitOrder, fetchOptionChainRaw } from './api.js';
+import { showView, clearDashboard, lastPositions, closeRollChainModal, openOrderModal, closeOrderModal, renderOptionChainTable, renderRollCandidatesTable } from './ui.js';
 import { baseUnderlying, isPutOption, formatOptionSymbol, escapeHtml } from './utils.js';
 import { initStockPage, loadStockData, onStocksTabActivated, resizeStockChart } from './stocks/stock-page.js';
 
@@ -207,23 +207,51 @@ document.getElementById('btn-reset-filters')?.addEventListener('click', () => {
 document.getElementById('btn-fetch-boxes')?.addEventListener('click', fetchSPXBoxes);
 
 // =====================================================================================
+// =====================================================================================
 // --- TRANSACTIONS ---
 // =====================================================================================
 document.getElementById('btn-sync-transactions')?.addEventListener('click', syncTransactions);
+
+const handleTransactionFilter = () => {
+    applyTransactionFilters();
+};
+
+document.getElementById('btn-filter-transactions')?.addEventListener('click', handleTransactionFilter);
+document.getElementById('txn-account')?.addEventListener('change', handleTransactionFilter);
+document.getElementById('txn-type')?.addEventListener('change', handleTransactionFilter);
+document.getElementById('txn-from-date')?.addEventListener('change', handleTransactionFilter);
+document.getElementById('txn-to-date')?.addEventListener('change', handleTransactionFilter);
+document.getElementById('txn-symbol')?.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') handleTransactionFilter();
+});
+document.getElementById('txn-from-date')?.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') handleTransactionFilter();
+});
+document.getElementById('txn-to-date')?.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') handleTransactionFilter();
+});
+
+document.getElementById('btn-reset-transactions')?.addEventListener('click', () => {
+    const symbolInput = document.getElementById('txn-symbol');
+    const accountSelect = document.getElementById('txn-account');
+    const typeSelect = document.getElementById('txn-type');
+    const fromDateInput = document.getElementById('txn-from-date');
+    const toDateInput = document.getElementById('txn-to-date');
+
+    if (symbolInput) symbolInput.value = 'ALL';
+    if (accountSelect) accountSelect.value = 'ALL';
+    if (typeSelect) typeSelect.value = 'TRADE';
+    if (fromDateInput) fromDateInput.value = '';
+    if (toDateInput) toDateInput.value = '';
+
+    applyTransactionFilters();
+});
 
 // =====================================================================================
 // --- REALIZED GAIN/LOSS ---
 // =====================================================================================
 const handleRealizedFilter = () => {
-    const symbolInput = document.getElementById('realized-symbol');
-    const minDateInput = document.getElementById('realized-min-date');
-    const accountSelect = document.getElementById('realized-account');
-    const typeSelect = document.getElementById('realized-type');
-    const symbolVal = symbolInput ? symbolInput.value.trim().toUpperCase() : 'ALL';
-    const minDateVal = minDateInput ? minDateInput.value : '';
-    const accountVal = accountSelect ? accountSelect.value : 'ALL';
-    const typeVal = typeSelect ? typeSelect.value : 'ALL';
-    applyRealizedFilters(symbolVal, minDateVal, accountVal, typeVal);
+    applyRealizedFilters();
 };
 
 document.getElementById('btn-filter-realized')?.addEventListener('click', handleRealizedFilter);
@@ -232,22 +260,29 @@ document.getElementById('realized-type')?.addEventListener('change', handleReali
 document.getElementById('realized-symbol')?.addEventListener('keyup', (e) => {
     if (e.key === 'Enter') handleRealizedFilter();
 });
-document.getElementById('realized-min-date')?.addEventListener('keyup', (e) => {
+document.getElementById('realized-from-date')?.addEventListener('change', handleRealizedFilter);
+document.getElementById('realized-from-date')?.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') handleRealizedFilter();
+});
+document.getElementById('realized-to-date')?.addEventListener('change', handleRealizedFilter);
+document.getElementById('realized-to-date')?.addEventListener('keyup', (e) => {
     if (e.key === 'Enter') handleRealizedFilter();
 });
 
 document.getElementById('btn-reset-realized')?.addEventListener('click', () => {
     const symbolInput = document.getElementById('realized-symbol');
-    const minDateInput = document.getElementById('realized-min-date');
+    const fromDateInput = document.getElementById('realized-from-date');
+    const toDateInput = document.getElementById('realized-to-date');
     const accountSelect = document.getElementById('realized-account');
     const typeSelect = document.getElementById('realized-type');
     if (symbolInput) symbolInput.value = 'ALL';
     if (accountSelect) accountSelect.value = 'ALL';
     if (typeSelect) typeSelect.value = 'ALL';
     const currentYear = new Date().getFullYear();
-    const defaultMinDate = `${currentYear}-01-01`;
-    if (minDateInput) minDateInput.value = defaultMinDate;
-    applyRealizedFilters('ALL', defaultMinDate, 'ALL', 'ALL');
+    const defaultFromDate = `${currentYear}-01-01`;
+    if (fromDateInput) fromDateInput.value = defaultFromDate;
+    if (toDateInput) toDateInput.value = '';
+    applyRealizedFilters();
 });
 
 
@@ -618,7 +653,7 @@ async function handleOrderSubmit(preview = false) {
             close_symbol: closeSymbol,
             open_symbol: openSymbol,
             quantity,
-            orderType,
+            order_type: orderType,
             price,
             duration,
             session: 'NORMAL',
@@ -660,7 +695,7 @@ async function handleOrderSubmit(preview = false) {
             symbol,
             instruction,
             quantity,
-            orderType,
+            order_type: orderType,
             duration,
             session: 'NORMAL',
             preview

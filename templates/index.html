@@ -238,8 +238,13 @@
                         </div>
 
                         <div class="filter-group">
-                            <label for="realized-min-date">Min Sell Date</label>
-                            <input type="date" id="realized-min-date">
+                            <label for="realized-from-date">From Date</label>
+                            <input type="date" id="realized-from-date">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="realized-to-date">To Date</label>
+                            <input type="date" id="realized-to-date">
                         </div>
 
                         <div class="filter-actions">
@@ -266,15 +271,61 @@
             <div id="tab-content-transactions" class="tab-content">
                 <div class="section-card">
                     <div class="txn-top-bar">
-                        <div id="txn-stats-bar" class="txn-stats-inline" style="display:none;">
-                            <span class="txn-stat-item">Earliest: <span id="txn-stat-earliest">—</span></span>
-                            <span class="txn-stat-divider">•</span>
-                            <span class="txn-stat-item">Latest: <span id="txn-stat-latest">—</span></span>
+                        <div class="section-header-row" style="margin: 0;">
+                            <h3 style="margin: 0;">Transactions</h3>
                         </div>
                         <div class="txn-sync-actions">
                             <span id="txn-sync-status" class="txn-sync-status"></span>
                             <button id="btn-sync-transactions" class="btn-action-refresh">&#8635; Sync</button>
                         </div>
+                    </div>
+
+                    <div class="chain-filter-bar">
+                        <div class="filter-group">
+                            <label for="txn-symbol">Symbol</label>
+                            <input type="text" id="txn-symbol" value="ALL" placeholder="e.g. AAPL or ALL"
+                                style="text-transform: uppercase;">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="txn-account">Account</label>
+                            <select id="txn-account">
+                                <option value="ALL" selected>ALL</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="txn-type">Txn Type</label>
+                            <select id="txn-type">
+                                <option value="ALL">ALL</option>
+                                <option value="TRADE" selected>TRADE</option>
+                                <option value="DIVIDEND_OR_INTEREST">DIVIDEND_OR_INTEREST</option>
+                                <option value="RECEIVE_AND_DELIVER">RECEIVE_AND_DELIVER</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="txn-from-date">From Date</label>
+                            <input type="date" id="txn-from-date">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="txn-to-date">To Date</label>
+                            <input type="date" id="txn-to-date">
+                        </div>
+
+                        <div class="filter-actions">
+                            <button id="btn-filter-transactions" class="btn-action-refresh">Apply Filters</button>
+                            <button id="btn-reset-transactions" class="btn-toggle">Reset Filters</button>
+                        </div>
+                    </div>
+
+                    <div id="txn-stats-bar" class="txn-stats-inline" style="display:none; margin-bottom: 12px;">
+                        <span class="txn-stat-item">Earliest: <span id="txn-stat-earliest">—</span></span>
+                        <span class="txn-stat-divider">•</span>
+                        <span class="txn-stat-item">Latest: <span id="txn-stat-latest">—</span></span>
+                        <span class="txn-stat-divider">•</span>
+                        <span class="txn-stat-item">Count: <span id="txn-stat-count">—</span></span>
                     </div>
 
                     <div id="transactions-container" class="mobile-card-table">

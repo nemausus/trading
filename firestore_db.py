@@ -1,6 +1,7 @@
 import datetime
 import firebase_admin
 from firebase_admin import firestore
+from option_symbol import base_symbol
 
 # Initialize Firebase Admin SDK if not already initialized
 if not firebase_admin._apps:
@@ -88,64 +89,130 @@ def delete_user_schwab_credentials(uid: str) -> None:
 # Transaction helpers
 # ---------------------------------------------------------------------------
 
-def _account_subcollection(db, uid: str, account_hash: str, name: str):
+def _account_subcollection(db, uid: str, account_number: str, name: str):
     """Returns a Firestore CollectionReference nested under a user's account."""
+    if not uid:
+        raise ValueError("No UID provided")
+    if not account_number:
+        raise ValueError("No Account Number provided")
+    if not name:
+        raise ValueError("No Collection Name provided")
     return (
         db.collection('users')
         .document(uid)
         .collection('accounts')
-        .document(account_hash)
+        .document(account_number)
         .collection(name)
     )
 
 
-def _txn_collection(db, uid: str, account_hash: str):
+def _txn_collection(db, uid: str, account_number: str):
     """Returns the Firestore CollectionReference for a user's transactions."""
-    return _account_subcollection(db, uid, account_hash, 'transactions')
+    return _account_subcollection(db, uid, account_number, 'transactions')
+
+
+def _matches_txn_symbol(txn: dict, symbol: str) -> bool:
+    if not symbol or symbol.strip().upper() == 'ALL':
+        return True
+    target = symbol.strip().upper()
+    for item in txn.get('transferItems', []):
+        inst = item.get('instrument', {}) or {}
+        raw_sym = (inst.get('symbol') or '').strip().upper()
+        und_sym = (inst.get('underlyingSymbol') or '').strip().upper()
+        if not und_sym and raw_sym:
+            und_sym = base_symbol(raw_sym).strip().upper()
+        if target in und_sym or target in raw_sym:
+            return True
+    return False
 
 
 def get_transactions(
     uid: str,
-    account_hash: str,
+    account_number: str,
     limit: int,
+    *,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    txn_type: str | None = None,
+    symbol: str | None = None,
 ) -> list[dict]:
     """
     Returns stored transactions for the given user/account, ordered by
     time descending (most recent first), up to *limit* records.
-
-    Each returned dict contains the raw Firestore document data with the
-    document ID added as ``activityId`` (string).
+    Filters are pushed down to Firestore query on time range wherever possible.
     """
     db = get_db()
-    col = _txn_collection(db, uid, account_hash)
-    docs = col.order_by('time', direction='DESCENDING').limit(limit).stream()
+    col = _txn_collection(db, uid, account_number)
+    query = col
+
+    # Push date range filter directly to Firestore query on time field
+    if from_date:
+        query = query.where('time', '>=', from_date.strip())
+    if to_date:
+        to_bound = to_date.strip()
+        if 'T' not in to_bound:
+            to_bound = f"{to_bound}T23:59:59.999999"
+        query = query.where('time', '<=', to_bound)
+
+    query = query.order_by('time', direction='DESCENDING')
+
+    has_post_filter = bool((symbol and symbol.strip().upper() != 'ALL') or
+                           (txn_type and txn_type.strip().upper() != 'ALL'))
+    fetch_limit = limit * 10 if has_post_filter else limit
+
+    docs = query.limit(fetch_limit).stream()
     results = []
+    target_type = txn_type.strip().upper() if (txn_type and txn_type.strip().upper() != 'ALL') else None
+
     for doc in docs:
         data = doc.to_dict()
-        # Ensure activityId is present as a string (it's also the doc ID)
         if 'activityId' not in data:
             data['activityId'] = doc.id
-        # Firestore SERVER_TIMESTAMP is not JSON-serialisable; drop it
         data.pop('fetched_at', None)
+
+        if target_type and (data.get('type') or '').upper() != target_type:
+            continue
+
+        if symbol and not _matches_txn_symbol(data, symbol):
+            continue
+
         results.append(data)
+        if len(results) >= limit:
+            break
+
     return results
 
 
-def get_transactions_for_accounts(uid: str, account_hashes: list[str], limit: int) -> list[dict]:
+def get_transactions_for_accounts(
+    uid: str,
+    account_numbers: list[str],
+    limit: int,
+    *,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    txn_type: str | None = None,
+    symbol: str | None = None,
+) -> list[dict]:
     """
     Returns stored transactions for multiple accounts, ordered by time descending,
     up to *limit* records across all specified accounts.
     """
-    return sorted(
-        (t for h in account_hashes for t in get_transactions(uid, h, limit)),
-        key=lambda x: x.get('time', ''),
-        reverse=True,
-    )
+    results = []
+    for num in account_numbers:
+        results.extend(get_transactions(
+            uid, num, limit,
+            from_date=from_date,
+            to_date=to_date,
+            txn_type=txn_type,
+            symbol=symbol,
+        ))
+    results.sort(key=lambda x: x.get('time', ''), reverse=True)
+    return results[:limit]
 
 
 def get_unprocessed_transactions(
     uid: str,
-    account_hash: str,
+    account_number: str,
     limit: int = 1000,
 ) -> list[dict]:
     """
@@ -153,7 +220,7 @@ def get_unprocessed_transactions(
     time ascending (oldest first for FIFO matching), up to *limit* records.
     """
     db = get_db()
-    col = _txn_collection(db, uid, account_hash)
+    col = _txn_collection(db, uid, account_number)
     docs = col.where('processed', '==', False).stream()
     unprocessed = []
     for doc in docs:
@@ -167,13 +234,13 @@ def get_unprocessed_transactions(
 
 
 
-def get_latest_transaction_time(uid: str, account_hash: str) -> str | None:
+def get_latest_transaction_time(uid: str, account_number: str) -> str | None:
     """
     Returns the ``time`` field of the most recently stored transaction for the
     given user and account, or ``None`` if no transactions are stored yet.
     """
     db = get_db()
-    col = _txn_collection(db, uid, account_hash)
+    col = _txn_collection(db, uid, account_number)
     docs = col.order_by('time', direction='DESCENDING').limit(1).stream()
     for doc in docs:
         return doc.to_dict().get('time')
@@ -182,7 +249,7 @@ def get_latest_transaction_time(uid: str, account_hash: str) -> str | None:
 
 def get_existing_activity_ids(
     uid: str,
-    account_hash: str,
+    account_number: str,
     activity_ids: list[str],
 ) -> set[str]:
     """
@@ -194,7 +261,7 @@ def get_existing_activity_ids(
     if not activity_ids:
         return set()
     db = get_db()
-    col = _txn_collection(db, uid, account_hash)
+    col = _txn_collection(db, uid, account_number)
     doc_refs = [col.document(str(aid)) for aid in activity_ids]
     snaps = db.get_all(doc_refs)
     return {snap.id for snap in snaps if snap.exists}
@@ -202,14 +269,14 @@ def get_existing_activity_ids(
 
 def save_transactions(
     uid: str,
-    account_hash: str,
+    account_number: str,
     docs: list[dict],
 ) -> None:
     """
     Batch-write transaction documents to Firestore.
 
     Each document is stored at:
-        users/{uid}/accounts/{account_hash}/transactions/{activityId}
+        users/{uid}/accounts/{account_number}/transactions/{activityId}
 
     The ``activityId`` field is used as the document ID (natural dedup key).
     A ``fetched_at`` server timestamp is injected into every document.
@@ -219,7 +286,7 @@ def save_transactions(
     if not docs:
         return
     db = get_db()
-    col = _txn_collection(db, uid, account_hash)
+    col = _txn_collection(db, uid, account_number)
 
     for chunk in _chunks(docs, _BATCH_SIZE):
         batch = db.batch()
@@ -238,9 +305,9 @@ def save_transactions(
 # Realized P/L helpers
 # ---------------------------------------------------------------------------
 
-def _realized_pl_collection(db, uid: str, account_hash: str):
+def _realized_pl_collection(db, uid: str, account_number: str):
     """Returns the Firestore CollectionReference for a user's realized P/L records."""
-    return _account_subcollection(db, uid, account_hash, 'realized_pl')
+    return _account_subcollection(db, uid, account_number, 'realized_pl')
 
 
 def _categorize_realized_trade(doc: dict) -> str:
@@ -303,58 +370,113 @@ def _categorize_realized_trade(doc: dict) -> str:
     return 'Put Short' if is_short else 'Put Long'
 
 
+def _matches_realized_symbol(record: dict, symbol: str) -> bool:
+    if not symbol or symbol.strip().upper() == 'ALL':
+        return True
+    target = symbol.strip().upper()
+    raw_sym = (record.get('symbol') or '').strip().upper()
+    if not raw_sym:
+        return False
+    und_sym = base_symbol(raw_sym).strip().upper()
+    return target in und_sym or target in raw_sym
+
+
 def get_realized_pl_transactions(
     uid: str,
-    account_hash: str,
+    account_number: str,
     limit: int,
+    *,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    trade_type: str | None = None,
+    symbol: str | None = None,
 ) -> list[dict]:
     """
     Returns stored realized P/L transactions for the given user/account,
     ordered by sell_date descending, up to *limit* records.
+    Date range filtering is pushed directly to Firestore query on sell_date.
     """
     db = get_db()
-    col = _realized_pl_collection(db, uid, account_hash)
-    docs = col.order_by('sell_date', direction='DESCENDING').limit(limit).stream()
+    col = _realized_pl_collection(db, uid, account_number)
+    query = col
+
+    # Push date range filter directly to Firestore query on sell_date field
+    if from_date:
+        query = query.where('sell_date', '>=', from_date.strip())
+    if to_date:
+        query = query.where('sell_date', '<=', to_date.strip())
+
+    query = query.order_by('sell_date', direction='DESCENDING')
+
+    has_post_filter = bool((symbol and symbol.strip().upper() != 'ALL') or
+                           (trade_type and trade_type.strip().upper() != 'ALL'))
+    fetch_limit = limit * 10 if has_post_filter else limit
+
+    docs = query.limit(fetch_limit).stream()
     results = []
+    target_trade_type = trade_type.strip() if (trade_type and trade_type.strip().upper() != 'ALL') else None
+
     for doc in docs:
         data = doc.to_dict()
         data.pop('created_at', None)
-        data['trade_type'] = data.get('trade_type') or _categorize_realized_trade(data)
+        tt = data.get('trade_type') or _categorize_realized_trade(data)
+        data['trade_type'] = tt
+
+        if target_trade_type and tt.lower() != target_trade_type.lower():
+            continue
+
+        if symbol and not _matches_realized_symbol(data, symbol):
+            continue
+
         results.append(data)
+        if len(results) >= limit:
+            break
+
     return results
 
 
 def get_realized_pl_for_accounts(
     uid: str,
-    account_hashes: list[str],
+    account_numbers: list[str],
     limit: int,
+    *,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    trade_type: str | None = None,
+    symbol: str | None = None,
 ) -> list[dict]:
     """
     Returns stored realized P/L transactions for multiple accounts, ordered by
     sell_date descending, up to *limit* records across specified accounts.
     """
-    return sorted(
-        (r for h in account_hashes for r in get_realized_pl_transactions(uid, h, limit)),
-        key=lambda x: x.get('sell_date', ''),
-        reverse=True,
-    )
+    results = []
+    for num in account_numbers:
+        results.extend(get_realized_pl_transactions(
+            uid, num, limit,
+            from_date=from_date,
+            to_date=to_date,
+            trade_type=trade_type,
+            symbol=symbol,
+        ))
+    results.sort(key=lambda x: x.get('sell_date', ''), reverse=True)
+    return results[:limit]
 
 
 def save_realized_pl_transactions(
     uid: str,
-    account_hash: str,
+    account_number: str,
     docs: list[dict],
 ) -> None:
     """
     Batch-write realized P/L documents to Firestore.
 
     Each document is stored at:
-        users/{uid}/accounts/{account_hash}/realized_pl/{doc_id}
+        users/{uid}/accounts/{account_number}/realized_pl/{doc_id}
     """
     if not docs:
         return
     db = get_db()
-    col = _realized_pl_collection(db, uid, account_hash)
+    col = _realized_pl_collection(db, uid, account_number)
 
     for chunk in _chunks(docs, _BATCH_SIZE):
         batch = db.batch()
@@ -373,7 +495,7 @@ def save_realized_pl_transactions(
 
 def mark_transactions_processed(
     uid: str,
-    account_hash: str,
+    account_number: str,
     activity_ids: set[str] | list[str],
 ) -> None:
     """
@@ -382,7 +504,7 @@ def mark_transactions_processed(
     if not activity_ids:
         return
     db = get_db()
-    col = _txn_collection(db, uid, account_hash)
+    col = _txn_collection(db, uid, account_number)
     for chunk in _chunks(list(activity_ids), _BATCH_SIZE):
         batch = db.batch()
         for aid in chunk:

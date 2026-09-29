@@ -10,7 +10,7 @@ Flow:
     3. Fetch raw transactions from Schwab for that date range.
     4. Deduplicate against activityIds already in Firestore.
     5. Persist new records under:
-         users/{uid}/accounts/{accountHash}/transactions/{activityId}
+         users/{uid}/accounts/{accountNumber}/transactions/{activityId}
 """
 
 import datetime
@@ -18,7 +18,7 @@ import logging
 
 import firestore_db
 import schwab_api
-from constants import SCHWAB_TZ, get_account_number_for_hash
+from constants import SCHWAB_TZ, get_account_hash
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +52,9 @@ def _normalize_to_seconds(iso_str: str) -> str:
 # Core Service Functions
 # ---------------------------------------------------------------------------
 
-def fetch_transactions_raw(
+def _fetch_transactions_raw(
     access_token: str,
-    account_hash: str,
+    account_number: str,
     from_date: str,
     to_date: str,
 ) -> list[dict]:
@@ -63,7 +63,7 @@ def fetch_transactions_raw(
 
     Args:
         access_token: Valid Schwab Bearer access token.
-        account_hash:  Encrypted Schwab account hash.
+        account_number:  Schwab account number.
         from_date:     ISO string (e.g. '2026-01-01T00:00:00-07:30').
         to_date:       ISO string (e.g. '2026-06-01T23:59:59-07:30').
 
@@ -75,7 +75,7 @@ def fetch_transactions_raw(
     """
     data = schwab_api.get_transactions(
         access_token,
-        account_hash,
+        get_account_hash(account_number),
         start_date=from_date,
         end_date=to_date,
     )
@@ -85,7 +85,7 @@ def fetch_transactions_raw(
     return data
 
 
-def sync_transactions(uid: str, access_token: str, account_hash: str) -> dict:
+def sync_transactions(uid: str, access_token: str, account_number: str) -> dict:
     """
     Orchestrate an incremental sync of Schwab transactions for the given user and account.
 
@@ -99,27 +99,27 @@ def sync_transactions(uid: str, access_token: str, account_hash: str) -> dict:
     Args:
         uid:          Firebase user ID.
         access_token: Valid Schwab Bearer access token.
-        account_hash: Target Schwab account hash.
+        account_number: Target Schwab account number.
 
     Returns:
         Dict with keys:
-            new_count    (int)  -- number of new transactions written
-            from_date    (str)  -- startDate used for this sync
-            to_date      (str)  -- endDate used for this sync
-            account_hash (str)  -- resolved account hash
+            new_count      (int)  -- number of new transactions written
+            from_date      (str)  -- startDate used for this sync
+            to_date        (str)  -- endDate used for this sync
+            account_number (str)  -- resolved account number
     """
+
     # -- Step 1: determine fromDate ------------------------------------------
-    latest_time = firestore_db.get_latest_transaction_time(uid, account_hash)
+    latest_time = firestore_db.get_latest_transaction_time(uid, account_number)
     from_date = _normalize_to_seconds(latest_time) if latest_time else DEFAULT_FROM_DATE
     to_date = _today_iso()
     logger.info(
         "Syncing transactions for uid=%s account=%s from=%s to=%s",
-        uid, account_hash[:10], from_date, to_date,
+        uid, account_number, from_date, to_date,
     )
 
     # -- Step 2: fetch from Schwab -------------------------------------------
-    account_number = get_account_number_for_hash(account_hash)
-    raw_txns = fetch_transactions_raw(access_token, account_hash, from_date, to_date)
+    raw_txns = _fetch_transactions_raw(access_token, account_number, from_date, to_date)
     if not raw_txns:
         return {
             "new_count": 0,
@@ -131,7 +131,7 @@ def sync_transactions(uid: str, access_token: str, account_hash: str) -> dict:
     # -- Step 3: deduplicate -------------------------------------------------
     incoming_ids = [str(txn["activityId"]) for txn in raw_txns if "activityId" in txn]
     existing_ids = firestore_db.get_existing_activity_ids(
-        uid, account_hash, incoming_ids
+        uid, account_number, incoming_ids
     )
 
     new_txns = [
@@ -146,7 +146,7 @@ def sync_transactions(uid: str, access_token: str, account_hash: str) -> dict:
 
     # -- Step 4: persist to Firestore ----------------------------------------
     if new_txns:
-        firestore_db.save_transactions(uid, account_hash, new_txns)
+        firestore_db.save_transactions(uid, account_number, new_txns)
 
     return {
         "new_count": len(new_txns),

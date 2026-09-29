@@ -21,13 +21,11 @@ export function formatNumber(val, decimals = 2) {
 export function isOption(symbol) {
     if (!symbol) return false;
     const s = symbol.trim();
+    const upper = s.toUpperCase();
+    if (upper.includes('MARGIN') || upper.includes('INTEREST') || upper === 'CURRENCY_USD') {
+        return false;
+    }
     return s.length > 6 || (s.includes(' ') && s.length > 4) || /\d{6}[CP]\d+/.test(s);
-}
-
-export function isCallOption(symbol) {
-    if (!isOption(symbol)) return false;
-    const clean = symbol.replace(/\s+/g, '');
-    return /[0-9]{6}C[0-9]{8}/.test(clean);
 }
 
 export function isPutOption(symbol) {
@@ -40,6 +38,11 @@ export function baseUnderlying(symbol) {
     if (!symbol) return '';
     const s = symbol.trim();
     if (!isOption(s)) return s;
+    if (s.includes(' ')) {
+        return s.split(/\s+/)[0];
+    }
+    const occMatch = s.match(/^([A-Za-z]+)\d{6}[CP]\d+/);
+    if (occMatch) return occMatch[1];
     return s.slice(0, 6).trimEnd();
 }
 

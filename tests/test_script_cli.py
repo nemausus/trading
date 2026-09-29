@@ -12,11 +12,11 @@ import script
 class TestScriptCLI(unittest.TestCase):
 
     @patch('script.constants.get_all_account_hashes')
+    @patch('script.constants.resolve_account_hash')
     @patch('script.constants.get_account_hash')
-    def test_resolve_account_hashes(self, mock_get_hash, mock_sec, mock_pri, mock_all):
+    def test_resolve_account_hashes(self, mock_get_hash, mock_resolve_hash, mock_all):
         mock_all.return_value = ['hash1', 'hash2']
-        mock_pri.return_value = 'hash_primary'
-        mock_sec.return_value = 'hash_secondary'
+        mock_resolve_hash.side_effect = lambda x: 'hash_primary' if x in ('primary', 'ind') else ('hash_secondary' if x in ('secondary', 'ira') else None)
         mock_get_hash.return_value = 'hash_suffix'
 
         self.assertEqual(script.resolve_account_hashes('all'), ['hash1', 'hash2'])
@@ -71,12 +71,20 @@ class TestScriptCLI(unittest.TestCase):
         with patch('sys.stdout'):
             script.handle_realized_command(
                 uid='uid1',
-                account_hashes=['hash1'],
+                account_numbers=['hash1'],
                 limit=10,
                 symbol_filter='NVDA',
                 output_json=False
             )
-        mock_get_realized.assert_called_once_with('uid1', ['hash1'], limit=100)
+        mock_get_realized.assert_called_once_with(
+            uid='uid1',
+            account_numbers=['hash1'],
+            limit=10,
+            from_date=None,
+            to_date=None,
+            trade_type=None,
+            symbol='NVDA',
+        )
 
     def test_is_option_symbol(self):
         self.assertTrue(script._is_option_symbol('NVDA  260821C00210000'))
@@ -268,7 +276,7 @@ class TestScriptCLI(unittest.TestCase):
         )
         mock_execute.assert_called_once_with(
             access_token='valid_token',
-            account='hash123',
+            account_number='acc1',
             order_payload=mock_build.return_value,
             preview=True,
         )
@@ -290,7 +298,7 @@ class TestScriptCLI(unittest.TestCase):
             )
         mock_execute.assert_called_once_with(
             access_token='valid_token',
-            account='hash123',
+            account_number='acc1',
             order_payload=mock_build.return_value,
             preview=False,
         )

@@ -246,26 +246,26 @@ def calculate_realized_pl(txns: list[dict]) -> list[dict]:
     return result
 
 
-def process_account_realized_pl(uid: str, account_hash: str) -> int:
+def process_account_realized_pl(uid: str, account_number: str) -> int:
     """Fetch unprocessed raw transactions for an account, calculate realized P/L,
     save realized records to Firestore, and mark matched transactions processed.
 
     Args:
         uid: User ID.
-        account_hash: Schwab account hash.
+        account_number: Schwab account number.
 
     Returns:
         Number of realized P/L records saved.
     """
     import firestore_db
-    txns = firestore_db.get_unprocessed_transactions(uid, account_hash)
+    txns = firestore_db.get_unprocessed_transactions(uid, account_number)
     if not txns:
         return 0
     realized_records, processed_ids = calculate_realized_pl_with_status(txns)
     if realized_records:
-        firestore_db.save_realized_pl_transactions(uid, account_hash, realized_records)
+        firestore_db.save_realized_pl_transactions(uid, account_number, realized_records)
     if processed_ids:
-        firestore_db.mark_transactions_processed(uid, account_hash, processed_ids)
+        firestore_db.mark_transactions_processed(uid, account_number, processed_ids)
     return len(realized_records)
 
 

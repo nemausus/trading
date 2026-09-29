@@ -8,9 +8,14 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 import orders
+import constants
 
 
 class TestOrders(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        constants.init_accounts()
 
     def test_format_price(self):
         self.assertEqual(orders.format_price(2.5), "2.50")
@@ -92,7 +97,7 @@ class TestOrders(unittest.TestCase):
             orders.build_single_order(symbol="AAPL", quantity=1, instruction="BUY", order_type="LIMIT")
 
     @patch("orders.schwab_api.place_order")
-    @patch("orders.resolve_account_hash", return_value="HASH_TEST")
+    @patch('orders.get_account_hash', return_value='HASH_TEST')
     def test_place_order_service(self, mock_resolve, mock_api_place):
         mock_api_place.return_value = {"success": True, "orderId": 12345}
 
@@ -104,7 +109,7 @@ class TestOrders(unittest.TestCase):
         )
         res = orders.place_order(
             access_token="token_abc",
-            account="ind",
+            account_number=constants.get_all_account_numbers()[0],
             order_payload=payload,
         )
 
@@ -117,7 +122,7 @@ class TestOrders(unittest.TestCase):
         self.assertEqual(args[2]["orderLegCollection"][0]["instruction"], "SELL_TO_OPEN")
 
     @patch("orders.schwab_api.preview_order")
-    @patch("orders.resolve_account_hash", return_value="HASH_TEST")
+    @patch('orders.get_account_hash', return_value='HASH_TEST')
     def test_preview_order_service(self, mock_resolve, mock_api_preview):
         mock_api_preview.return_value = {"orderValidationResult": "SUCCESS"}
 
@@ -129,7 +134,7 @@ class TestOrders(unittest.TestCase):
         )
         res = orders.preview_order(
             access_token="token_abc",
-            account="ira",
+            account_number=constants.get_all_account_numbers()[1],
             order_payload=payload,
         )
 
@@ -204,12 +209,12 @@ class TestOrderRoute(unittest.TestCase):
     @patch('app.auth.verify_id_token', return_value={'uid': 'test_user'})
     @patch('app.schwab_auth.refresh_user_tokens_if_needed', return_value='fake_schwab_token')
     @patch('orders.schwab_api.place_order')
-    @patch('orders.resolve_account_hash', return_value='HASH_MOCK')
+    @patch('orders.get_account_hash', return_value='HASH_MOCK')
     def test_post_order_route_success(self, mock_resolve, mock_api_place, mock_token, mock_auth):
         mock_api_place.return_value = {'success': True, 'orderId': 998877, 'location': '/orders/998877'}
 
         payload = {
-            'account': 'ind',
+            'account_number': constants.get_all_account_numbers()[0],
             'symbol': 'AAPL  260821C00205000',
             'quantity': 1,
             'instruction': 'BTC',
@@ -228,12 +233,12 @@ class TestOrderRoute(unittest.TestCase):
     @patch('app.auth.verify_id_token', return_value={'uid': 'test_user'})
     @patch('app.schwab_auth.refresh_user_tokens_if_needed', return_value='fake_schwab_token')
     @patch('orders.schwab_api.preview_order')
-    @patch('orders.resolve_account_hash', return_value='HASH_MOCK')
+    @patch('orders.get_account_hash', return_value='HASH_MOCK')
     def test_post_order_preview_route_success(self, mock_resolve, mock_api_preview, mock_token, mock_auth):
         mock_api_preview.return_value = {'orderValidationResult': 'SUCCESS', 'cost': 150.0}
 
         payload = {
-            'account': 'ira',
+            'account_number': constants.get_all_account_numbers()[1],
             'symbol': 'NVDA',
             'quantity': 10,
             'instruction': 'BUY',
@@ -270,19 +275,19 @@ class TestOrderRoute(unittest.TestCase):
     @patch('app.auth.verify_id_token', return_value={'uid': 'test_user'})
     @patch('app.schwab_auth.refresh_user_tokens_if_needed', return_value='fake_schwab_token')
     @patch('orders.schwab_api.place_order')
-    @patch('orders.resolve_account_hash', return_value='HASH_MOCK')
+    @patch('orders.get_account_hash', return_value='HASH_MOCK')
     def test_post_roll_order_route_success(self, mock_resolve, mock_api_place, mock_token, mock_auth):
         mock_api_place.return_value = {'success': True, 'orderId': 554433, 'location': '/orders/554433'}
 
         payload = {
-            'account': 'ind',
+            'account_number': constants.get_all_account_numbers()[0],
             'roll': True,
             'close_symbol': 'AAPL  260417C00200000',
             'open_symbol': 'AAPL  260515C00205000',
             'quantity': 1,
             'close_instruction': 'BTC',
             'open_instruction': 'STO',
-            'orderType': 'NET_CREDIT',
+            'order_type': 'NET_CREDIT',
             'price': 0.35,
         }
         res = self.client.post(

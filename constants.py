@@ -18,19 +18,26 @@ SCHWAB_TZ: datetime.timezone = datetime.timezone(
     -datetime.timedelta(hours=7)
 )
 
+
+accounts: dict[str, Account] = {}
+
 class Account:
-    def __init__(self, name, env_var: str) -> None:
+    def __init__(self, name: str) -> None:
         self.name = name
-        self.env_var = env_var
-        info = os.environ.get(env_var, '').split(',')
+        info = os.environ.get(name, '').split(',')
         assert len(info) == 2
         self.number = info[0]
         self.hash = info[1]
 
 
-ind_account = Account('ind', 'IND_ACCOUNT')
-ira_account = Account('ira', 'IRA_ACCOUNT')
-accounts = {ind_account.name: ind_account, ira_account.name: ira_account}
+def init_accounts() -> None:
+    """Initialize accounts from environment variables once at startup."""
+    global accounts
+    if accounts:
+        return
+    ind = Account('IND_ACCOUNT')
+    ira = Account('IRA_ACCOUNT')
+    accounts = {ind.name: ind, ira.name: ira}
 
 
 def get_account_hash(account_number: str) -> str:
@@ -49,3 +56,22 @@ def get_account_number_for_hash(account_hash: str) -> str:
 
 def get_all_account_hashes() -> list[str]:
     return [acc.hash for acc in accounts.values()]
+
+
+def get_all_account_numbers() -> list[str]:
+    return [acc.number for acc in accounts.values()]
+
+
+def resolve_account_hash(account_param: str | None) -> list[str]:
+    if not account_param or account_param.strip().upper() == 'ALL':
+        return get_all_account_hashes()
+    val = account_param.strip()
+    if val in accounts:
+        return [accounts[val].hash]
+    return [get_account_hash(val)]
+
+
+def resolve_account_number(account_param: str | None) -> list[str]:
+    if not account_param or account_param.strip().upper() == 'ALL':
+        return get_all_account_numbers()
+    return [account_param.strip()]

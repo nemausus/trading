@@ -257,6 +257,8 @@ export async function fetchSPXBoxes() {
 // --- TRANSACTIONS ---
 // =====================================================================================
 
+export let allTransactions = [];
+
 export async function fetchTransactions() {
     const user = auth.currentUser;
     if (!user) return;
@@ -265,15 +267,66 @@ export async function fetchTransactions() {
     container.innerHTML = `<div class="no-data-msg"><p>Loading stored transactions...</p></div>`;
     setRefreshBtnLoading(true);
 
+    const symbolInput = document.getElementById('txn-symbol');
+    const accountSelect = document.getElementById('txn-account');
+    const typeSelect = document.getElementById('txn-type');
+    const fromDateInput = document.getElementById('txn-from-date');
+    const toDateInput = document.getElementById('txn-to-date');
+
+    const symbolVal = symbolInput ? symbolInput.value.trim().toUpperCase() : 'ALL';
+    const accountVal = accountSelect ? accountSelect.value : 'ALL';
+    const typeVal = typeSelect ? typeSelect.value : 'TRADE';
+    const fromDateVal = fromDateInput ? fromDateInput.value : '';
+    const toDateVal = toDateInput ? toDateInput.value : '';
+
+    const queryParams = new URLSearchParams();
+    if (symbolVal && symbolVal !== 'ALL') queryParams.set('symbol', symbolVal);
+    if (accountVal && accountVal !== 'ALL') queryParams.set('account', accountVal);
+    if (typeVal && typeVal !== 'ALL') queryParams.set('type', typeVal);
+    if (fromDateVal) queryParams.set('from_date', fromDateVal);
+    if (toDateVal) queryParams.set('to_date', toDateVal);
+
     try {
         const token = await user.getIdToken();
-        const response = await fetch('/api/schwab/transactions', {
+        const url = `/api/schwab/transactions?${queryParams.toString()}`;
+        const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
 
         if (response.ok) {
-            renderTransactions(data.transactions || []);
+            allTransactions = data.transactions || [];
+
+            // Populate account dropdown options dynamically from returned accounts
+            if (accountSelect && data.accounts) {
+                const currentSelection = accountSelect.value || 'ALL';
+                const sortedAccounts = Array.from(new Set(data.accounts)).sort();
+                accountSelect.innerHTML = '<option value="ALL">ALL</option>' +
+                    sortedAccounts.map(acc => `<option value="${acc}">${acc}</option>`).join('');
+                if (sortedAccounts.includes(currentSelection)) {
+                    accountSelect.value = currentSelection;
+                } else {
+                    accountSelect.value = 'ALL';
+                }
+            }
+
+            // Populate any extra transaction types dynamically
+            if (typeSelect && allTransactions.length > 0) {
+                const currentTypeSelection = typeSelect.value || 'TRADE';
+                const baseTypes = ['ALL', 'TRADE', 'DIVIDEND_OR_INTEREST', 'RECEIVE_AND_DELIVER'];
+                const typesSet = new Set(allTransactions.map(t => t.type).filter(Boolean));
+                const extraTypes = Array.from(typesSet).filter(t => !baseTypes.includes(t)).sort();
+
+                typeSelect.innerHTML = '<option value="ALL">ALL</option>' +
+                    '<option value="TRADE">TRADE</option>' +
+                    '<option value="DIVIDEND_OR_INTEREST">DIVIDEND_OR_INTEREST</option>' +
+                    '<option value="RECEIVE_AND_DELIVER">RECEIVE_AND_DELIVER</option>' +
+                    extraTypes.map(t => `<option value="${t}">${t}</option>`).join('');
+
+                typeSelect.value = currentTypeSelection;
+            }
+
+            renderTransactions(allTransactions);
         } else {
             const errMsg = data.error || 'Failed to load transactions';
             container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
@@ -284,6 +337,10 @@ export async function fetchTransactions() {
     } finally {
         setRefreshBtnLoading(false);
     }
+}
+
+export async function applyTransactionFilters() {
+    await fetchTransactions();
 }
 
 export async function syncTransactions() {
@@ -360,25 +417,49 @@ export async function fetchRealized() {
     container.innerHTML = `<div class="no-data-msg"><p>Loading realized transactions...</p></div>`;
     setRefreshBtnLoading(true);
 
+    const symbolInput = document.getElementById('realized-symbol');
+    const fromDateInput = document.getElementById('realized-from-date');
+    const toDateInput = document.getElementById('realized-to-date');
+    const accountSelect = document.getElementById('realized-account');
+    const typeSelect = document.getElementById('realized-type');
+
+    // Default fromDate is 1st January of current year
+    const currentYear = new Date().getFullYear();
+    const defaultFromDate = `${currentYear}-01-01`;
+    if (fromDateInput && !fromDateInput.value) {
+        fromDateInput.value = defaultFromDate;
+    }
+
+    const symbolVal = symbolInput ? symbolInput.value.trim().toUpperCase() : 'ALL';
+    const fromDateVal = fromDateInput ? fromDateInput.value : defaultFromDate;
+    const toDateVal = toDateInput ? toDateInput.value : '';
+    const accountVal = accountSelect ? accountSelect.value : 'ALL';
+    const typeVal = typeSelect ? typeSelect.value : 'ALL';
+
+    const queryParams = new URLSearchParams();
+    if (symbolVal && symbolVal !== 'ALL') queryParams.set('symbol', symbolVal);
+    if (accountVal && accountVal !== 'ALL') queryParams.set('account', accountVal);
+    if (typeVal && typeVal !== 'ALL') queryParams.set('type', typeVal);
+    if (fromDateVal) queryParams.set('from_date', fromDateVal);
+    if (toDateVal) queryParams.set('to_date', toDateVal);
+
     try {
         const token = await user.getIdToken();
-        const response = await fetch('/api/schwab/realized', {
+        const url = `/api/schwab/realized?${queryParams.toString()}`;
+        const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
 
         if (response.ok) {
             allRealized = data.realized_transactions || [];
-            // Populate account dropdown options dynamically
-            const accountSelect = document.getElementById('realized-account');
-            if (accountSelect) {
-                const currentSelection = accountSelect.value || 'ALL';
-                const accountsSet = new Set(allRealized.map(r => r.accountNumber).filter(Boolean));
-                const sortedAccounts = Array.from(accountsSet).sort();
 
+            // Populate account dropdown options dynamically from returned accounts
+            if (accountSelect && data.accounts) {
+                const currentSelection = accountSelect.value || 'ALL';
+                const sortedAccounts = Array.from(new Set(data.accounts)).sort();
                 accountSelect.innerHTML = '<option value="ALL">ALL</option>' +
                     sortedAccounts.map(acc => `<option value="${acc}">${acc}</option>`).join('');
-
                 if (sortedAccounts.includes(currentSelection)) {
                     accountSelect.value = currentSelection;
                 } else {
@@ -386,24 +467,7 @@ export async function fetchRealized() {
                 }
             }
 
-            // Apply default filters
-            const symbolInput = document.getElementById('realized-symbol');
-            const minDateInput = document.getElementById('realized-min-date');
-            const typeSelect = document.getElementById('realized-type');
-
-            // Default minDate is 1st January of current year
-            const currentYear = new Date().getFullYear();
-            const defaultMinDate = `${currentYear}-01-01`;
-            if (minDateInput && !minDateInput.value) {
-                minDateInput.value = defaultMinDate;
-            }
-
-            const symbolVal = symbolInput ? symbolInput.value.trim().toUpperCase() : 'ALL';
-            const minDateVal = minDateInput ? minDateInput.value : defaultMinDate;
-            const accountVal = accountSelect ? accountSelect.value : 'ALL';
-            const typeVal = typeSelect ? typeSelect.value : 'ALL';
-
-            applyRealizedFilters(symbolVal, minDateVal, accountVal, typeVal);
+            renderRealized(allRealized);
         } else {
             const errMsg = data.error || 'Failed to load realized transactions';
             container.innerHTML = `<div class="no-data-msg" style="color:var(--accent-red)"><p>Error: ${errMsg}</p></div>`;
@@ -416,30 +480,8 @@ export async function fetchRealized() {
     }
 }
 
-export function applyRealizedFilters(symbol, minDate, accountNum, tradeType) {
-    let filtered = allRealized;
-
-    // Filter by symbol if not "ALL" and not empty
-    if (symbol && symbol !== 'ALL') {
-        filtered = filtered.filter(r => r.symbol && r.symbol.toUpperCase().includes(symbol));
-    }
-
-    // Filter by min sell/close date
-    if (minDate) {
-        filtered = filtered.filter(r => r.sell_date && r.sell_date >= minDate);
-    }
-
-    // Filter by accountNumber if not "ALL" and not empty
-    if (accountNum && accountNum !== 'ALL') {
-        filtered = filtered.filter(r => String(r.accountNumber) === String(accountNum));
-    }
-
-    // Filter by tradeType if not "ALL" and not empty
-    if (tradeType && tradeType !== 'ALL') {
-        filtered = filtered.filter(r => r.trade_type === tradeType);
-    }
-
-    renderRealized(filtered);
+export async function applyRealizedFilters() {
+    await fetchRealized();
 }
 
 

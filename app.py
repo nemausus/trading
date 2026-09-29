@@ -16,7 +16,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 import firestore_db
-from constants import get_all_account_hashes
+from constants import get_all_account_numbers, resolve_account_number, init_accounts
 from schwab_api import SchwabAPIError
 from schwab_auth import SchwabAuthManager
 import portfolio
@@ -28,7 +28,7 @@ import roll_chain
 import orders
 import stocks
 
-
+init_accounts()
 schwab_auth = SchwabAuthManager()
 
 # app must be defined before Talisman/Limiter and before decorators that reference it.
@@ -336,15 +336,15 @@ def schwab_sync_transactions(decoded_token, access_token):
     uid = decoded_token['uid']
     try:
         results = []
-        for acc_hash in get_all_account_hashes():
-            result = transactions.sync_transactions(uid, access_token, acc_hash)
+        for acc_num in get_all_account_numbers():
+            result = transactions.sync_transactions(uid, access_token, acc_num)
             if 'error' in result:
                 app.logger.error(
                     "Transaction sync error for user %s: %s", uid, result['error']
                 )
                 return jsonify({'error': result['error']}), 502
             # Force calculate realized pl for this account, even if no new transactions.
-            realized.process_account_realized_pl(uid, acc_hash)
+            realized.process_account_realized_pl(uid, acc_num)
             results.append(result)
         return jsonify({'results': results})
     except SchwabAPIError as e:
@@ -360,11 +360,28 @@ def schwab_sync_transactions(decoded_token, access_token):
 @require_firebase_auth
 def schwab_get_transactions(decoded_token):
     uid = decoded_token['uid']
+    symbol = request.args.get('symbol', '').strip()
+    account_param = request.args.get('account', '').strip()
+    txn_type = request.args.get('type', 'TRADE').strip()
+    from_date = request.args.get('from_date', '').strip() or None
+    to_date = request.args.get('to_date', '').strip() or None
+    limit = _get_limit(100, 1000)
+
     try:
-        account_hashes = get_all_account_hashes()
-        txns = firestore_db.get_transactions_for_accounts(uid, account_hashes, _get_limit(100, 100))
+        account_numbers = resolve_account_number(account_param)
+
+        txns = firestore_db.get_transactions_for_accounts(
+            uid, account_numbers, limit,
+            from_date=from_date,
+            to_date=to_date,
+            txn_type=txn_type,
+            symbol=symbol,
+        )
         _strip_internal_fields(txns, 'account_hash', 'accountHash', 'processed', 'remaining_amount')
-        return jsonify({'transactions': txns})
+        return jsonify({
+            'transactions': txns,
+            'accounts': get_all_account_numbers(),
+        })
     except Exception as e:
         app.logger.error("Error reading transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to read transactions'}), 500
@@ -375,15 +392,28 @@ def schwab_get_transactions(decoded_token):
 @require_firebase_auth
 def schwab_get_realized(decoded_token):
     uid = decoded_token['uid']
+    symbol = request.args.get('symbol', '').strip()
+    account_param = request.args.get('account', '').strip()
+    trade_type = request.args.get('type', request.args.get('trade_type', '')).strip()
+    from_date = request.args.get('from_date', '').strip() or None
+    to_date = request.args.get('to_date', '').strip() or None
+    limit = _get_limit(1000, 1000)
+
     try:
-        account_hashes = get_all_account_hashes()
-        records = firestore_db.get_realized_pl_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
-        if not records:
-            for acc_hash in account_hashes:
-                realized.process_account_realized_pl(uid, acc_hash)
-            records = firestore_db.get_realized_pl_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
+        account_numbers = resolve_account_number(account_param)
+
+        records = firestore_db.get_realized_pl_for_accounts(
+            uid, account_numbers, limit,
+            from_date=from_date,
+            to_date=to_date,
+            trade_type=trade_type,
+            symbol=symbol,
+        )
         _strip_internal_fields(records, 'account_hash', 'accountHash', 'created_at', 'id')
-        return jsonify({'realized_transactions': records})
+        return jsonify({
+            'realized_transactions': records,
+            'accounts': get_all_account_numbers(),
+        })
     except Exception as e:
         app.logger.error("Error reading realized transactions for user %s: %s", uid, e)
         return jsonify({'error': 'Failed to read transactions'}), 500
@@ -399,8 +429,8 @@ def schwab_get_roll_chain(decoded_token):
         return jsonify({'error': 'Parameter symbol is required'}), 400
 
     try:
-        account_hashes = get_all_account_hashes()
-        txns = firestore_db.get_transactions_for_accounts(uid, account_hashes, _get_limit(1000, 1000))
+        account_numbers = get_all_account_numbers()
+        txns = firestore_db.get_transactions_for_accounts(uid, account_numbers, _get_limit(1000, 1000))
         chain_data = roll_chain.build_roll_chain(txns, symbol)
         return jsonify({'roll_chain': chain_data})
     except Exception as e:
@@ -419,7 +449,7 @@ def schwab_place_order(decoded_token, access_token):
     if not data or not isinstance(data, dict):
         return jsonify({'error': 'Request body must be a valid JSON object.'}), 400
 
-    account = data.get('account')
+    account_number = data.get('account_number') or data.get('account')
     preview = bool(data.get('preview', False))
 
     try:
@@ -430,10 +460,10 @@ def schwab_place_order(decoded_token, access_token):
                 close_symbol=data.get('close_symbol') or data.get('symbol'),
                 open_symbol=data.get('open_symbol') or data.get('target_symbol'),
                 quantity=data.get('quantity'),
-                close_instruction=data.get('closeInstruction') or 'BUY_TO_CLOSE',
-                open_instruction=data.get('openInstruction') or 'SELL_TO_OPEN',
+                close_instruction=data.get('close_instruction') or 'BUY_TO_CLOSE',
+                open_instruction=data.get('open_instruction') or 'SELL_TO_OPEN',
                 price=data.get('price'),
-                order_type=data.get('orderType') or 'NET_CREDIT',
+                order_type=data.get('order_type') or 'NET_CREDIT',
                 duration=data.get('duration') or 'GOOD_TILL_CANCEL',
                 session=data.get('session') or 'NORMAL',
             )
@@ -443,7 +473,7 @@ def schwab_place_order(decoded_token, access_token):
                 quantity=data.get('quantity'),
                 instruction=data.get('instruction'),
                 price=data.get('price'),
-                order_type=data.get('orderType') or 'LIMIT',
+                order_type=data.get('order_type') or 'LIMIT',
                 duration=data.get('duration') or 'GOOD_TILL_CANCEL',
                 session=data.get('session') or 'NORMAL',
             )
@@ -451,13 +481,13 @@ def schwab_place_order(decoded_token, access_token):
         if preview:
             result = orders.preview_order(
                 access_token=access_token,
-                account=account,
+                account_number=account_number,
                 order_payload=order_payload,
             )
         else:
             result = orders.place_order(
                 access_token=access_token,
-                account=account,
+                account_number=account_number,
                 order_payload=order_payload,
             )
 

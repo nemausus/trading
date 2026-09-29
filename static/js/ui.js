@@ -2,7 +2,7 @@ import {
     formatCurrency, formatPercent, formatNumber,
     baseUnderlying, sortPositionsGrouped, isOption,
     getPLFormatting, getPLPercentFormatting, getSymbolBadgeClass,
-    formatOptionSymbol, getTradeTypeBadgeClass, isCallOption, isPutOption,
+    formatOptionSymbol, getTradeTypeBadgeClass,
     escapeHtml
 } from './utils.js';
 
@@ -83,15 +83,6 @@ export function renderDashboard(data) {
     lastPositions = data.positions || [];
     lastOrders = data.orders || [];
     renderUnifiedAccounts(data.summaries || [], lastPositions, lastOrders);
-}
-
-export function renderSummaries(summaries) {
-    renderUnifiedAccounts(summaries, lastPositions, lastOrders);
-}
-
-export function renderPositions(positions) {
-    lastPositions = positions || [];
-    renderUnifiedAccounts([], lastPositions, lastOrders);
 }
 
 function parseActionItem(accNum, actionStr) {
@@ -766,8 +757,16 @@ export function renderTransactions(transactions) {
     const statsBar = document.getElementById('txn-stats-bar');
 
     if (!transactions || transactions.length === 0) {
-        container.innerHTML = _noDataHtml('No transactions stored yet. Click <strong>Sync</strong> to fetch from Schwab.');
-        if (statsBar) statsBar.style.display = 'none';
+        container.innerHTML = _noDataHtml('No transactions match the selected criteria.');
+        if (statsBar) {
+            const earliestEl = document.getElementById('txn-stat-earliest');
+            const latestEl = document.getElementById('txn-stat-latest');
+            const countEl = document.getElementById('txn-stat-count');
+            if (earliestEl) earliestEl.textContent = '—';
+            if (latestEl) latestEl.textContent = '—';
+            if (countEl) countEl.textContent = '0';
+            statsBar.style.display = 'flex';
+        }
         return;
     }
 
@@ -776,8 +775,10 @@ export function renderTransactions(transactions) {
         const times = transactions.map(t => t.time).filter(Boolean).sort();
         const earliestEl = document.getElementById('txn-stat-earliest');
         const latestEl = document.getElementById('txn-stat-latest');
-        if (earliestEl) earliestEl.textContent = _shortDate(times[0]);
-        if (latestEl) latestEl.textContent = _shortDate(times[times.length - 1]);
+        const countEl = document.getElementById('txn-stat-count');
+        if (earliestEl) earliestEl.textContent = times.length ? _shortDate(times[0]) : '—';
+        if (latestEl) latestEl.textContent = times.length ? _shortDate(times[times.length - 1]) : '—';
+        if (countEl) countEl.textContent = transactions.length;
         statsBar.style.display = 'flex';
     }
 
