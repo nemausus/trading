@@ -5,9 +5,7 @@ from option_symbol import base_symbol
 
 # Initialize Firebase Admin SDK if not already initialized
 if not firebase_admin._apps:
-    firebase_admin.initialize_app(options={
-        'projectId': 'covered-calls-ab5d1'
-    })
+    firebase_admin.initialize_app(options={"projectId": "covered-calls-ab5d1"})
 
 # Firestore batch write limit.
 _BATCH_SIZE = 500
@@ -16,7 +14,8 @@ _BATCH_SIZE = 500
 def _chunks(lst: list, n: int):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
-        yield lst[i:i + n]
+        yield lst[i : i + n]
+
 
 # Lazy singleton — the Firestore client is thread-safe and intended to be reused.
 _db = None
@@ -26,22 +25,20 @@ def get_db():
     """Returns the Firestore client, using the custom database ID if specified."""
     global _db
     if _db is None:
-        _db = firestore.client(database_id='covered-calls-db')
+        _db = firestore.client(database_id="covered-calls-db")
     return _db
 
 
 def save_schwab_auth_state(state: str, uid: str, expires_at: datetime.datetime) -> None:
     """Stores the OAuth state -> uid mapping with an expiration time."""
     db = get_db()
-    db.collection('schwab_auth_states').document(state).set({
-        'uid': uid,
-        'expires_at': expires_at
-    })
+    db.collection("schwab_auth_states").document(state).set({"uid": uid, "expires_at": expires_at})
+
 
 def consume_schwab_auth_state(state: str) -> dict | None:
     """Transactionally retrieves and deletes the OAuth state to prevent replay attacks."""
     db = get_db()
-    state_ref = db.collection('schwab_auth_states').document(state)
+    state_ref = db.collection("schwab_auth_states").document(state)
 
     @firestore.transactional
     def consume_state(transaction, doc_ref):
@@ -58,36 +55,43 @@ def consume_schwab_auth_state(state: str) -> dict | None:
 def save_user_schwab_credentials(uid: str, encrypted_data: str) -> None:
     """Saves the encrypted Schwab credentials to the user's document."""
     db = get_db()
-    user_ref = db.collection('users').document(uid)
-    user_ref.set({
-        'schwab_credentials': encrypted_data,
-        'schwab_connected': True,
-        'schwab_updated_at': firestore.SERVER_TIMESTAMP
-    }, merge=True)
+    user_ref = db.collection("users").document(uid)
+    user_ref.set(
+        {
+            "schwab_credentials": encrypted_data,
+            "schwab_connected": True,
+            "schwab_updated_at": firestore.SERVER_TIMESTAMP,
+        },
+        merge=True,
+    )
+
 
 def get_user_schwab_credentials(uid: str) -> str | None:
     """Retrieves the encrypted Schwab credentials for a user."""
     db = get_db()
-    user_doc = db.collection('users').document(uid).get()
+    user_doc = db.collection("users").document(uid).get()
     if not user_doc.exists:
         return None
-    return user_doc.to_dict().get('schwab_credentials')
+    return user_doc.to_dict().get("schwab_credentials")
 
 
 def delete_user_schwab_credentials(uid: str) -> None:
     """Deletes Schwab credentials and sets connected status to False."""
     db = get_db()
-    user_ref = db.collection('users').document(uid)
-    user_ref.update({
-        'schwab_credentials': firestore.DELETE_FIELD,
-        'schwab_connected': False,
-        'schwab_updated_at': firestore.SERVER_TIMESTAMP
-    })
+    user_ref = db.collection("users").document(uid)
+    user_ref.update(
+        {
+            "schwab_credentials": firestore.DELETE_FIELD,
+            "schwab_connected": False,
+            "schwab_updated_at": firestore.SERVER_TIMESTAMP,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Transaction helpers
 # ---------------------------------------------------------------------------
+
 
 def _account_subcollection(db, uid: str, account_number: str, name: str):
     """Returns a Firestore CollectionReference nested under a user's account."""
@@ -98,9 +102,9 @@ def _account_subcollection(db, uid: str, account_number: str, name: str):
     if not name:
         raise ValueError("No Collection Name provided")
     return (
-        db.collection('users')
+        db.collection("users")
         .document(uid)
-        .collection('accounts')
+        .collection("accounts")
         .document(account_number)
         .collection(name)
     )
@@ -108,17 +112,17 @@ def _account_subcollection(db, uid: str, account_number: str, name: str):
 
 def _txn_collection(db, uid: str, account_number: str):
     """Returns the Firestore CollectionReference for a user's transactions."""
-    return _account_subcollection(db, uid, account_number, 'transactions')
+    return _account_subcollection(db, uid, account_number, "transactions")
 
 
 def _matches_txn_symbol(txn: dict, symbol: str) -> bool:
-    if not symbol or symbol.strip().upper() == 'ALL':
+    if not symbol or symbol.strip().upper() == "ALL":
         return True
     target = symbol.strip().upper()
-    for item in txn.get('transferItems', []):
-        inst = item.get('instrument', {}) or {}
-        raw_sym = (inst.get('symbol') or '').strip().upper()
-        und_sym = (inst.get('underlyingSymbol') or '').strip().upper()
+    for item in txn.get("transferItems", []):
+        inst = item.get("instrument", {}) or {}
+        raw_sym = (inst.get("symbol") or "").strip().upper()
+        und_sym = (inst.get("underlyingSymbol") or "").strip().upper()
         if not und_sym and raw_sym:
             und_sym = base_symbol(raw_sym).strip().upper()
         if target in und_sym or target in raw_sym:
@@ -147,30 +151,34 @@ def get_transactions(
 
     # Push date range filter directly to Firestore query on time field
     if from_date:
-        query = query.where('time', '>=', from_date.strip())
+        query = query.where("time", ">=", from_date.strip())
     if to_date:
         to_bound = to_date.strip()
-        if 'T' not in to_bound:
+        if "T" not in to_bound:
             to_bound = f"{to_bound}T23:59:59.999999"
-        query = query.where('time', '<=', to_bound)
+        query = query.where("time", "<=", to_bound)
 
-    query = query.order_by('time', direction='DESCENDING')
+    query = query.order_by("time", direction="DESCENDING")
 
-    has_post_filter = bool((symbol and symbol.strip().upper() != 'ALL') or
-                           (txn_type and txn_type.strip().upper() != 'ALL'))
+    has_post_filter = bool(
+        (symbol and symbol.strip().upper() != "ALL")
+        or (txn_type and txn_type.strip().upper() != "ALL")
+    )
     fetch_limit = limit * 10 if has_post_filter else limit
 
     docs = query.limit(fetch_limit).stream()
     results = []
-    target_type = txn_type.strip().upper() if (txn_type and txn_type.strip().upper() != 'ALL') else None
+    target_type = (
+        txn_type.strip().upper() if (txn_type and txn_type.strip().upper() != "ALL") else None
+    )
 
     for doc in docs:
         data = doc.to_dict()
-        if 'activityId' not in data:
-            data['activityId'] = doc.id
-        data.pop('fetched_at', None)
+        if "activityId" not in data:
+            data["activityId"] = doc.id
+        data.pop("fetched_at", None)
 
-        if target_type and (data.get('type') or '').upper() != target_type:
+        if target_type and (data.get("type") or "").upper() != target_type:
             continue
 
         if symbol and not _matches_txn_symbol(data, symbol):
@@ -199,14 +207,18 @@ def get_transactions_for_accounts(
     """
     results = []
     for num in account_numbers:
-        results.extend(get_transactions(
-            uid, num, limit,
-            from_date=from_date,
-            to_date=to_date,
-            txn_type=txn_type,
-            symbol=symbol,
-        ))
-    results.sort(key=lambda x: x.get('time', ''), reverse=True)
+        results.extend(
+            get_transactions(
+                uid,
+                num,
+                limit,
+                from_date=from_date,
+                to_date=to_date,
+                txn_type=txn_type,
+                symbol=symbol,
+            )
+        )
+    results.sort(key=lambda x: x.get("time", ""), reverse=True)
     return results[:limit]
 
 
@@ -221,17 +233,16 @@ def get_unprocessed_transactions(
     """
     db = get_db()
     col = _txn_collection(db, uid, account_number)
-    docs = col.where('processed', '==', False).stream()
+    docs = col.where("processed", "==", False).stream()
     unprocessed = []
     for doc in docs:
         data = doc.to_dict()
-        if 'activityId' not in data:
-            data['activityId'] = doc.id
-        data.pop('fetched_at', None)
+        if "activityId" not in data:
+            data["activityId"] = doc.id
+        data.pop("fetched_at", None)
         unprocessed.append(data)
-    unprocessed.sort(key=lambda x: x.get('time', ''))
+    unprocessed.sort(key=lambda x: x.get("time", ""))
     return unprocessed[:limit]
-
 
 
 def get_latest_transaction_time(uid: str, account_number: str) -> str | None:
@@ -241,9 +252,9 @@ def get_latest_transaction_time(uid: str, account_number: str) -> str | None:
     """
     db = get_db()
     col = _txn_collection(db, uid, account_number)
-    docs = col.order_by('time', direction='DESCENDING').limit(1).stream()
+    docs = col.order_by("time", direction="DESCENDING").limit(1).stream()
     for doc in docs:
-        return doc.to_dict().get('time')
+        return doc.to_dict().get("time")
     return None
 
 
@@ -291,12 +302,12 @@ def save_transactions(
     for chunk in _chunks(docs, _BATCH_SIZE):
         batch = db.batch()
         for txn in chunk:
-            activity_id = str(txn['activityId'])
+            activity_id = str(txn["activityId"])
             doc_ref = col.document(activity_id)
             payload = dict(txn)
-            if 'processed' not in payload:
-                payload['processed'] = False
-            payload['fetched_at'] = firestore.SERVER_TIMESTAMP
+            if "processed" not in payload:
+                payload["processed"] = False
+            payload["fetched_at"] = firestore.SERVER_TIMESTAMP
             batch.set(doc_ref, payload)
         batch.commit()
 
@@ -305,9 +316,10 @@ def save_transactions(
 # Realized P/L helpers
 # ---------------------------------------------------------------------------
 
+
 def _realized_pl_collection(db, uid: str, account_number: str):
     """Returns the Firestore CollectionReference for a user's realized P/L records."""
-    return _account_subcollection(db, uid, account_number, 'realized_pl')
+    return _account_subcollection(db, uid, account_number, "realized_pl")
 
 
 def _categorize_realized_trade(doc: dict) -> str:
@@ -319,62 +331,62 @@ def _categorize_realized_trade(doc: dict) -> str:
     5) Put Long (bought put option to open and sold to close)
     Or 'Margin Interest' for interest charges.
     """
-    symbol = (doc.get('symbol') or '').strip()
+    symbol = (doc.get("symbol") or "").strip()
     if not symbol:
-        return 'Stock'
+        return "Stock"
 
     sym_upper = symbol.upper()
-    if sym_upper in ('MARGIN INTEREST', 'INTEREST', 'MARGIN'):
-        return 'Margin Interest'
+    if sym_upper in ("MARGIN INTEREST", "INTEREST", "MARGIN"):
+        return "Margin Interest"
 
     # Check for option symbol
     contract_type = None
     if len(symbol) >= 15:
         rest = symbol[6:].strip()
-        c_idx = rest.find('C')
-        p_idx = rest.find('P')
+        c_idx = rest.find("C")
+        p_idx = rest.find("P")
         if c_idx >= 6 and rest[:c_idx].isdigit():
-            contract_type = 'C'
+            contract_type = "C"
         elif p_idx >= 6 and rest[:p_idx].isdigit():
-            contract_type = 'P'
+            contract_type = "P"
 
     if not contract_type:
         parts = symbol.split()
-        if len(parts) == 4 and parts[3].upper() in ('C', 'P') and '/' in parts[1]:
+        if len(parts) == 4 and parts[3].upper() in ("C", "P") and "/" in parts[1]:
             contract_type = parts[3].upper()
 
     if not contract_type:
-        return 'Stock'
+        return "Stock"
 
-    sl = (doc.get('sl') or '').lower()
-    if sl == 'short':
-        return 'Call Short' if contract_type == 'C' else 'Put Short'
-    elif sl == 'long':
-        return 'Call Long' if contract_type == 'C' else 'Put Long'
+    sl = (doc.get("sl") or "").lower()
+    if sl == "short":
+        return "Call Short" if contract_type == "C" else "Put Short"
+    elif sl == "long":
+        return "Call Long" if contract_type == "C" else "Put Long"
 
     # Deduce from open price (buy_price), close price (sell_price), and P/L
-    buy_price = float(doc.get('buy_price') or 0.0)
-    sell_price = float(doc.get('sell_price') or 0.0)
-    pl = float(doc.get('P/L') or 0.0)
+    buy_price = float(doc.get("buy_price") or 0.0)
+    sell_price = float(doc.get("sell_price") or 0.0)
+    pl = float(doc.get("P/L") or 0.0)
 
     delta = sell_price - buy_price
     if delta > 0:
-        is_short = (pl < 0)
+        is_short = pl < 0
     elif delta < 0:
-        is_short = (pl > 0)
+        is_short = pl > 0
     else:
-        is_short = (pl >= 0)
+        is_short = pl >= 0
 
-    if contract_type == 'C':
-        return 'Call Short' if is_short else 'Call Long'
-    return 'Put Short' if is_short else 'Put Long'
+    if contract_type == "C":
+        return "Call Short" if is_short else "Call Long"
+    return "Put Short" if is_short else "Put Long"
 
 
 def _matches_realized_symbol(record: dict, symbol: str) -> bool:
-    if not symbol or symbol.strip().upper() == 'ALL':
+    if not symbol or symbol.strip().upper() == "ALL":
         return True
     target = symbol.strip().upper()
-    raw_sym = (record.get('symbol') or '').strip().upper()
+    raw_sym = (record.get("symbol") or "").strip().upper()
     if not raw_sym:
         return False
     und_sym = base_symbol(raw_sym).strip().upper()
@@ -402,25 +414,29 @@ def get_realized_pl_transactions(
 
     # Push date range filter directly to Firestore query on sell_date field
     if from_date:
-        query = query.where('sell_date', '>=', from_date.strip())
+        query = query.where("sell_date", ">=", from_date.strip())
     if to_date:
-        query = query.where('sell_date', '<=', to_date.strip())
+        query = query.where("sell_date", "<=", to_date.strip())
 
-    query = query.order_by('sell_date', direction='DESCENDING')
+    query = query.order_by("sell_date", direction="DESCENDING")
 
-    has_post_filter = bool((symbol and symbol.strip().upper() != 'ALL') or
-                           (trade_type and trade_type.strip().upper() != 'ALL'))
+    has_post_filter = bool(
+        (symbol and symbol.strip().upper() != "ALL")
+        or (trade_type and trade_type.strip().upper() != "ALL")
+    )
     fetch_limit = limit * 10 if has_post_filter else limit
 
     docs = query.limit(fetch_limit).stream()
     results = []
-    target_trade_type = trade_type.strip() if (trade_type and trade_type.strip().upper() != 'ALL') else None
+    target_trade_type = (
+        trade_type.strip() if (trade_type and trade_type.strip().upper() != "ALL") else None
+    )
 
     for doc in docs:
         data = doc.to_dict()
-        data.pop('created_at', None)
-        tt = data.get('trade_type') or _categorize_realized_trade(data)
-        data['trade_type'] = tt
+        data.pop("created_at", None)
+        tt = data.get("trade_type") or _categorize_realized_trade(data)
+        data["trade_type"] = tt
 
         if target_trade_type and tt.lower() != target_trade_type.lower():
             continue
@@ -451,14 +467,18 @@ def get_realized_pl_for_accounts(
     """
     results = []
     for num in account_numbers:
-        results.extend(get_realized_pl_transactions(
-            uid, num, limit,
-            from_date=from_date,
-            to_date=to_date,
-            trade_type=trade_type,
-            symbol=symbol,
-        ))
-    results.sort(key=lambda x: x.get('sell_date', ''), reverse=True)
+        results.extend(
+            get_realized_pl_transactions(
+                uid,
+                num,
+                limit,
+                from_date=from_date,
+                to_date=to_date,
+                trade_type=trade_type,
+                symbol=symbol,
+            )
+        )
+    results.sort(key=lambda x: x.get("sell_date", ""), reverse=True)
     return results[:limit]
 
 
@@ -481,14 +501,14 @@ def save_realized_pl_transactions(
     for chunk in _chunks(docs, _BATCH_SIZE):
         batch = db.batch()
         for idx, item in enumerate(chunk):
-            doc_id = item.get('id') or (
+            doc_id = item.get("id") or (
                 f"realized_{item.get('accountNumber', '')}_"
                 f"{item.get('symbol', '')}_{item.get('buy_date', '')}_"
                 f"{item.get('sell_date', '')}_{idx}"
             )
             doc_ref = col.document(str(doc_id))
             payload = dict(item)
-            payload['created_at'] = firestore.SERVER_TIMESTAMP
+            payload["created_at"] = firestore.SERVER_TIMESTAMP
             batch.set(doc_ref, payload, merge=True)
         batch.commit()
 
@@ -509,6 +529,5 @@ def mark_transactions_processed(
         batch = db.batch()
         for aid in chunk:
             doc_ref = col.document(str(aid))
-            batch.update(doc_ref, {'processed': True})
+            batch.update(doc_ref, {"processed": True})
         batch.commit()
-

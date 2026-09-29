@@ -52,6 +52,7 @@ def _normalize_to_seconds(iso_str: str) -> str:
 # Core Service Functions
 # ---------------------------------------------------------------------------
 
+
 def _fetch_transactions_raw(
     access_token: str,
     account_number: str,
@@ -115,7 +116,10 @@ def sync_transactions(uid: str, access_token: str, account_number: str) -> dict:
     to_date = _today_iso()
     logger.info(
         "Syncing transactions for uid=%s account=%s from=%s to=%s",
-        uid, account_number, from_date, to_date,
+        uid,
+        account_number,
+        from_date,
+        to_date,
     )
 
     # -- Step 2: fetch from Schwab -------------------------------------------
@@ -130,18 +134,19 @@ def sync_transactions(uid: str, access_token: str, account_number: str) -> dict:
 
     # -- Step 3: deduplicate -------------------------------------------------
     incoming_ids = [str(txn["activityId"]) for txn in raw_txns if "activityId" in txn]
-    existing_ids = firestore_db.get_existing_activity_ids(
-        uid, account_number, incoming_ids
-    )
+    existing_ids = firestore_db.get_existing_activity_ids(uid, account_number, incoming_ids)
 
     new_txns = [
-        txn for txn in raw_txns
+        txn
+        for txn in raw_txns
         if "activityId" in txn and str(txn["activityId"]) not in existing_ids
     ]
 
     logger.info(
         "Fetched %d txns, %d already stored, %d new to write.",
-        len(raw_txns), len(existing_ids), len(new_txns),
+        len(raw_txns),
+        len(existing_ids),
+        len(new_txns),
     )
 
     # -- Step 4: persist to Firestore ----------------------------------------

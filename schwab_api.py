@@ -20,7 +20,6 @@ import requests
 
 from constants import SCHWAB_REQUEST_TIMEOUT
 
-
 # ---------------------------------------------------------------------------
 # Base URLs
 # ---------------------------------------------------------------------------
@@ -32,6 +31,7 @@ SCHWAB_TRADER_BASE_URL = "https://api.schwabapi.com/trader/v1"
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
+
 
 class SchwabAPIError(Exception):
     """Raised when a Schwab API HTTP call fails.
@@ -49,6 +49,7 @@ class SchwabAPIError(Exception):
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _headers(access_token: str) -> dict:
     """Return standard Schwab Bearer auth headers for every API call."""
     return {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
@@ -57,7 +58,7 @@ def _headers(access_token: str) -> dict:
 def _save_response_dump(url: str, data: dict | list) -> None:
     """Save raw response JSON to a file in responses/ directory for debugging."""
     filename = "responses/" + url.replace("/", "_").replace(":", "_") + ".json"
-    with open(filename, 'w') as f:
+    with open(filename, "w") as f:
         f.write(str(datetime.now()))
         f.write("\n")
         json.dump(data, f, indent=2)
@@ -66,6 +67,7 @@ def _save_response_dump(url: str, data: dict | list) -> None:
 # ---------------------------------------------------------------------------
 # Market Data endpoints
 # ---------------------------------------------------------------------------
+
 
 def get_quotes(access_token: str, symbols: list[str]) -> dict:
     """Fetch real-time quotes for a list of symbols.
@@ -212,6 +214,7 @@ def get_price_history(
 # ---------------------------------------------------------------------------
 # Trader / Accounts endpoints
 # ---------------------------------------------------------------------------
+
 
 def get_accounts(access_token: str, *, fields: str = "positions") -> list:
     """Fetch all accounts for the authenticated user.
@@ -403,6 +406,7 @@ def preview_order(
 # HTTP transport (shared by all gateway functions above)
 # ---------------------------------------------------------------------------
 
+
 def schwab_request(
     method: str,
     url: str,
@@ -411,7 +415,7 @@ def schwab_request(
     data: dict | None = None,
     timeout: tuple[int, int] = SCHWAB_REQUEST_TIMEOUT,
     return_response: bool = False,
-    **kwargs
+    **kwargs,
 ) -> dict | list | requests.Response:
     """Make an HTTP request to the Schwab backend with unified logging.
 
@@ -423,13 +427,17 @@ def schwab_request(
 
     try:
         resp = requests.request(
-            method.upper(), url,
-            headers=headers, params=params, data=data,
-            timeout=timeout, **kwargs,
+            method.upper(),
+            url,
+            headers=headers,
+            params=params,
+            data=data,
+            timeout=timeout,
+            **kwargs,
         )
         resp.raise_for_status()
     except requests.RequestException as e:
-        resp = getattr(e, 'response', None)
+        resp = getattr(e, "response", None)
         raise SchwabAPIError(f"{method.upper()} {url} failed: {e}", response=resp) from e
 
     if return_response:

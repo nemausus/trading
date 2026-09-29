@@ -31,6 +31,7 @@ import orders
 
 constants.init_accounts()
 
+
 def resolve_uid(uid_arg: str | None) -> str:
     """Resolve Firebase user ID from arguments, environment, or Firestore auto-discovery.
 
@@ -46,13 +47,13 @@ def resolve_uid(uid_arg: str | None) -> str:
     if uid_arg:
         return uid_arg
 
-    env_uid = os.environ.get('DEFAULT_UID')
+    env_uid = os.environ.get("DEFAULT_UID")
     if env_uid:
         return env_uid
 
     try:
         db = firestore_db.get_db()
-        users = list(db.collection('users').limit(1).stream())
+        users = list(db.collection("users").limit(1).stream())
         if users:
             return users[0].id
     except Exception as err:
@@ -70,7 +71,7 @@ def resolve_account_hashes(account_input: str | None) -> list[str]:
     Returns:
         List of matching account hash strings.
     """
-    if not account_input or account_input.lower() == 'all':
+    if not account_input or account_input.lower() == "all":
         return constants.get_all_account_hashes()
 
     acc_hash = constants.resolve_account_hash(account_input)
@@ -104,7 +105,7 @@ def handle_txns_command(
     output_json: bool,
     from_date: str | None = None,
     to_date: str | None = None,
-    txn_type: str | None = 'TRADE',
+    txn_type: str | None = "TRADE",
 ) -> None:
     """Fetch and display raw transactions for specified account(s)."""
     if unprocessed_only:
@@ -112,14 +113,14 @@ def handle_txns_command(
         txns = []
         for acc_num in account_numbers:
             txns.extend(firestore_db.get_unprocessed_transactions(uid, acc_num, limit=fetch_limit))
-        txns.sort(key=lambda x: x.get('time', ''), reverse=True)
-        if txn_type and txn_type.upper() != 'ALL':
-            txns = [t for t in txns if (t.get('type') or '').upper() == txn_type.upper()]
+        txns.sort(key=lambda x: x.get("time", ""), reverse=True)
+        if txn_type and txn_type.upper() != "ALL":
+            txns = [t for t in txns if (t.get("type") or "").upper() == txn_type.upper()]
         if from_date:
-            txns = [t for t in txns if (t.get('time') or '')[:10] >= from_date]
+            txns = [t for t in txns if (t.get("time") or "")[:10] >= from_date]
         if to_date:
-            txns = [t for t in txns if (t.get('time') or '')[:10] <= to_date]
-        if symbol_filter and symbol_filter.upper() != 'ALL':
+            txns = [t for t in txns if (t.get("time") or "")[:10] <= to_date]
+        if symbol_filter and symbol_filter.upper() != "ALL":
             txns = [t for t in txns if firestore_db._matches_txn_symbol(t, symbol_filter)]
         txns = txns[:limit]
     else:
@@ -147,25 +148,29 @@ def handle_txns_command(
     print("-" * len(header))
 
     for t in txns:
-        act_id = str(t.get('activityId', 'N/A'))[:15]
-        time_str = str(t.get('time', ''))[:10]
-        acc_num = t.get('accountNumber', 'N/A')
-        processed = str(t.get('processed', False))
+        act_id = str(t.get("activityId", "N/A"))[:15]
+        time_str = str(t.get("time", ""))[:10]
+        acc_num = t.get("accountNumber", "N/A")
+        processed = str(t.get("processed", False))
 
-        transfer_items = t.get('transferItems', [])
+        transfer_items = t.get("transferItems", [])
         if transfer_items:
             for item in transfer_items:
-                inst = item.get('instrument', {}) or {}
-                sym = inst.get('symbol', 'N/A')[:24]
-                pos_eff = item.get('positionEffect') or 'N/A'
-                amount = item.get('amount', 0.0)
-                price = item.get('price', 0.0)
-                net_amt = t.get('netAmount', 0.0)
-                print(f"{act_id:<15} {time_str:<12} {acc_num:<8} {sym:<24} {pos_eff:<10} {amount:>8.2f} {price:>10.2f} {net_amt:>12.2f} {processed:<10}")
+                inst = item.get("instrument", {}) or {}
+                sym = inst.get("symbol", "N/A")[:24]
+                pos_eff = item.get("positionEffect") or "N/A"
+                amount = item.get("amount", 0.0)
+                price = item.get("price", 0.0)
+                net_amt = t.get("netAmount", 0.0)
+                print(
+                    f"{act_id:<15} {time_str:<12} {acc_num:<8} {sym:<24} {pos_eff:<10} {amount:>8.2f} {price:>10.2f} {net_amt:>12.2f} {processed:<10}"
+                )
         else:
-            net_amt = t.get('netAmount', 0.0)
-            txn_type = t.get('type', 'N/A')[:24]
-            print(f"{act_id:<15} {time_str:<12} {acc_num:<8} {txn_type:<24} {'N/A':<10} {'0.00':>8} {'0.00':>10} {net_amt:>12.2f} {processed:<10}")
+            net_amt = t.get("netAmount", 0.0)
+            txn_type = t.get("type", "N/A")[:24]
+            print(
+                f"{act_id:<15} {time_str:<12} {acc_num:<8} {txn_type:<24} {'N/A':<10} {'0.00':>8} {'0.00':>10} {net_amt:>12.2f} {processed:<10}"
+            )
 
     print(f"\nTotal: {len(txns)} transaction(s) listed.")
 
@@ -205,19 +210,21 @@ def handle_realized_command(
 
     total_pl = 0.0
     for r in records:
-        rec_id = str(r.get('id', 'N/A'))[:30]
-        acc_num = r.get('accountNumber', 'N/A')
-        trade_type = r.get('trade_type', 'N/A')[:12]
-        sym = r.get('symbol', 'N/A')[:24]
-        buy_date = r.get('buy_date', '')[:10]
-        buy_price = r.get('buy_price', 0.0)
-        sell_date = r.get('sell_date', '')[:10]
-        sell_price = r.get('sell_price', 0.0)
-        amount = r.get('amount', 0.0)
-        pl = r.get('P/L', 0.0)
+        rec_id = str(r.get("id", "N/A"))[:30]
+        acc_num = r.get("accountNumber", "N/A")
+        trade_type = r.get("trade_type", "N/A")[:12]
+        sym = r.get("symbol", "N/A")[:24]
+        buy_date = r.get("buy_date", "")[:10]
+        buy_price = r.get("buy_price", 0.0)
+        sell_date = r.get("sell_date", "")[:10]
+        sell_price = r.get("sell_price", 0.0)
+        amount = r.get("amount", 0.0)
+        pl = r.get("P/L", 0.0)
         total_pl += pl
 
-        print(f"{rec_id:<30} {acc_num:<8} {trade_type:<12} {sym:<24} {buy_date:<10} {buy_price:>10.2f} {sell_date:<10} {sell_price:>10.2f} {amount:>8.2f} {pl:>12.2f}")
+        print(
+            f"{rec_id:<30} {acc_num:<8} {trade_type:<12} {sym:<24} {buy_date:<10} {buy_price:>10.2f} {sell_date:<10} {sell_price:>10.2f} {amount:>8.2f} {pl:>12.2f}"
+        )
 
     print(f"\nTotal Realized P/L: ${total_pl:,.2f} across {len(records)} record(s).")
 
@@ -244,7 +251,7 @@ def handle_migrate_accounts_command(
         dry_run: If True, preview what would be copied without writing.
     """
     db = firestore_db.get_db()
-    subcollections = ('transactions', 'realized_pl')
+    subcollections = ("transactions", "realized_pl")
     mode_label = "[DRY RUN]" if dry_run else "[LIVE]"
     print(f"=== {mode_label} Migrating Account Documents (hash -> number) ===")
     print(f"User: {uid}")
@@ -259,16 +266,16 @@ def handle_migrate_accounts_command(
 
         for sub_name in subcollections:
             src_col = (
-                db.collection('users')
+                db.collection("users")
                 .document(uid)
-                .collection('accounts')
+                .collection("accounts")
                 .document(acc_hash)
                 .collection(sub_name)
             )
             dst_col = (
-                db.collection('users')
+                db.collection("users")
                 .document(uid)
-                .collection('accounts')
+                .collection("accounts")
                 .document(acc_num)
                 .collection(sub_name)
             )
@@ -289,7 +296,9 @@ def handle_migrate_accounts_command(
             total_skipped += skipped
 
             if skipped:
-                print(f"  {sub_name}: {skipped} document(s) already exist in destination, skipping.")
+                print(
+                    f"  {sub_name}: {skipped} document(s) already exist in destination, skipping."
+                )
 
             if not to_copy:
                 print(f"  {sub_name}: nothing new to copy.")
@@ -301,7 +310,7 @@ def handle_migrate_accounts_command(
                 batch_size = 500
                 for i in range(0, len(to_copy), batch_size):
                     batch = db.batch()
-                    chunk = to_copy[i:i + batch_size]
+                    chunk = to_copy[i : i + batch_size]
                     for doc_id, doc_data in chunk:
                         batch.set(dst_col.document(doc_id), doc_data)
                     batch.commit()
@@ -333,14 +342,19 @@ def _is_exception_record(doc_id: str, doc_data: dict) -> bool:
     Returns:
         True if this record is the protected META exception, False otherwise.
     """
-    if '2025-12-31' in doc_id and '2026-01-23' in doc_id and '655' in doc_id:
+    if "2025-12-31" in doc_id and "2026-01-23" in doc_id and "655" in doc_id:
         return True
 
-    buy_date = str(doc_data.get('buy_date') or '')[:10]
-    sell_date = str(doc_data.get('sell_date') or doc_data.get('close_date') or '')[:10]
-    symbol = str(doc_data.get('symbol') or '')
+    buy_date = str(doc_data.get("buy_date") or "")[:10]
+    sell_date = str(doc_data.get("sell_date") or doc_data.get("close_date") or "")[:10]
+    symbol = str(doc_data.get("symbol") or "")
 
-    if buy_date == '2025-12-31' and sell_date == '2026-01-23' and 'META' in symbol and '655' in symbol:
+    if (
+        buy_date == "2025-12-31"
+        and sell_date == "2026-01-23"
+        and "META" in symbol
+        and "655" in symbol
+    ):
         return True
 
     return False
@@ -349,8 +363,8 @@ def _is_exception_record(doc_id: str, doc_data: dict) -> bool:
 def handle_fix_realized_command(
     uid: str,
     account_hashes: list[str],
-    start_date: str = '2026-01-01',
-    end_date: str = '2026-08-18',
+    start_date: str = "2026-01-01",
+    end_date: str = "2026-08-18",
     dry_run: bool = False,
 ) -> None:
     """Fix realized transactions for options by swapping buy_price and sell_price (close_price).
@@ -384,8 +398,8 @@ def handle_fix_realized_command(
         for doc in docs:
             d = doc.to_dict()
             doc_id = doc.id
-            close_date = str(d.get('sell_date') or d.get('close_date') or '')[:10]
-            symbol = d.get('symbol', '')
+            close_date = str(d.get("sell_date") or d.get("close_date") or "")[:10]
+            symbol = d.get("symbol", "")
 
             if not (start_date <= close_date <= end_date):
                 total_skipped_date += 1
@@ -396,23 +410,37 @@ def handle_fix_realized_command(
                 continue
 
             if _is_exception_record(doc_id, d):
-                print(f"  [PROTECTED EXCEPTION] Skipping {doc_id} ({symbol}, close date: {close_date})")
+                print(
+                    f"  [PROTECTED EXCEPTION] Skipping {doc_id} ({symbol}, close date: {close_date})"
+                )
                 total_skipped_exception += 1
                 continue
 
             total_candidates += 1
-            old_buy = float(d.get('buy_price') or 0.0)
-            old_close = float(d.get('sell_price') or 0.0)
+            old_buy = float(d.get("buy_price") or 0.0)
+            old_close = float(d.get("sell_price") or 0.0)
 
             new_buy = old_close
             new_close = old_buy
 
             payload = {
-                'buy_price': new_buy,
-                'sell_price': new_close,
+                "buy_price": new_buy,
+                "sell_price": new_close,
             }
 
-            updates.append((doc.reference, doc_id, symbol, close_date, old_buy, new_buy, old_close, new_close, payload))
+            updates.append(
+                (
+                    doc.reference,
+                    doc_id,
+                    symbol,
+                    close_date,
+                    old_buy,
+                    new_buy,
+                    old_close,
+                    new_close,
+                    payload,
+                )
+            )
 
         if updates:
             header = f"{'Doc ID':<58} {'Symbol':<24} {'Close Date':<12} {'Buy Price (Old -> New)':<26} {'Close Price (Old -> New)':<26}"
@@ -428,14 +456,18 @@ def handle_fix_realized_command(
                 batch_size = 500
                 for i in range(0, len(updates), batch_size):
                     batch = db.batch()
-                    chunk = updates[i:i + batch_size]
+                    chunk = updates[i : i + batch_size]
                     for doc_ref, _, _, _, _, _, _, _, payload in chunk:
                         batch.set(doc_ref, payload, merge=True)
                     batch.commit()
                 total_updated += len(updates)
-                print(f"\nSuccessfully committed {len(updates)} record update(s) to Firestore for account {acc_num}.")
+                print(
+                    f"\nSuccessfully committed {len(updates)} record update(s) to Firestore for account {acc_num}."
+                )
             else:
-                print(f"\n[DRY RUN] Would update {len(updates)} record(s) for account {acc_num}. No writes performed.")
+                print(
+                    f"\n[DRY RUN] Would update {len(updates)} record(s) for account {acc_num}. No writes performed."
+                )
         else:
             print(f"Account {acc_num}: No option records matched criteria for update.")
 
@@ -455,15 +487,18 @@ def handle_order_command(
     instruction: str,
     price: str | None,
     preview: bool,
-    order_type: str = 'LIMIT',
-    duration: str = 'GTC',
-    session: str = 'NORMAL',
+    order_type: str = "LIMIT",
+    duration: str = "GTC",
+    session: str = "NORMAL",
 ) -> None:
     """Submit or preview an order on Charles Schwab via the CLI."""
     schwab_auth = SchwabAuthManager()
     access_token = schwab_auth.refresh_user_tokens_if_needed(uid)
     if not access_token:
-        print(f"Error: Schwab account not connected or failed to refresh token for user {uid}.", file=sys.stderr)
+        print(
+            f"Error: Schwab account not connected or failed to refresh token for user {uid}.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     acc_num = constants.get_account_number_for_hash(account_hash) or "unknown"
@@ -500,7 +535,7 @@ def handle_order_command(
             print(json.dumps(res, indent=2))
         else:
             print(f"\nSuccessfully placed order! Order ID: {res.get('orderId')}")
-            if res.get('location'):
+            if res.get("location"):
                 print(f"Location: {res['location']}")
     except Exception as e:
         print(f"\nOrder failed: {e}", file=sys.stderr)
@@ -512,119 +547,180 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Administrative CLI tool for querying Firestore transactions and realized P/L data."
     )
-    parser.add_argument('--account', type=str, default='all', help="Account name ('ind', 'ira', 'all') or account number.")
-    parser.add_argument('-s', '--symbol', type=str, help="Filter by ticker or underlying symbol (e.g. NVDA, IBIT).")
-    parser.add_argument('--uid', type=str, help="Firebase User ID (auto-discovered from Firestore if omitted).")
+    parser.add_argument(
+        "--account",
+        type=str,
+        default="all",
+        help="Account name ('ind', 'ira', 'all') or account number.",
+    )
+    parser.add_argument(
+        "-s", "--symbol", type=str, help="Filter by ticker or underlying symbol (e.g. NVDA, IBIT)."
+    )
+    parser.add_argument(
+        "--uid", type=str, help="Firebase User ID (auto-discovered from Firestore if omitted)."
+    )
 
-    subparsers = parser.add_subparsers(dest='command', required=True, help="Subcommand to execute")
+    subparsers = parser.add_subparsers(dest="command", required=True, help="Subcommand to execute")
 
     # txns subcommand
-    txns_parser = subparsers.add_parser('txns', aliases=['transactions'], help="List raw transactions from Firestore.")
-    txns_parser.add_argument('--limit', type=int, default=100, help="Maximum number of transactions to return (default: 100).")
-    txns_parser.add_argument('--unprocessed', action='store_true', help="Only return unprocessed raw transactions.")
-    txns_parser.add_argument('--from-date', type=str, default=None, help="Filter transactions from date (YYYY-MM-DD, inclusive).")
-    txns_parser.add_argument('--to-date', type=str, default=None, help="Filter transactions to date (YYYY-MM-DD, inclusive).")
-    txns_parser.add_argument('--type', '--txn-type', dest='txn_type', type=str, default='TRADE', help="Filter by transaction type (default: TRADE, use 'ALL' for all).")
-    txns_parser.add_argument('--json', action='store_true', help="Output results in JSON format.")
+    txns_parser = subparsers.add_parser(
+        "txns", aliases=["transactions"], help="List raw transactions from Firestore."
+    )
+    txns_parser.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="Maximum number of transactions to return (default: 100).",
+    )
+    txns_parser.add_argument(
+        "--unprocessed", action="store_true", help="Only return unprocessed raw transactions."
+    )
+    txns_parser.add_argument(
+        "--from-date",
+        type=str,
+        default=None,
+        help="Filter transactions from date (YYYY-MM-DD, inclusive).",
+    )
+    txns_parser.add_argument(
+        "--to-date",
+        type=str,
+        default=None,
+        help="Filter transactions to date (YYYY-MM-DD, inclusive).",
+    )
+    txns_parser.add_argument(
+        "--type",
+        "--txn-type",
+        dest="txn_type",
+        type=str,
+        default="TRADE",
+        help="Filter by transaction type (default: TRADE, use 'ALL' for all).",
+    )
+    txns_parser.add_argument("--json", action="store_true", help="Output results in JSON format.")
 
     # realized subcommand
-    realized_parser = subparsers.add_parser('realized', help="List realized P/L records from Firestore.")
-    realized_parser.add_argument('--limit', type=int, default=100, help="Maximum number of realized records to return (default: 100).")
-    realized_parser.add_argument('--from-date', type=str, default=None, help="Filter realized records from sell date (YYYY-MM-DD, inclusive).")
-    realized_parser.add_argument('--to-date', type=str, default=None, help="Filter realized records to sell date (YYYY-MM-DD, inclusive).")
-    realized_parser.add_argument('--type', '--trade-type', dest='trade_type', type=str, default='ALL', help="Filter by trade type (default: ALL).")
-    realized_parser.add_argument('--json', action='store_true', help="Output results in JSON format.")
+    realized_parser = subparsers.add_parser(
+        "realized", help="List realized P/L records from Firestore."
+    )
+    realized_parser.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="Maximum number of realized records to return (default: 100).",
+    )
+    realized_parser.add_argument(
+        "--from-date",
+        type=str,
+        default=None,
+        help="Filter realized records from sell date (YYYY-MM-DD, inclusive).",
+    )
+    realized_parser.add_argument(
+        "--to-date",
+        type=str,
+        default=None,
+        help="Filter realized records to sell date (YYYY-MM-DD, inclusive).",
+    )
+    realized_parser.add_argument(
+        "--type",
+        "--trade-type",
+        dest="trade_type",
+        type=str,
+        default="ALL",
+        help="Filter by trade type (default: ALL).",
+    )
+    realized_parser.add_argument(
+        "--json", action="store_true", help="Output results in JSON format."
+    )
 
     # fix-realized subcommand
     fix_parser = subparsers.add_parser(
-        'fix-realized',
-        help="Fix realized option transactions by swapping buy_price and sell_price (close_price)."
+        "fix-realized",
+        help="Fix realized option transactions by swapping buy_price and sell_price (close_price).",
     )
     fix_parser.add_argument(
-        '--account',
-        dest='sub_account',
+        "--account",
+        dest="sub_account",
         type=str,
         default=None,
-        help="Account number or name (e.g. acc2, ira)."
+        help="Account number or name (e.g. acc2, ira).",
     )
     fix_parser.add_argument(
-        '--start-date',
+        "--start-date",
         type=str,
-        default='2026-01-01',
-        help="Start close date (inclusive, YYYY-MM-DD, default: 2026-01-01)."
+        default="2026-01-01",
+        help="Start close date (inclusive, YYYY-MM-DD, default: 2026-01-01).",
     )
     fix_parser.add_argument(
-        '--end-date',
+        "--end-date",
         type=str,
-        default='2026-08-18',
-        help="End close date (inclusive, YYYY-MM-DD, default: 2026-08-18)."
+        default="2026-08-18",
+        help="End close date (inclusive, YYYY-MM-DD, default: 2026-08-18).",
     )
     fix_parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help="Preview transactions that would be fixed without updating Firestore."
+        "--dry-run",
+        action="store_true",
+        help="Preview transactions that would be fixed without updating Firestore.",
     )
 
     # migrate-accounts subcommand
     migrate_parser = subparsers.add_parser(
-        'migrate-accounts',
-        help="Migrate Firestore account data from hash-keyed to number-keyed documents."
+        "migrate-accounts",
+        help="Migrate Firestore account data from hash-keyed to number-keyed documents.",
     )
     migrate_parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help="Preview migration without writing to Firestore."
+        "--dry-run", action="store_true", help="Preview migration without writing to Firestore."
     )
 
     # order subcommand
-    order_parser = subparsers.add_parser('order', aliases=['place-order'], help="Place or preview an order on Charles Schwab.")
-    order_parser.add_argument(
-        '-s', '--symbol',
-        type=str,
-        required=True,
-        help="Ticker or OCC option symbol (e.g. AAPL, 'AAPL  260821C00205000')."
+    order_parser = subparsers.add_parser(
+        "order", aliases=["place-order"], help="Place or preview an order on Charles Schwab."
     )
     order_parser.add_argument(
-        '-q', '--quantity',
+        "-s",
+        "--symbol",
+        type=str,
+        required=True,
+        help="Ticker or OCC option symbol (e.g. AAPL, 'AAPL  260821C00205000').",
+    )
+    order_parser.add_argument(
+        "-q",
+        "--quantity",
         type=float,
         required=True,
-        help="Order quantity (number of contracts or shares)."
+        help="Order quantity (number of contracts or shares).",
     )
     order_parser.add_argument(
-        '-p', '--price',
-        type=str,
-        help="Limit price for the order (required for LIMIT orders)."
+        "-p", "--price", type=str, help="Limit price for the order (required for LIMIT orders)."
     )
     order_parser.add_argument(
-        '-i', '--instruction',
+        "-i",
+        "--instruction",
         type=str,
         required=True,
-        choices=['BTO', 'BTC', 'STO', 'STC', 'BUY', 'SELL', 'SELL_SHORT', 'BUY_TO_COVER'],
-        help="Order instruction (e.g. BTC, STO, BTO, STC, BUY, SELL)."
+        choices=["BTO", "BTC", "STO", "STC", "BUY", "SELL", "SELL_SHORT", "BUY_TO_COVER"],
+        help="Order instruction (e.g. BTC, STO, BTO, STC, BUY, SELL).",
     )
     order_parser.add_argument(
-        '--preview',
-        action='store_true',
-        help="Preview the order instead of submitting live."
+        "--preview", action="store_true", help="Preview the order instead of submitting live."
     )
     order_parser.add_argument(
-        '--order-type', '--type',
-        dest='order_type',
-        default='LIMIT',
-        choices=['LIMIT', 'MARKET', 'NET_DEBIT', 'NET_CREDIT'],
-        help="Order type (default: LIMIT)."
+        "--order-type",
+        "--type",
+        dest="order_type",
+        default="LIMIT",
+        choices=["LIMIT", "MARKET", "NET_DEBIT", "NET_CREDIT"],
+        help="Order type (default: LIMIT).",
     )
     order_parser.add_argument(
-        '--duration',
-        default='GTC',
-        choices=['GTC', 'DAY', 'FOK', 'IOC'],
-        help="Order duration (default: GTC)."
+        "--duration",
+        default="GTC",
+        choices=["GTC", "DAY", "FOK", "IOC"],
+        help="Order duration (default: GTC).",
     )
     order_parser.add_argument(
-        '--session',
-        default='NORMAL',
-        choices=['NORMAL', 'AM', 'PM', 'SEAMLESS'],
-        help="Trading session (default: NORMAL)."
+        "--session",
+        default="NORMAL",
+        choices=["NORMAL", "AM", "PM", "SEAMLESS"],
+        help="Trading session (default: NORMAL).",
     )
 
     return parser
@@ -636,8 +732,8 @@ def main() -> None:
     args = parser.parse_args()
 
     account_input = args.account
-    if args.command == 'fix-realized':
-        assert account_input == 'ira'
+    if args.command == "fix-realized":
+        assert account_input == "ira"
 
     try:
         uid = resolve_uid(args.uid)
@@ -647,7 +743,7 @@ def main() -> None:
         print(f"Error: {err}", file=sys.stderr)
         sys.exit(1)
 
-    if args.command in ('txns', 'transactions'):
+    if args.command in ("txns", "transactions"):
         handle_txns_command(
             uid=uid,
             account_numbers=account_numbers,
@@ -655,22 +751,22 @@ def main() -> None:
             unprocessed_only=args.unprocessed,
             symbol_filter=args.symbol,
             output_json=args.json,
-            from_date=getattr(args, 'from_date', None),
-            to_date=getattr(args, 'to_date', None),
-            txn_type=getattr(args, 'txn_type', 'TRADE'),
+            from_date=getattr(args, "from_date", None),
+            to_date=getattr(args, "to_date", None),
+            txn_type=getattr(args, "txn_type", "TRADE"),
         )
-    elif args.command == 'realized':
+    elif args.command == "realized":
         handle_realized_command(
             uid=uid,
             account_numbers=account_numbers,
             limit=args.limit,
             symbol_filter=args.symbol,
             output_json=args.json,
-            from_date=getattr(args, 'from_date', None),
-            to_date=getattr(args, 'to_date', None),
-            trade_type=getattr(args, 'trade_type', None),
+            from_date=getattr(args, "from_date", None),
+            to_date=getattr(args, "to_date", None),
+            trade_type=getattr(args, "trade_type", None),
         )
-    elif args.command == 'fix-realized':
+    elif args.command == "fix-realized":
         handle_fix_realized_command(
             uid=uid,
             account_hashes=account_hashes,
@@ -678,13 +774,13 @@ def main() -> None:
             end_date=args.end_date,
             dry_run=args.dry_run,
         )
-    elif args.command == 'migrate-accounts':
+    elif args.command == "migrate-accounts":
         handle_migrate_accounts_command(
             uid=uid,
             account_hashes=account_hashes,
             dry_run=args.dry_run,
         )
-    elif args.command == 'order':
+    elif args.command == "order":
         is_preview = args.preview
         assert len(account_hashes) == 1
         handle_order_command(
@@ -703,5 +799,5 @@ def main() -> None:
         parser.print_help()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

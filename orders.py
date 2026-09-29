@@ -11,7 +11,6 @@ from typing import Any
 from constants import get_account_hash
 import schwab_api
 
-
 # ---------------------------------------------------------------------------
 # Module-level constants
 # ---------------------------------------------------------------------------
@@ -122,6 +121,7 @@ def _validate_quantity(quantity) -> float:
 # ---------------------------------------------------------------------------
 # Order payload construction
 # ---------------------------------------------------------------------------
+
 
 def build_single_order(
     *,
@@ -238,13 +238,17 @@ def build_roll_order(
     qty_num = _validate_quantity(quantity)
 
     # Normalize instructions
-    canonical_close_instruction = _normalize_field(close_instruction, INSTRUCTION_MAP, "close_instruction")
+    canonical_close_instruction = _normalize_field(
+        close_instruction, INSTRUCTION_MAP, "close_instruction"
+    )
     if canonical_close_instruction not in ("BUY_TO_CLOSE", "SELL_TO_CLOSE"):
         raise ValueError(
             f"Invalid close_instruction '{close_instruction}'. Must be BUY_TO_CLOSE or SELL_TO_CLOSE."
         )
 
-    canonical_open_instruction = _normalize_field(open_instruction, INSTRUCTION_MAP, "open_instruction")
+    canonical_open_instruction = _normalize_field(
+        open_instruction, INSTRUCTION_MAP, "open_instruction"
+    )
     if canonical_open_instruction not in ("SELL_TO_OPEN", "BUY_TO_OPEN"):
         raise ValueError(
             f"Invalid open_instruction '{open_instruction}'. Must be SELL_TO_OPEN or BUY_TO_OPEN."
@@ -255,7 +259,9 @@ def build_roll_order(
     # defaults to NET_CREDIT, but the generic order type dropdown may send 'LIMIT'.
     otype_key = str(order_type).strip().upper()
     if otype_key not in ("NET_CREDIT", "NET_DEBIT", "NET_ZERO", "LIMIT"):
-        raise ValueError(f"Invalid roll order_type '{order_type}'. Must be NET_CREDIT or NET_DEBIT.")
+        raise ValueError(
+            f"Invalid roll order_type '{order_type}'. Must be NET_CREDIT or NET_DEBIT."
+        )
     canonical_order_type = "NET_CREDIT" if otype_key in ("NET_CREDIT", "LIMIT") else otype_key
 
     canonical_duration = _normalize_field(duration, DURATION_MAP, "duration")
@@ -296,6 +302,7 @@ def build_roll_order(
 # ---------------------------------------------------------------------------
 # Public order placement and preview services
 # ---------------------------------------------------------------------------
+
 
 def execute_order(
     access_token: str,

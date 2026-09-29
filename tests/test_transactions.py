@@ -7,10 +7,10 @@ import transactions
 class TestTransactions(unittest.TestCase):
     """Unit tests for transactions.py."""
 
-    @patch('transactions.firestore_db.save_transactions')
-    @patch('transactions.firestore_db.get_existing_activity_ids')
-    @patch('transactions._fetch_transactions_raw')
-    @patch('transactions.firestore_db.get_latest_transaction_time')
+    @patch("transactions.firestore_db.save_transactions")
+    @patch("transactions.firestore_db.get_existing_activity_ids")
+    @patch("transactions._fetch_transactions_raw")
+    @patch("transactions.firestore_db.get_latest_transaction_time")
     def test_sync_transactions_success(
         self,
         mock_get_latest_time,
@@ -35,5 +35,5 @@ class TestTransactions(unittest.TestCase):
         mock_save.assert_called_once_with("user123", "acc1", [{"activityId": 102, "amount": 20}])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

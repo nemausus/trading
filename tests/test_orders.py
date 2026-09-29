@@ -94,10 +94,12 @@ class TestOrders(unittest.TestCase):
 
         # Missing price on limit order
         with self.assertRaises(ValueError):
-            orders.build_single_order(symbol="AAPL", quantity=1, instruction="BUY", order_type="LIMIT")
+            orders.build_single_order(
+                symbol="AAPL", quantity=1, instruction="BUY", order_type="LIMIT"
+            )
 
     @patch("orders.schwab_api.place_order")
-    @patch('orders.get_account_hash', return_value='HASH_TEST')
+    @patch("orders.get_account_hash", return_value="HASH_TEST")
     def test_place_order_service(self, mock_resolve, mock_api_place):
         mock_api_place.return_value = {"success": True, "orderId": 12345}
 
@@ -122,7 +124,7 @@ class TestOrders(unittest.TestCase):
         self.assertEqual(args[2]["orderLegCollection"][0]["instruction"], "SELL_TO_OPEN")
 
     @patch("orders.schwab_api.preview_order")
-    @patch('orders.get_account_hash', return_value='HASH_TEST')
+    @patch("orders.get_account_hash", return_value="HASH_TEST")
     def test_preview_order_service(self, mock_resolve, mock_api_preview):
         mock_api_preview.return_value = {"orderValidationResult": "SUCCESS"}
 
@@ -140,7 +142,6 @@ class TestOrders(unittest.TestCase):
 
         self.assertEqual(res["orderValidationResult"], "SUCCESS")
         mock_api_preview.assert_called_once()
-
 
     def test_build_roll_order(self):
         order = orders.build_roll_order(
@@ -200,111 +201,123 @@ class TestOrders(unittest.TestCase):
 
 class TestOrderRoute(unittest.TestCase):
 
-
     def setUp(self):
         from app import app
-        app.config['TESTING'] = True
+
+        app.config["TESTING"] = True
         self.client = app.test_client()
 
-    @patch('app.auth.verify_id_token', return_value={'uid': 'test_user'})
-    @patch('app.schwab_auth.refresh_user_tokens_if_needed', return_value='fake_schwab_token')
-    @patch('orders.schwab_api.place_order')
-    @patch('orders.get_account_hash', return_value='HASH_MOCK')
+    @patch("app.auth.verify_id_token", return_value={"uid": "test_user"})
+    @patch("app.schwab_auth.refresh_user_tokens_if_needed", return_value="fake_schwab_token")
+    @patch("orders.schwab_api.place_order")
+    @patch("orders.get_account_hash", return_value="HASH_MOCK")
     def test_post_order_route_success(self, mock_resolve, mock_api_place, mock_token, mock_auth):
-        mock_api_place.return_value = {'success': True, 'orderId': 998877, 'location': '/orders/998877'}
+        mock_api_place.return_value = {
+            "success": True,
+            "orderId": 998877,
+            "location": "/orders/998877",
+        }
 
         payload = {
-            'account_number': constants.get_all_account_numbers()[0],
-            'symbol': 'AAPL  260821C00205000',
-            'quantity': 1,
-            'instruction': 'BTC',
-            'price': 2.75,
+            "account_number": constants.get_all_account_numbers()[0],
+            "symbol": "AAPL  260821C00205000",
+            "quantity": 1,
+            "instruction": "BTC",
+            "price": 2.75,
         }
         res = self.client.post(
-            '/api/schwab/order',
+            "/api/schwab/order",
             json=payload,
-            headers={'Authorization': 'Bearer fake_id_token'},
+            headers={"Authorization": "Bearer fake_id_token"},
         )
         self.assertEqual(res.status_code, 201)
         data = res.get_json()
-        self.assertTrue(data['success'])
-        self.assertEqual(data['orderId'], 998877)
+        self.assertTrue(data["success"])
+        self.assertEqual(data["orderId"], 998877)
 
-    @patch('app.auth.verify_id_token', return_value={'uid': 'test_user'})
-    @patch('app.schwab_auth.refresh_user_tokens_if_needed', return_value='fake_schwab_token')
-    @patch('orders.schwab_api.preview_order')
-    @patch('orders.get_account_hash', return_value='HASH_MOCK')
-    def test_post_order_preview_route_success(self, mock_resolve, mock_api_preview, mock_token, mock_auth):
-        mock_api_preview.return_value = {'orderValidationResult': 'SUCCESS', 'cost': 150.0}
+    @patch("app.auth.verify_id_token", return_value={"uid": "test_user"})
+    @patch("app.schwab_auth.refresh_user_tokens_if_needed", return_value="fake_schwab_token")
+    @patch("orders.schwab_api.preview_order")
+    @patch("orders.get_account_hash", return_value="HASH_MOCK")
+    def test_post_order_preview_route_success(
+        self, mock_resolve, mock_api_preview, mock_token, mock_auth
+    ):
+        mock_api_preview.return_value = {"orderValidationResult": "SUCCESS", "cost": 150.0}
 
         payload = {
-            'account_number': constants.get_all_account_numbers()[1],
-            'symbol': 'NVDA',
-            'quantity': 10,
-            'instruction': 'BUY',
-            'price': 115.0,
-            'preview': True,
+            "account_number": constants.get_all_account_numbers()[1],
+            "symbol": "NVDA",
+            "quantity": 10,
+            "instruction": "BUY",
+            "price": 115.0,
+            "preview": True,
         }
         res = self.client.post(
-            '/api/schwab/orders',
+            "/api/schwab/orders",
             json=payload,
-            headers={'Authorization': 'Bearer fake_id_token'},
+            headers={"Authorization": "Bearer fake_id_token"},
         )
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
-        self.assertEqual(data['orderValidationResult'], 'SUCCESS')
+        self.assertEqual(data["orderValidationResult"], "SUCCESS")
 
-    @patch('app.auth.verify_id_token', return_value={'uid': 'test_user'})
-    @patch('app.schwab_auth.refresh_user_tokens_if_needed', return_value='fake_schwab_token')
+    @patch("app.auth.verify_id_token", return_value={"uid": "test_user"})
+    @patch("app.schwab_auth.refresh_user_tokens_if_needed", return_value="fake_schwab_token")
     def test_post_order_route_validation_error(self, mock_token, mock_auth):
         # Missing symbol
         payload = {
-            'quantity': 1,
-            'instruction': 'BTC',
-            'price': 2.75,
+            "quantity": 1,
+            "instruction": "BTC",
+            "price": 2.75,
         }
         res = self.client.post(
-            '/api/schwab/order',
+            "/api/schwab/order",
             json=payload,
-            headers={'Authorization': 'Bearer fake_id_token'},
+            headers={"Authorization": "Bearer fake_id_token"},
         )
         self.assertEqual(res.status_code, 400)
         data = res.get_json()
-        self.assertIn('error', data)
+        self.assertIn("error", data)
 
-    @patch('app.auth.verify_id_token', return_value={'uid': 'test_user'})
-    @patch('app.schwab_auth.refresh_user_tokens_if_needed', return_value='fake_schwab_token')
-    @patch('orders.schwab_api.place_order')
-    @patch('orders.get_account_hash', return_value='HASH_MOCK')
-    def test_post_roll_order_route_success(self, mock_resolve, mock_api_place, mock_token, mock_auth):
-        mock_api_place.return_value = {'success': True, 'orderId': 554433, 'location': '/orders/554433'}
+    @patch("app.auth.verify_id_token", return_value={"uid": "test_user"})
+    @patch("app.schwab_auth.refresh_user_tokens_if_needed", return_value="fake_schwab_token")
+    @patch("orders.schwab_api.place_order")
+    @patch("orders.get_account_hash", return_value="HASH_MOCK")
+    def test_post_roll_order_route_success(
+        self, mock_resolve, mock_api_place, mock_token, mock_auth
+    ):
+        mock_api_place.return_value = {
+            "success": True,
+            "orderId": 554433,
+            "location": "/orders/554433",
+        }
 
         payload = {
-            'account_number': constants.get_all_account_numbers()[0],
-            'roll': True,
-            'close_symbol': 'AAPL  260417C00200000',
-            'open_symbol': 'AAPL  260515C00205000',
-            'quantity': 1,
-            'close_instruction': 'BTC',
-            'open_instruction': 'STO',
-            'order_type': 'NET_CREDIT',
-            'price': 0.35,
+            "account_number": constants.get_all_account_numbers()[0],
+            "roll": True,
+            "close_symbol": "AAPL  260417C00200000",
+            "open_symbol": "AAPL  260515C00205000",
+            "quantity": 1,
+            "close_instruction": "BTC",
+            "open_instruction": "STO",
+            "order_type": "NET_CREDIT",
+            "price": 0.35,
         }
         res = self.client.post(
-            '/api/schwab/order',
+            "/api/schwab/order",
             json=payload,
-            headers={'Authorization': 'Bearer fake_id_token'},
+            headers={"Authorization": "Bearer fake_id_token"},
         )
         self.assertEqual(res.status_code, 201)
         data = res.get_json()
-        self.assertTrue(data['success'])
-        self.assertEqual(data['orderId'], 554433)
+        self.assertTrue(data["success"])
+        self.assertEqual(data["orderId"], 554433)
         mock_api_place.assert_called_once()
         sent_payload = mock_api_place.call_args[0][2]
-        self.assertEqual(sent_payload['complexOrderStrategyType'], 'CUSTOM')
-        self.assertEqual(sent_payload['orderType'], 'NET_CREDIT')
-        self.assertEqual(sent_payload['price'], '0.3500')
-        self.assertEqual(len(sent_payload['orderLegCollection']), 2)
+        self.assertEqual(sent_payload["complexOrderStrategyType"], "CUSTOM")
+        self.assertEqual(sent_payload["orderType"], "NET_CREDIT")
+        self.assertEqual(sent_payload["price"], "0.3500")
+        self.assertEqual(len(sent_payload["orderLegCollection"]), 2)
 
 
 if __name__ == "__main__":

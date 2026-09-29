@@ -17,8 +17,8 @@ _VALID_PERIODS = {"5D", "1M", "3M", "6M", "1Y", "2Y", "5Y"}
 _VALID_INTERVALS = {"1M", "5M", "15M", "30M", "1D", "1W", "1MO"}
 _INTRADAY_INTERVALS = {"1M", "5M", "15M", "30M"}
 
-_DEFAULT_DAILY_TTL = 900       # 15 minutes for daily/weekly/monthly data
-_DEFAULT_INTRADAY_TTL = 60     # 1 minute for intraday data
+_DEFAULT_DAILY_TTL = 900  # 15 minutes for daily/weekly/monthly data
+_DEFAULT_INTRADAY_TTL = 60  # 1 minute for intraday data
 
 _TICKER_REGEX = re.compile(r"^[A-Z0-9.\-\/\$]{1,10}$")
 
@@ -26,7 +26,9 @@ _TICKER_REGEX = re.compile(r"^[A-Z0-9.\-\/\$]{1,10}$")
 class StockHistoryCache:
     """Thread-safe in-memory cache for historical stock price data."""
 
-    def __init__(self, daily_ttl: int = _DEFAULT_DAILY_TTL, intraday_ttl: int = _DEFAULT_INTRADAY_TTL):
+    def __init__(
+        self, daily_ttl: int = _DEFAULT_DAILY_TTL, intraday_ttl: int = _DEFAULT_INTRADAY_TTL
+    ):
         self._daily_ttl = daily_ttl
         self._intraday_ttl = intraday_ttl
         self._cache: dict[str, tuple[float, int, dict]] = {}
@@ -48,7 +50,9 @@ class StockHistoryCache:
                 return None
             return data
 
-    def set(self, symbol: str, period: str, interval: str, data: dict, ttl: int | None = None) -> None:
+    def set(
+        self, symbol: str, period: str, interval: str, data: dict, ttl: int | None = None
+    ) -> None:
         """Store history data in cache with appropriate TTL."""
         key = self._make_key(symbol, period, interval)
         if ttl is None:
@@ -242,7 +246,9 @@ def _normalize_candle(raw: dict) -> dict | None:
     }
 
 
-def normalize_price_history(raw_response: dict, symbol: str, slice_last_n: int | None = None) -> dict:
+def normalize_price_history(
+    raw_response: dict, symbol: str, slice_last_n: int | None = None
+) -> dict:
     """Normalize raw Schwab price history JSON response into clean OHLCV format.
 
     Ensures candles are strictly sorted ascending by time and deduplicated.
@@ -326,7 +332,9 @@ def fetch_stock_history(
     if use_cache:
         cached = stocks_cache.get(clean_ticker, norm_period, norm_interval)
         if cached is not None:
-            logging.debug("Stock history cache hit for %s %s %s", clean_ticker, norm_period, norm_interval)
+            logging.debug(
+                "Stock history cache hit for %s %s %s", clean_ticker, norm_period, norm_interval
+            )
             return cached
 
     # Map parameters to Schwab API request kwargs

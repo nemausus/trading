@@ -14,15 +14,13 @@ import os
 SCHWAB_REQUEST_TIMEOUT: tuple[int, int] = (5, 30)
 
 # Schwab's API reports times in Mountain Standard Time (UTC-7:00).
-SCHWAB_TZ: datetime.timezone = datetime.timezone(
-    -datetime.timedelta(hours=7)
-)
+SCHWAB_TZ: datetime.timezone = datetime.timezone(-datetime.timedelta(hours=7))
 
 
 class Account:
     def __init__(self, name: str) -> None:
         self.name = name
-        info = os.environ.get(name, '').split(',')
+        info = os.environ.get(name, "").split(",")
         assert len(info) == 2
         self.number = info[0]
         self.hash = info[1]
@@ -30,13 +28,14 @@ class Account:
 
 accounts: dict[str, Account] = {}
 
+
 def init_accounts() -> None:
     """Initialize accounts from environment variables once at startup."""
     global accounts
     if accounts:
         return
-    ind = Account('IND_ACCOUNT')
-    ira = Account('IRA_ACCOUNT')
+    ind = Account("IND_ACCOUNT")
+    ira = Account("IRA_ACCOUNT")
     accounts = {ind.name: ind, ira.name: ira}
 
 
@@ -63,7 +62,7 @@ def get_all_account_numbers() -> list[str]:
 
 
 def resolve_account_hash(account_param: str | None) -> list[str]:
-    if not account_param or account_param.strip().upper() == 'ALL':
+    if not account_param or account_param.strip().upper() == "ALL":
         return get_all_account_hashes()
     val = account_param.strip()
     if val in accounts:
@@ -72,6 +71,6 @@ def resolve_account_hash(account_param: str | None) -> list[str]:
 
 
 def resolve_account_number(account_param: str | None) -> list[str]:
-    if not account_param or account_param.strip().upper() == 'ALL':
+    if not account_param or account_param.strip().upper() == "ALL":
         return get_all_account_numbers()
     return [account_param.strip()]
