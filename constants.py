@@ -19,8 +19,6 @@ SCHWAB_TZ: datetime.timezone = datetime.timezone(
 )
 
 
-accounts: dict[str, Account] = {}
-
 class Account:
     def __init__(self, name: str) -> None:
         self.name = name
@@ -29,6 +27,8 @@ class Account:
         self.number = info[0]
         self.hash = info[1]
 
+
+accounts: dict[str, Account] = {}
 
 def init_accounts() -> None:
     """Initialize accounts from environment variables once at startup."""
