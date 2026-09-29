@@ -319,6 +319,48 @@ class TestOrderRoute(unittest.TestCase):
         self.assertEqual(sent_payload["price"], "0.3500")
         self.assertEqual(len(sent_payload["orderLegCollection"]), 2)
 
+    @patch("app.auth.verify_id_token", return_value={"uid": "test_user"})
+    @patch("app.schwab_auth.refresh_user_tokens_if_needed", return_value="fake_schwab_token")
+    def test_post_roll_order_route_rejects_symbol_fallback(self, mock_token, mock_auth):
+        payload = {
+            "account_number": constants.get_all_account_numbers()[0],
+            "roll": True,
+            "symbol": "AAPL  260417C00200000",
+            "open_symbol": "AAPL  260515C00205000",
+            "quantity": 1,
+            "price": 0.35,
+        }
+        res = self.client.post(
+            "/api/schwab/order",
+            json=payload,
+            headers={"Authorization": "Bearer fake_id_token"},
+        )
+        self.assertEqual(res.status_code, 400)
+        data = res.get_json()
+        self.assertIn("error", data)
+        self.assertIn("close_symbol", data["error"])
+
+    @patch("app.auth.verify_id_token", return_value={"uid": "test_user"})
+    @patch("app.schwab_auth.refresh_user_tokens_if_needed", return_value="fake_schwab_token")
+    def test_post_roll_order_route_rejects_target_symbol_fallback(self, mock_token, mock_auth):
+        payload = {
+            "account_number": constants.get_all_account_numbers()[0],
+            "roll": True,
+            "close_symbol": "AAPL  260417C00200000",
+            "target_symbol": "AAPL  260515C00205000",
+            "quantity": 1,
+            "price": 0.35,
+        }
+        res = self.client.post(
+            "/api/schwab/order",
+            json=payload,
+            headers={"Authorization": "Bearer fake_id_token"},
+        )
+        self.assertEqual(res.status_code, 400)
+        data = res.get_json()
+        self.assertIn("error", data)
+        self.assertIn("open_symbol", data["error"])
+
 
 if __name__ == "__main__":
 

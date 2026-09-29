@@ -431,7 +431,7 @@
                                     <span class="roll-leg-tag leg-tag-close">Leg 1: Close Current</span>
                                     <div class="roll-leg-content">
                                         <span class="roll-leg-action" id="roll-close-action">BTC</span>
-                                        <span class="roll-leg-symbol" id="roll-close-symbol">-</span>
+                                        <span class="roll-leg-symbol" id="roll-close-symbol-display">-</span>
                                         <span class="roll-leg-mark" id="roll-close-mark">Mark: -</span>
                                     </div>
                                 </div>
@@ -440,13 +440,14 @@
                                     <span class="roll-leg-tag leg-tag-open">Leg 2: Open Target</span>
                                     <div class="roll-leg-content">
                                         <span class="roll-leg-action" id="roll-open-action">STO</span>
-                                        <span class="roll-leg-symbol" id="roll-open-symbol">Select target from table below</span>
+                                        <span class="roll-leg-symbol" id="roll-open-symbol-display">Select target from table below</span>
                                         <span class="roll-leg-mark" id="roll-open-mark">Mark: -</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <input type="hidden" id="roll-target-symbol" value="">
+                            <input type="hidden" id="roll-close-symbol" value="">
+                            <input type="hidden" id="roll-open-symbol" value="">
 
                             <!-- Roll Form Inputs -->
                             <div class="order-form-grid" style="margin-top: 10px;">

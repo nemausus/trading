@@ -582,12 +582,12 @@ document.getElementById('roll-chain-candidates-container')?.addEventListener('cl
     if (btn) btn.textContent = '✓ Selected';
 
     // Update Leg 2 UI
-    const openSymbolEl = document.getElementById('roll-open-symbol');
-    if (openSymbolEl) openSymbolEl.textContent = formatOptionSymbol(sym);
+    const openSymbolDisplayEl = document.getElementById('roll-open-symbol-display');
+    if (openSymbolDisplayEl) openSymbolDisplayEl.textContent = formatOptionSymbol(sym);
     const openMarkEl = document.getElementById('roll-open-mark');
     if (openMarkEl) openMarkEl.textContent = `Mark: ~$${mark.toFixed(2)}`;
-    const targetInput = document.getElementById('roll-target-symbol');
-    if (targetInput) targetInput.value = sym;
+    const openSymbolInput = document.getElementById('roll-open-symbol');
+    if (openSymbolInput) openSymbolInput.value = sym;
 
     // Auto-calculate Net Credit / Debit Limit Price
     const orderTypeEl = document.getElementById('roll-order-type');
@@ -628,14 +628,18 @@ async function handleOrderSubmit(preview = false) {
     let desc = '';
 
     if (isRoll) {
-        const closeSymbol = document.getElementById('order-symbol')?.value.trim();
-        const openSymbol = document.getElementById('roll-target-symbol')?.value.trim();
+        const closeSymbol = document.getElementById('roll-close-symbol')?.value.trim();
+        const openSymbol = document.getElementById('roll-open-symbol')?.value.trim();
         const account = document.getElementById('roll-account')?.value;
         const quantity = parseInt(document.getElementById('roll-quantity')?.value, 10);
         const orderType = document.getElementById('roll-order-type')?.value || 'NET_CREDIT';
         const price = parseFloat(document.getElementById('roll-price')?.value);
         const duration = document.getElementById('roll-duration')?.value || 'GOOD_TILL_CANCEL';
 
+        if (!closeSymbol) {
+            showStatus('Missing option contract to close.', 'error');
+            return;
+        }
         if (!openSymbol) {
             showStatus('Please select a target option contract from the chain table below.', 'error');
             return;

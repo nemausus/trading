@@ -494,8 +494,8 @@ def schwab_place_order(decoded_token, access_token):
             order_payload = data["order"]
         elif data.get("roll") or (data.get("close_symbol") and data.get("open_symbol")):
             order_payload = orders.build_roll_order(
-                close_symbol=data.get("close_symbol") or data.get("symbol"),
-                open_symbol=data.get("open_symbol") or data.get("target_symbol"),
+                close_symbol=data.get("close_symbol"),
+                open_symbol=data.get("open_symbol"),
                 quantity=data.get("quantity"),
                 close_instruction=data.get("close_instruction") or "BUY_TO_CLOSE",
                 open_instruction=data.get("open_instruction") or "SELL_TO_OPEN",

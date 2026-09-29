@@ -1266,19 +1266,21 @@ export function openOrderModal(params = {}) {
         // Setup Leg 1
         const closeActionEl = document.getElementById('roll-close-action');
         if (closeActionEl) closeActionEl.textContent = 'BTC';
-        const closeSymbolEl = document.getElementById('roll-close-symbol');
-        if (closeSymbolEl) closeSymbolEl.textContent = formatOptionSymbol(symbol);
+        const closeSymbolDisplayEl = document.getElementById('roll-close-symbol-display');
+        if (closeSymbolDisplayEl) closeSymbolDisplayEl.textContent = formatOptionSymbol(symbol);
+        const closeSymbolInput = document.getElementById('roll-close-symbol');
+        if (closeSymbolInput) closeSymbolInput.value = symbol;
         const closeMarkEl = document.getElementById('roll-close-mark');
         const markVal = Number(params.mark || 0);
         if (closeMarkEl) closeMarkEl.textContent = markVal > 0 ? `Mark: ~$${markVal.toFixed(2)}` : 'Mark: -';
 
         // Reset Leg 2
-        const openSymbolEl = document.getElementById('roll-open-symbol');
-        if (openSymbolEl) openSymbolEl.textContent = 'Select target from table below';
+        const openSymbolDisplayEl = document.getElementById('roll-open-symbol-display');
+        if (openSymbolDisplayEl) openSymbolDisplayEl.textContent = 'Select target from table below';
         const openMarkEl = document.getElementById('roll-open-mark');
         if (openMarkEl) openMarkEl.textContent = 'Mark: -';
-        const targetInput = document.getElementById('roll-target-symbol');
-        if (targetInput) targetInput.value = '';
+        const openSymbolInput = document.getElementById('roll-open-symbol');
+        if (openSymbolInput) openSymbolInput.value = '';
 
         // Reset price and hint
         const rollPriceEl = document.getElementById('roll-price');
