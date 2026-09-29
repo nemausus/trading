@@ -408,7 +408,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                     symbolCellDesktopHtml = `
                         <div class="symbol-option-wrap">
                             <span class="symbol-option-ticker">${formatOptionSymbol(pos.symbol)}</span>
-                            <button class="btn-row-action btn-option-menu-trigger" data-symbol="${pos.symbol}" data-account="${pos.accountNumber}" data-qty="${pos.quantity}" data-cost="${pos['cost/share'] || 0}" data-val="${pos['value/share'] || 0}" title="Option Actions">···</button>
+                            <button class="btn-row-action btn-option-menu-trigger" data-symbol="${pos.symbol}" data-account="${pos.accountNumber || pos.account || ''}" data-qty="${pos.quantity}" data-cost="${pos['cost/share'] || 0}" data-val="${pos['value/share'] || 0}" title="Option Actions">···</button>
                         </div>
                     `;
                 }
@@ -448,7 +448,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         <!-- Mobile Only Combined Row Layout -->
                         <td class="mobile-only-card-col" colspan="12">
                             <div class="mobile-split-row header-row">
-                                <div class="split-col col-symbol"><span>${symbolCellMobileHtml} ${pos.quantity}</span> ${isOpt ? `<button class="btn-row-action btn-option-menu-trigger" data-symbol="${pos.symbol}" data-account="${pos.accountNumber}" data-qty="${pos.quantity}" data-cost="${pos['cost/share'] || 0}" data-val="${pos['value/share'] || 0}" title="Option Actions">···</button>` : ''}</div>
+                                <div class="split-col col-symbol"><span>${symbolCellMobileHtml} ${pos.quantity}</span> ${isOpt ? `<button class="btn-row-action btn-option-menu-trigger" data-symbol="${pos.symbol}" data-account="${pos.accountNumber || pos.account || ''}" data-qty="${pos.quantity}" data-cost="${pos['cost/share'] || 0}" data-val="${pos['value/share'] || 0}" title="Option Actions">···</button>` : ''}</div>
                                 <div class="split-col col-pl ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
                             </div>
                             <div class="mobile-split-row details-row">

@@ -431,7 +431,8 @@ document.addEventListener('click', (e) => {
         e.preventDefault();
         const menu = document.getElementById('option-context-menu');
         const symbol = menu.dataset.symbol;
-        if (symbol) fetchAndShowRollChain(symbol);
+        const account = menu.dataset.account;
+        if (symbol) fetchAndShowRollChain(symbol, account);
         menu.classList.add('hidden');
         return;
     }
@@ -455,7 +456,8 @@ document.addEventListener('click', (e) => {
     if (chainBtn) {
         e.preventDefault();
         const symbol = chainBtn.getAttribute('data-symbol');
-        if (symbol) fetchAndShowRollChain(symbol);
+        const account = chainBtn.getAttribute('data-account') || chainBtn.getAttribute('data-account-number') || '';
+        if (symbol) fetchAndShowRollChain(symbol, account);
         return;
     }
 

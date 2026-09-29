@@ -1,5 +1,5 @@
 import { auth } from './auth.js';
-import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionChainTable, renderTransactions, renderRealized, renderRollChainModal, renderBoxes } from './ui.js';
+import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionChainTable, renderTransactions, renderRealized, renderRollChainModal, renderBoxes, lastPositions } from './ui.js';
 
 export let rawChainData = { underlying: {}, chain: [] };
 
@@ -485,15 +485,31 @@ export async function applyRealizedFilters() {
 }
 
 
-export async function fetchAndShowRollChain(symbol) {
+export async function fetchAndShowRollChain(symbol, accountNumber = '') {
     const user = auth.currentUser;
     if (!user) return;
+
+    if (!accountNumber && lastPositions && lastPositions.length > 0) {
+        const matchingPos = lastPositions.find(p => p.symbol === symbol && (p.accountNumber || p.account));
+        if (matchingPos) {
+            accountNumber = matchingPos.accountNumber || matchingPos.account || '';
+        }
+    }
+
+    if (!accountNumber) {
+        renderRollChainModal({ error: 'Account number is required to fetch roll chain.' });
+        return;
+    }
 
     renderRollChainModal({ roll_chain: { target_symbol: symbol, chain: [] } });
 
     try {
         const token = await user.getIdToken();
-        const response = await fetch(`/api/schwab/roll-chain?symbol=${encodeURIComponent(symbol)}`, {
+        const queryParams = new URLSearchParams({
+            symbol,
+            account: accountNumber
+        });
+        const response = await fetch(`/api/schwab/roll-chain?${queryParams.toString()}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();

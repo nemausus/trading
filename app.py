@@ -428,9 +428,22 @@ def schwab_get_roll_chain(decoded_token):
     if not symbol:
         return jsonify({'error': 'Parameter symbol is required'}), 400
 
+    account_number = request.args.get('account')
+    if not account_number:
+        return jsonify({'error': 'Parameter account is required'}), 400
+
+    if account_number.upper() == 'ALL':
+        return jsonify({'error': 'Roll chain requires a single specific account'}), 400
+
+    underlying = roll_chain.extract_underlying_symbol(symbol)
+
     try:
-        account_numbers = get_all_account_numbers()
-        txns = firestore_db.get_transactions_for_accounts(uid, account_numbers, _get_limit(1000, 1000))
+        txns = firestore_db.get_transactions(
+            uid,
+            account_number,
+            _get_limit(1000, 1000),
+            symbol=underlying,
+        )
         chain_data = roll_chain.build_roll_chain(txns, symbol)
         return jsonify({'roll_chain': chain_data})
     except Exception as e:
@@ -450,6 +463,11 @@ def schwab_place_order(decoded_token, access_token):
         return jsonify({'error': 'Request body must be a valid JSON object.'}), 400
 
     account_number = data.get('account_number') or data.get('account')
+    if not account_number:
+        return jsonify({'error': 'Parameter account is required'}), 400
+
+    if account_number.upper() == 'ALL':
+        return jsonify({'error': 'Order requires a single specific account'}), 400
     preview = bool(data.get('preview', False))
 
     try:
