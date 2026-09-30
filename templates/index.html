@@ -485,9 +485,13 @@
                                 <div class="roll-chain-picker-header">
                                     <div>
                                         <h4 style="margin: 0; font-size: 0.86rem; font-weight: 600;">Choose Target Option from Chain</h4>
-                                        <div style="font-size: 0.74rem; color: var(--text-secondary);">Filtered for minimal credit/debit roll near current mark</div>
+                                        <div id="roll-chain-picker-subtitle" style="font-size: 0.74rem; color: var(--text-secondary);">Filtered for minimal credit/debit roll near current mark</div>
                                     </div>
-                                    <div class="roll-chain-picker-controls">
+                                    <div class="roll-chain-picker-controls" style="display: flex; gap: 6px;">
+                                        <select id="roll-chain-mark-filter" class="order-select" style="font-size: 0.76rem; padding: 3px 6px;">
+                                            <option value="10pct" selected>Within 10% Mark</option>
+                                            <option value="all">All Marks</option>
+                                        </select>
                                         <select id="roll-chain-expiry-filter" class="order-select" style="font-size: 0.76rem; padding: 3px 6px;">
                                             <option value="later" selected>Later Expirations (Recommended)</option>
                                             <option value="all">All Expirations</option>

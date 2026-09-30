@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { isOption, baseUnderlying } from '../static/js/utils.js';
+import { isOption, baseUnderlying, parseOptionStrike, isMarkWithinPercent } from '../static/js/utils.js';
 
 console.log("Running transaction & realized filter tests...");
 
@@ -21,6 +21,36 @@ assert.strictEqual(baseUnderlying('SPX   261219P05000000'), 'SPX');
 assert.strictEqual(baseUnderlying('GOOGL 261219C00200000'), 'GOOGL');
 assert.strictEqual(baseUnderlying('BRK/B 261219C00200000'), 'BRK/B');
 assert.strictEqual(baseUnderlying('NVDA261219C00200000'), 'NVDA');
+
+// 2b. Test parseOptionStrike
+assert.strictEqual(parseOptionStrike('AAPL  261219C00295000'), 295.0);
+assert.strictEqual(parseOptionStrike('SPX   261219P05000000'), 5000.0);
+assert.strictEqual(parseOptionStrike('NVDA261219C00122500'), 122.5);
+assert.strictEqual(parseOptionStrike('META 1/23/26 655 C'), 655.0);
+assert.strictEqual(parseOptionStrike('AAPL'), null);
+
+// 2c. Test isMarkWithinPercent (default 10% tolerance)
+// Current mark = 5.0 -> 10% range is [4.50, 5.50]
+assert.strictEqual(isMarkWithinPercent(5.0, 5.0), true, 'Exact match should be within 10%');
+assert.strictEqual(isMarkWithinPercent(4.5, 5.0), true, 'Lower boundary 4.5 should be within 10%');
+assert.strictEqual(isMarkWithinPercent(5.5, 5.0), true, 'Upper boundary 5.5 should be within 10%');
+assert.strictEqual(isMarkWithinPercent(5.1, 5.0), true, '5.1 should be within 10% of 5.0');
+assert.strictEqual(isMarkWithinPercent(4.9, 5.0), true, '4.9 should be within 10% of 5.0');
+assert.strictEqual(isMarkWithinPercent(4.49, 5.0), false, '4.49 is below 10% range');
+assert.strictEqual(isMarkWithinPercent(5.51, 5.0), false, '5.51 is above 10% range');
+assert.strictEqual(isMarkWithinPercent(2.0, 5.0), false, '2.0 is well outside 10% range');
+assert.strictEqual(isMarkWithinPercent(10.0, 5.0), false, '10.0 is well outside 10% range');
+// Edge cases: null, undefined, NaN, non-positive
+assert.strictEqual(isMarkWithinPercent(null, 5.0), false, 'null candMark should return false');
+assert.strictEqual(isMarkWithinPercent(5.0, null), false, 'null currentMark should return false');
+assert.strictEqual(isMarkWithinPercent(undefined, 5.0), false, 'undefined candMark should return false');
+assert.strictEqual(isMarkWithinPercent(5.0, undefined), false, 'undefined currentMark should return false');
+assert.strictEqual(isMarkWithinPercent(NaN, 5.0), false, 'NaN candMark should return false');
+assert.strictEqual(isMarkWithinPercent(5.0, 0), false, '0 currentMark should return false');
+assert.strictEqual(isMarkWithinPercent(5.0, -1.0), false, 'negative currentMark should return false');
+// Custom pct parameter
+assert.strictEqual(isMarkWithinPercent(6.0, 5.0, 0.25), true, '6.0 is within 25% of 5.0');
+assert.strictEqual(isMarkWithinPercent(6.5, 5.0, 0.25), false, '6.5 is outside 25% of 5.0');
 
 // 3. Mock transactions for date/type/account filter verification
 const optionTxn = {

@@ -40,8 +40,10 @@ def _validate_chain_params(
     max_dte: int | None,
     min_delta: float | None,
     max_delta: float | None,
+    min_strike: float | None = None,
+    max_strike: float | None = None,
 ) -> None:
-    """Validate DTE, Delta, and symbol parameters, raising ValueError for out-of-bounds values."""
+    """Validate DTE, Delta, Strike, and symbol parameters, raising ValueError for out-of-bounds values."""
     if not symbol or not isinstance(symbol, str) or len(symbol) > 10:
         raise ValueError(
             f"Invalid symbol: '{symbol}'. Must be an alphanumeric ticker up to 10 characters."
@@ -60,6 +62,13 @@ def _validate_chain_params(
         _validate_range("max_delta", max_delta, lo=-1.0, hi=1.0, typ=(int, float))
     if min_delta is not None and max_delta is not None and min_delta > max_delta:
         raise ValueError(f"min_delta ({min_delta}) cannot be greater than max_delta ({max_delta}).")
+
+    if min_strike is not None:
+        _validate_range("min_strike", min_strike, lo=0.0, hi=1000000.0, typ=(int, float))
+    if max_strike is not None:
+        _validate_range("max_strike", max_strike, lo=0.0, hi=1000000.0, typ=(int, float))
+    if min_strike is not None and max_strike is not None and min_strike > max_strike:
+        raise ValueError(f"min_strike ({min_strike}) cannot be greater than max_strike ({max_strike}).")
 
 
 def parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) -> list:
@@ -141,14 +150,16 @@ def fetch_option_chain(
     max_dte: int | None = None,
     min_delta: float | None = None,
     max_delta: float | None = None,
+    min_strike: float | None = None,
+    max_strike: float | None = None,
 ) -> dict:
-    """Fetch the option chain for *symbol*, filter by DTE and delta, and return structured data.
+    """Fetch the option chain for *symbol*, filter by DTE, delta, and strike price, and return structured data.
 
     Raises:
         ValueError: If any parameter fails validation.
         SchwabAPIError: If the Schwab API call fails.
     """
-    _validate_chain_params(symbol, min_dte, max_dte, min_delta, max_delta)
+    _validate_chain_params(symbol, min_dte, max_dte, min_delta, max_delta, min_strike, max_strike)
 
     today = datetime.datetime.now(SCHWAB_TZ).date()
     from_date = _offset_date(today, min_dte)
@@ -161,6 +172,8 @@ def fetch_option_chain(
         contract_type=ct,
         from_date=from_date,
         to_date=to_date,
+        from_strike=min_strike,
+        to_strike=max_strike,
         include_underlying_quote=True,
     )
 
@@ -189,6 +202,8 @@ def fetch_option_chain(
         and (max_dte is None or opt["dte"] <= max_dte)
         and (min_delta is None or opt["delta"] >= min_delta)
         and (max_delta is None or opt["delta"] <= max_delta)
+        and (min_strike is None or opt["strikePrice"] >= min_strike)
+        and (max_strike is None or opt["strikePrice"] <= max_strike)
     ]
     filtered.sort(key=lambda x: (x["expirationDate"], x["strikePrice"], x["contractType"]))
 

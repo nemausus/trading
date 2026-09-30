@@ -281,8 +281,8 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                             <div class="summary-metric-item"><span>Short P/L:</span><strong class="${shortPLFormat.cssClass}">${shortPLFormat.sign}${shortPLFormat.valDisplay}</strong></div>
                             <div class="summary-metric-item"><span>Short Val:</span><strong>${formatCurrency(sum['Short Value'])}</strong></div>
                             <div class="summary-metric-item"><span>Cash:</span><strong>${formatCurrency(sum.Cash)}</strong></div>
+                            <div class="summary-metric-item summary-metric-loan"><span>Box:</span><strong>${formatCurrency(sum['BOX'])}</strong></div>
                             <div class="summary-metric-item"><span>Risk:</span><strong class="${riskClass}">${formatPercent(sum.Risk)}</strong></div>
-                            <div class="summary-metric-item summary-metric-loan"><span>Loan:</span><strong>${formatCurrency(sum['Total Loan'])}</strong></div>
                         </div>
                     </div>
                 </div>
@@ -403,7 +403,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                     symbolCellDesktopHtml = `
                         <div class="symbol-option-wrap">
                             <span class="symbol-option-ticker">${formatOptionSymbol(pos.symbol)}</span>
-                            <button class="btn-row-action btn-option-menu-trigger" data-symbol="${pos.symbol}" data-account="${pos.accountNumber || pos.account || ''}" data-qty="${pos.quantity}" data-cost="${pos['cost/share'] || 0}" data-val="${pos['value/share'] || 0}" title="Option Actions">···</button>
+                            <button class="btn-row-action btn-option-menu-trigger" data-symbol="${pos.symbol}" data-account="${pos.accountNumber || pos.account || ''}" data-qty="${pos.quantity}" data-cost="${pos['cost/share'] || 0}" data-val="${pos['value/share'] || 0}" data-strike="${pos.strikePrice || ''}" title="Option Actions">···</button>
                         </div>
                     `;
                 }
@@ -443,7 +443,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         <!-- Mobile Only Combined Row Layout -->
                         <td class="mobile-only-card-col" colspan="12">
                             <div class="mobile-split-row header-row">
-                                <div class="split-col col-symbol"><span>${symbolCellMobileHtml} ${pos.quantity}</span> ${isOpt ? `<button class="btn-row-action btn-option-menu-trigger" data-symbol="${pos.symbol}" data-account="${pos.accountNumber || pos.account || ''}" data-qty="${pos.quantity}" data-cost="${pos['cost/share'] || 0}" data-val="${pos['value/share'] || 0}" title="Option Actions">···</button>` : ''}</div>
+                                <div class="split-col col-symbol"><span>${symbolCellMobileHtml} ${pos.quantity}</span> ${isOpt ? `<button class="btn-row-action btn-option-menu-trigger" data-symbol="${pos.symbol}" data-account="${pos.accountNumber || pos.account || ''}" data-qty="${pos.quantity}" data-cost="${pos['cost/share'] || 0}" data-val="${pos['value/share'] || 0}" data-strike="${pos.strikePrice || ''}" title="Option Actions">···</button>` : ''}</div>
                                 <div class="split-col col-pl ${pl.cssClass}" style="text-align: right;">${pl.sign}${pl.valDisplay} <span class="mobile-pl-pct">(${plPercent.sign}${plPercent.valDisplay})</span></div>
                             </div>
                             <div class="mobile-split-row details-row">
@@ -1292,6 +1292,30 @@ export function openOrderModal(params = {}) {
         if (rollPriceEl) rollPriceEl.value = '';
         const rollPriceHint = document.getElementById('roll-price-hint');
         if (rollPriceHint) rollPriceHint.textContent = 'Select a target contract below to auto-calculate Net Credit/Debit';
+
+        // Reset filter selects to default recommendations
+        const markFilterSelect = document.getElementById('roll-chain-mark-filter');
+        if (markFilterSelect) markFilterSelect.value = '10pct';
+        const expiryFilterSelect = document.getElementById('roll-chain-expiry-filter');
+        if (expiryFilterSelect) expiryFilterSelect.value = 'later';
+
+        // Update picker subtitle with current strike & mark filter info
+        const rollSubtitleEl = document.getElementById('roll-chain-picker-subtitle');
+        if (rollSubtitleEl) {
+            const subtitleParts = [];
+            if (params.currentStrike !== null && params.currentStrike !== undefined && !isNaN(params.currentStrike) && params.currentStrike > 0) {
+                subtitleParts.push(`strikes \u2265 $${Number(params.currentStrike).toFixed(2)}`);
+            }
+            if (params.mark !== null && params.mark !== undefined && !isNaN(params.mark) && Number(params.mark) > 0) {
+                const curM = Number(params.mark);
+                subtitleParts.push(`mark within 10% ($${(curM * 0.9).toFixed(2)} - $${(curM * 1.1).toFixed(2)})`);
+            }
+            if (subtitleParts.length > 0) {
+                rollSubtitleEl.textContent = `Filtered for ${subtitleParts.join(' & ')}`;
+            } else {
+                rollSubtitleEl.textContent = 'Filtered for minimal credit/debit roll near current mark';
+            }
+        }
 
         // Accounts dropdown
         _populateModalAccounts(document.getElementById('roll-account'), params.account);

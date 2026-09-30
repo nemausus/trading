@@ -1,7 +1,7 @@
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './auth.js';
 import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData, fetchRealized, fetchAndShowRollChain, submitOrder, fetchOptionChainRaw } from './api.js';
 import { showView, clearDashboard, lastPositions, closeRollChainModal, openOrderModal, closeOrderModal, renderOptionChainTable, renderRollCandidatesTable } from './ui.js';
-import { baseUnderlying, isPutOption, formatOptionSymbol, escapeHtml } from './utils.js';
+import { baseUnderlying, isPutOption, formatOptionSymbol, parseOptionStrike, isMarkWithinPercent, escapeHtml } from './utils.js';
 import { initStockPage, loadStockData, onStocksTabActivated, resizeStockChart } from './stocks/stock-page.js';
 
 // Parse URL params on load
@@ -275,6 +275,7 @@ document.addEventListener('click', (e) => {
         menu.dataset.qty = qty;
         menu.dataset.cost = cost;
         menu.dataset.val = val;
+        menu.dataset.strike = optionMenuBtn.dataset.strike || '';
 
         const isShort = qty < 0;
         const closeLabel = document.getElementById('context-menu-close-label');
@@ -344,8 +345,22 @@ document.addEventListener('click', (e) => {
         const isPut = isPutOption(symbol);
 
         let dte = 0;
+        let currentStrike = null;
         const pos = (lastPositions || []).find(p => p.symbol === symbol && String(p.accountNumber) === String(account));
-        if (pos && pos.dte !== undefined) dte = pos.dte;
+        if (pos) {
+            if (pos.dte !== undefined) dte = pos.dte;
+            if (pos.strikePrice !== undefined && pos.strikePrice !== null) {
+                currentStrike = Number(pos.strikePrice);
+            }
+        }
+        if (!currentStrike || isNaN(currentStrike) || currentStrike <= 0) {
+            const menuStrike = parseFloat(menu.dataset.strike);
+            if (!isNaN(menuStrike) && menuStrike > 0) {
+                currentStrike = menuStrike;
+            } else {
+                currentStrike = parseOptionStrike(symbol);
+            }
+        }
 
         menu.classList.add('hidden');
 
@@ -358,11 +373,12 @@ document.addEventListener('click', (e) => {
             quantity: Math.abs(qty) || 1,
             mark: targetMark,
             dte,
-            isPut
+            isPut,
+            currentStrike
         });
 
         // Load candidate options chain directly into the roll modal
-        loadRollCandidatesForModal(symbol, underlying, isPut ? 'PUT' : 'CALL', targetMark, dte);
+        loadRollCandidatesForModal(symbol, underlying, isPut ? 'PUT' : 'CALL', targetMark, dte, currentStrike);
         return;
     }
 
@@ -440,14 +456,21 @@ window.addEventListener('scroll', () => {
 // =====================================================================================
 // --- ORDER MODAL SUBMISSION / PREVIEW ---
 // =====================================================================================
-async function loadRollCandidatesForModal(symbol, underlying, contractType, targetMark, currentDte) {
+async function loadRollCandidatesForModal(symbol, underlying, contractType, targetMark, currentDte, currentStrike = null) {
     const container = document.getElementById('roll-chain-candidates-container');
     if (!container) return;
 
-    container.innerHTML = `<div class="no-data-msg" style="padding: 16px;"><p>Loading live options chain for ${underlying}...</p></div>`;
+    const strikeMsg = (currentStrike !== null && currentStrike !== undefined && !isNaN(currentStrike) && currentStrike > 0)
+        ? ` (strike \u2265 $${Number(currentStrike).toFixed(2)})`
+        : '';
+    container.innerHTML = `<div class="no-data-msg" style="padding: 16px;"><p>Loading live options chain for ${underlying}${strikeMsg}...</p></div>`;
 
     try {
-        const data = await fetchOptionChainRaw(underlying, contractType);
+        const fetchOptions = {};
+        if (currentStrike !== null && currentStrike !== undefined && !isNaN(currentStrike) && currentStrike > 0) {
+            fetchOptions.minStrike = currentStrike;
+        }
+        const data = await fetchOptionChainRaw(underlying, contractType, fetchOptions);
         const rawChain = data.chain || [];
 
         window._activeRollContext = {
@@ -456,6 +479,7 @@ async function loadRollCandidatesForModal(symbol, underlying, contractType, targ
             contractType,
             mark: targetMark,
             dte: currentDte,
+            currentStrike,
             chain: rawChain,
             selectedSymbol: ''
         };
@@ -471,10 +495,30 @@ function refreshRollCandidatesDisplay() {
     const ctx = window._activeRollContext;
     if (!ctx || !ctx.chain) return;
 
-    const filterVal = document.getElementById('roll-chain-expiry-filter')?.value || 'later';
+    const expiryFilterVal = document.getElementById('roll-chain-expiry-filter')?.value || 'later';
+    const markFilterVal = document.getElementById('roll-chain-mark-filter')?.value || '10pct';
     let candidates = ctx.chain.filter(c => c.symbol !== ctx.targetSymbol);
 
-    if (filterVal === 'later') {
+    // Filter out options with strike price lower than current strike price
+    if (ctx.currentStrike !== null && ctx.currentStrike !== undefined && !isNaN(ctx.currentStrike) && ctx.currentStrike > 0) {
+        candidates = candidates.filter(c => {
+            const strike = (c.strikePrice !== undefined && c.strikePrice !== null) ? Number(c.strikePrice) : 0;
+            return strike >= ctx.currentStrike;
+        });
+    }
+
+    // Filter target mark to be within 10% of mark of current option
+    if (markFilterVal === '10pct' && ctx.mark !== null && ctx.mark !== undefined && !isNaN(ctx.mark) && Number(ctx.mark) > 0) {
+        const currentMark = Number(ctx.mark);
+        candidates = candidates.filter(c => {
+            const candMark = (c.mark !== undefined && c.mark !== null && !isNaN(c.mark))
+                ? Number(c.mark)
+                : ((Number(c.bid || 0) + Number(c.ask || 0)) / 2);
+            return isMarkWithinPercent(candMark, currentMark, 0.10);
+        });
+    }
+
+    if (expiryFilterVal === 'later') {
         const minDte = (ctx.dte !== undefined && ctx.dte >= 0) ? ctx.dte : 0;
         candidates = candidates.filter(c => (c.dte !== undefined ? c.dte : 0) >= minDte);
     }
@@ -538,6 +582,10 @@ document.getElementById('roll-chain-candidates-container')?.addEventListener('cl
 });
 
 document.getElementById('roll-chain-expiry-filter')?.addEventListener('change', () => {
+    refreshRollCandidatesDisplay();
+});
+
+document.getElementById('roll-chain-mark-filter')?.addEventListener('change', () => {
     refreshRollCandidatesDisplay();
 });
 

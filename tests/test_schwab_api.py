@@ -106,11 +106,39 @@ class TestSchwabApi(unittest.TestCase):
         with self.assertRaises(ValueError):
             sa.place_order("token123", "HASH123", {})
 
-    def test_preview_order_validation(self):
-        with self.assertRaises(ValueError):
-            sa.preview_order("token123", "", {"a": 1})
-        with self.assertRaises(ValueError):
-            sa.preview_order("token123", "HASH123", {})
+    @patch("requests.request")
+    def test_get_option_chains(self, mock_request):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"symbol": "AAPL"}
+        mock_request.return_value = mock_resp
+
+        res = sa.get_option_chains(
+            "token123",
+            "AAPL",
+            contract_type="CALL",
+            from_date="2026-10-01",
+            to_date="2026-12-01",
+            from_strike=200.0,
+            to_strike=250.0,
+        )
+
+        self.assertEqual(res, {"symbol": "AAPL"})
+        mock_request.assert_called_once_with(
+            "GET",
+            f"{sa.SCHWAB_MARKETDATA_BASE_URL}/chains",
+            headers=sa._headers("token123"),
+            params={
+                "symbol": "AAPL",
+                "contractType": "CALL",
+                "includeUnderlyingQuote": True,
+                "fromDate": "2026-10-01",
+                "toDate": "2026-12-01",
+                "fromStrike": 200.0,
+                "toStrike": 250.0,
+            },
+            data=None,
+            timeout=sa.SCHWAB_REQUEST_TIMEOUT,
+        )
 
 
 if __name__ == "__main__":

@@ -147,6 +147,48 @@ export function formatOptionSymbol(symbol) {
 }
 
 /**
+ * Extract numeric strike price from OCC or human-readable option symbol string.
+ *
+ * @param {string} symbol - Option symbol (e.g. 'AAPL  260821C00200000' or 'META 1/23/26 655 C').
+ * @returns {number|null} Numeric strike price or null if unparseable.
+ */
+export function parseOptionStrike(symbol) {
+    if (!symbol || typeof symbol !== 'string') return null;
+    const s = symbol.trim();
+    // OCC format: ends with [CP]\d{8} (e.g. AAPL260821C00200000 or with spaces)
+    const clean = s.replace(/\s+/g, '');
+    const occMatch = clean.match(/[0-9]{6}[CP]([0-9]{8})$/);
+    if (occMatch) {
+        const strike = parseInt(occMatch[1], 10) / 1000.0;
+        return isNaN(strike) ? null : strike;
+    }
+    // Human-readable format: e.g. "TICKER MM/DD/YY STRIKE C/P"
+    const parts = s.split(/\s+/);
+    if (parts.length === 4 && (parts[3] === 'C' || parts[3] === 'P') && parts[1].includes('/')) {
+        const val = parseFloat(parts[2]);
+        return isNaN(val) ? null : val;
+    }
+    return null;
+}
+
+/**
+ * Check if candidate mark is within a given percentage of the current mark.
+ *
+ * @param {number} candMark - Mark of the candidate option.
+ * @param {number} currentMark - Mark of the current option.
+ * @param {number} [pct=0.10] - Percentage tolerance (default 0.10 for 10%).
+ * @returns {boolean} True if candMark is within +/- pct of currentMark.
+ */
+export function isMarkWithinPercent(candMark, currentMark, pct = 0.10) {
+    if (candMark == null || currentMark == null || isNaN(candMark) || isNaN(currentMark) || currentMark <= 0) {
+        return false;
+    }
+    const minMark = currentMark * (1 - pct);
+    const maxMark = currentMark * (1 + pct);
+    return candMark >= minMark && candMark <= maxMark;
+}
+
+/**
  * Format a volume number into a compact human-readable string (e.g. 1.23M, 45.6K).
  * @param {number|null} vol - Volume value.
  * @returns {string}

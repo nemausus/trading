@@ -94,6 +94,33 @@ class TestFetchOptionChain(unittest.TestCase):
         self.assertEqual(len(res["chain"]), 1)
         self.assertEqual(res["chain"][0]["symbol"], "C2")
 
+    @patch("schwab_api.schwab_request")
+    def test_fetch_option_chain_strike_filtering(self, mock_schwab_request):
+        mock_schwab_request.return_value = {
+            "underlying": {"symbol": "AAPL", "last": 200.0},
+            "callExpDateMap": {
+                "2026-08-21:50": {
+                    "190.0": [{"symbol": "C190", "strikePrice": 190.0, "daysToExpiration": 30, "delta": 0.6}],
+                    "200.0": [{"symbol": "C200", "strikePrice": 200.0, "daysToExpiration": 30, "delta": 0.5}],
+                    "210.0": [{"symbol": "C210", "strikePrice": 210.0, "daysToExpiration": 30, "delta": 0.4}],
+                    "220.0": [{"symbol": "C220", "strikePrice": 220.0, "daysToExpiration": 30, "delta": 0.3}],
+                }
+            },
+        }
+
+        # Filter: min_strike=200.0 -> should exclude strike 190.0
+        res = chain.fetch_option_chain("fake_token", "AAPL", "CALL", min_strike=200.0)
+        self.assertEqual(res["totalContracts"], 4)
+        self.assertEqual([c["symbol"] for c in res["chain"]], ["C200", "C210", "C220"])
+
+        # Filter: min_strike=210.0 -> should exclude 190.0 and 200.0
+        res2 = chain.fetch_option_chain("fake_token", "AAPL", "CALL", min_strike=210.0)
+        self.assertEqual([c["symbol"] for c in res2["chain"]], ["C210", "C220"])
+
+        # Filter: min_strike=200.0, max_strike=210.0
+        res3 = chain.fetch_option_chain("fake_token", "AAPL", "CALL", min_strike=200.0, max_strike=210.0)
+        self.assertEqual([c["symbol"] for c in res3["chain"]], ["C200", "C210"])
+
     def test_fetch_option_chain_validation_errors(self):
         """Verify ValueError is raised for negative DTE, out-of-range delta, or min > max."""
         with self.assertRaises(ValueError):
@@ -115,6 +142,12 @@ class TestFetchOptionChain(unittest.TestCase):
             chain.fetch_option_chain("fake_token", "AAPL", min_delta=0.5, max_delta=0.2)
 
         with self.assertRaises(ValueError):
+            chain.fetch_option_chain("fake_token", "AAPL", min_strike=-10.0)
+
+        with self.assertRaises(ValueError):
+            chain.fetch_option_chain("fake_token", "AAPL", min_strike=250.0, max_strike=200.0)
+
+        with self.assertRaises(ValueError):
             chain.fetch_option_chain("fake_token", "AAPL_WITH_EXCESSIVELY_LONG_SYMBOL_NAME_HERE")
 
         with self.assertRaises(ValueError):
@@ -123,6 +156,54 @@ class TestFetchOptionChain(unittest.TestCase):
     def test_parse_exp_map_empty(self):
         self.assertEqual(chain._parse_exp_map({}, 200.0, "CALL"), [])
         self.assertEqual(chain._parse_exp_map(None, 200.0, "CALL"), [])
+
+
+class TestSchwabChainEndpoint(unittest.TestCase):
+    """Tests for /api/schwab/chain Flask route."""
+
+    def setUp(self):
+        from app import app
+
+        app.config["TESTING"] = True
+        self.client = app.test_client()
+
+    @patch("app.auth.verify_id_token")
+    @patch("app.schwab_auth.refresh_user_tokens_if_needed")
+    @patch("chain.fetch_option_chain")
+    def test_endpoint_with_min_strike(self, mock_fetch, mock_tokens, mock_verify):
+        mock_verify.return_value = {"uid": "test_user"}
+        mock_tokens.return_value = "valid_schwab_token"
+        mock_fetch.return_value = {"underlying": {"symbol": "AAPL"}, "chain": []}
+
+        resp = self.client.get(
+            "/api/schwab/chain?symbol=AAPL&minStrike=210.5",
+            headers={"Authorization": "Bearer test_token"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        mock_fetch.assert_called_once_with(
+            "valid_schwab_token",
+            "AAPL",
+            "CALL",
+            min_dte=None,
+            max_dte=None,
+            min_delta=None,
+            max_delta=None,
+            min_strike=210.5,
+            max_strike=None,
+        )
+
+    @patch("app.auth.verify_id_token")
+    @patch("app.schwab_auth.refresh_user_tokens_if_needed")
+    def test_endpoint_invalid_min_strike(self, mock_tokens, mock_verify):
+        mock_verify.return_value = {"uid": "test_user"}
+        mock_tokens.return_value = "valid_schwab_token"
+
+        resp = self.client.get(
+            "/api/schwab/chain?symbol=AAPL&minStrike=invalid_num",
+            headers={"Authorization": "Bearer test_token"},
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("Invalid value", resp.get_json()["error"])
 
 
 if __name__ == "__main__":

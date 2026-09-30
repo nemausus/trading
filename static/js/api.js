@@ -178,6 +178,10 @@ export async function fetchOptionChain() {
         if (maxDte !== '' && maxDte !== null && !isNaN(maxDte)) query.append('maxDte', maxDte);
         if (minDelta !== '' && minDelta !== null && !isNaN(minDelta)) query.append('minDelta', minDelta);
         if (maxDelta !== '' && maxDelta !== null && !isNaN(maxDelta)) query.append('maxDelta', maxDelta);
+        const minStrike = document.getElementById('chain-min-strike')?.value;
+        const maxStrike = document.getElementById('chain-max-strike')?.value;
+        if (minStrike !== '' && minStrike !== null && minStrike !== undefined && !isNaN(minStrike)) query.append('minStrike', minStrike);
+        if (maxStrike !== '' && maxStrike !== null && maxStrike !== undefined && !isNaN(maxStrike)) query.append('maxStrike', maxStrike);
 
         const url = `/api/schwab/chain?${query.toString()}`;
         const response = await fetch(url, {
@@ -513,7 +517,7 @@ export async function submitOrder(orderData) {
     return result;
 }
 
-export async function fetchOptionChainRaw(symbol, contractType = 'CALL') {
+export async function fetchOptionChainRaw(symbol, contractType = 'CALL', options = {}) {
     const token = await _getAuthToken();
     if (!token) throw new Error("Please sign in first.");
 
@@ -521,6 +525,23 @@ export async function fetchOptionChainRaw(symbol, contractType = 'CALL') {
         symbol: symbol.trim().toUpperCase(),
         contractType: contractType.toUpperCase()
     });
+
+    const minStrike = options.minStrike ?? options.min_strike;
+    if (minStrike !== undefined && minStrike !== null && minStrike !== '' && !isNaN(minStrike)) {
+        query.append('minStrike', minStrike);
+    }
+    const maxStrike = options.maxStrike ?? options.max_strike;
+    if (maxStrike !== undefined && maxStrike !== null && maxStrike !== '' && !isNaN(maxStrike)) {
+        query.append('maxStrike', maxStrike);
+    }
+    const minDte = options.minDte ?? options.min_dte;
+    if (minDte !== undefined && minDte !== null && minDte !== '' && !isNaN(minDte)) {
+        query.append('minDte', minDte);
+    }
+    const maxDte = options.maxDte ?? options.max_dte;
+    if (maxDte !== undefined && maxDte !== null && maxDte !== '' && !isNaN(maxDte)) {
+        query.append('maxDte', maxDte);
+    }
 
     const response = await fetch(`/api/schwab/chain?${query.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` }

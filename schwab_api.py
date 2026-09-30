@@ -100,6 +100,8 @@ def get_option_chains(
     contract_type: str = "ALL",
     from_date: str | None = None,
     to_date: str | None = None,
+    from_strike: float | None = None,
+    to_strike: float | None = None,
     include_underlying_quote: bool = True,
 ) -> dict:
     """Fetch the option chain for an underlying symbol.
@@ -110,6 +112,8 @@ def get_option_chains(
         contract_type:            'CALL', 'PUT', or 'ALL' (default 'ALL').
         from_date:                ISO date string filter (inclusive lower bound).
         to_date:                  ISO date string filter (inclusive upper bound).
+        from_strike:              Minimum strike price filter.
+        to_strike:                Maximum strike price filter.
         include_underlying_quote: Whether to include the underlying quote in the
                                   response (default True).
 
@@ -138,6 +142,10 @@ def get_option_chains(
         params["fromDate"] = from_date
     if to_date:
         params["toDate"] = to_date
+    if from_strike is not None:
+        params["fromStrike"] = from_strike
+    if to_strike is not None:
+        params["toStrike"] = to_strike
 
     return schwab_request(
         "GET",

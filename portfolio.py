@@ -228,6 +228,7 @@ def _enrich_positions(positions: list) -> float:
             try:
                 opt = OptionSymbol.parse_symbol(symbol)
                 pos["dte"] = opt.dte()
+                pos["strikePrice"] = float(opt.strike_price)
                 # CSP: short puts only
                 if _is_short_put(pos):
                     csp += float(opt.strike_price) * pos["quantity"] * 100.0
@@ -451,7 +452,7 @@ def process_accounts_data(accounts_json: list, access_token: str) -> dict:
                 "Short Value": sum(
                     p["marketValue"] for p in account_positions if p["quantity"] < 0
                 ),
-                "Cash": cash,
+                "Cash": cash + margin,
                 "Total": sum(p["marketValue"] for p in account_positions),
                 "Net": net,
                 "Margin": margin,

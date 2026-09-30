@@ -3,6 +3,7 @@ import os
 import secrets
 import datetime
 import urllib.parse
+from typing import Callable
 from functools import wraps
 
 from dotenv import load_dotenv
@@ -141,6 +142,20 @@ def _strip_internal_fields(records: list, *keys: str) -> None:
                 record.pop(key, None)
 
 
+def _parse_optional(args, cast_func: Callable, *keys: str):
+    """Parse the first matching query parameter as the given type, raising ValueError if invalid."""
+    for k in keys:
+        if k in args:
+            val = args.get(k)
+            if val is None or (isinstance(val, str) and val.strip() == ""):
+                return None
+            try:
+                return cast_func(val)
+            except (ValueError, TypeError):
+                raise ValueError(f"Invalid value for parameter '{k}': '{val}'")
+    return None
+
+
 @app.route("/api/auth/schwab", methods=["POST"])
 @limiter.limit("5 per minute")
 @require_firebase_auth
@@ -255,10 +270,16 @@ def schwab_chain(decoded_token, access_token):
 
     symbol = request.args.get("symbol", "AAPL").upper().strip()
     contract_type = request.args.get("contractType", "CALL").upper().strip()
-    min_dte = request.args.get("minDte", type=int)
-    max_dte = request.args.get("maxDte", type=int)
-    min_delta = request.args.get("minDelta", type=float)
-    max_delta = request.args.get("maxDelta", type=float)
+
+    try:
+        min_dte = _parse_optional(request.args, int, "minDte", "min_dte")
+        max_dte = _parse_optional(request.args, int, "maxDte", "max_dte")
+        min_delta = _parse_optional(request.args, float, "minDelta", "min_delta")
+        max_delta = _parse_optional(request.args, float, "maxDelta", "max_delta")
+        min_strike = _parse_optional(request.args, float, "minStrike", "min_strike")
+        max_strike = _parse_optional(request.args, float, "maxStrike", "max_strike")
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
 
     try:
         chain_data = chain.fetch_option_chain(
@@ -269,6 +290,8 @@ def schwab_chain(decoded_token, access_token):
             max_dte=max_dte,
             min_delta=min_delta,
             max_delta=max_delta,
+            min_strike=min_strike,
+            max_strike=max_strike,
         )
         return jsonify(chain_data)
     except ValueError as ve:
