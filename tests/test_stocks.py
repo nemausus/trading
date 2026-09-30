@@ -426,13 +426,8 @@ class TestIndicatorAlgorithms(unittest.TestCase):
         sma3 = self._calculate_sma(prices, 3)
         self.assertEqual(sma3, [20.0, 30.0, 40.0])
 
-        # Test SMA 20, 50, 200 with 250 price points
+        # Test SMA 50, 200 with 250 price points
         long_prices = [100.0 + i for i in range(250)]
-        sma20 = self._calculate_sma(long_prices, 20)
-        self.assertEqual(len(sma20), 231)
-        # Average of 100 to 119 = 109.5
-        self.assertEqual(sma20[0], 109.5)
-
         sma50 = self._calculate_sma(long_prices, 50)
         self.assertEqual(len(sma50), 201)
         # Average of 100 to 149 = 124.5

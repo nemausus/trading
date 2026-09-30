@@ -12,7 +12,7 @@
  * Calculate Simple Moving Average (SMA).
  *
  * @param {Array<Object>} candles - Array of OHLCV candles with time and close properties.
- * @param {number} period - Number of bars to average (e.g. 20, 50, 200).
+ * @param {number} period - Number of bars to average (e.g. 50, 200).
  * @returns {Array<{ time: number, value: number }>}
  */
 export function calculateSMA(candles, period) {

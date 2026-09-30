@@ -131,7 +131,6 @@
     display: inline-block;
 }
 
-.dot-sma20 { background-color: #2563eb; }
 .dot-sma50 { background-color: #d97706; }
 .dot-sma200 { background-color: #dc2626; }
 .dot-volume { background-color: #0d9488; }
@@ -269,11 +268,6 @@
     font-variant-numeric: tabular-nums;
 }
 
-.badge-sma20 {
-    background-color: #eff6ff;
-    color: #1d4ed8;
-    border: 1px solid #bfdbfe;
-}
 
 .badge-sma50 {
     background-color: #fffbeb;

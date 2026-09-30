@@ -2,7 +2,7 @@
  * stock-chart.js
  * ~~~~~~~~~~~~~~
  * TradingView Lightweight Charts (v5) integration.
- * Manages candlestick series, volume histogram, SMA 20/50/200 overlays,
+ * Manages candlestick series, volume histogram, SMA 50/200 overlays,
  * RSI 14 pane with 30/70 reference lines, synchronized crosshair,
  * live hover tooltips, and responsive resizing.
  */
@@ -18,7 +18,6 @@ export class StockChart {
         this.chart = null;
         this.candlestickSeries = null;
         this.volumeSeries = null;
-        this.sma20Series = null;
         this.sma50Series = null;
         this.sma200Series = null;
         this.rsiSeries = null;
@@ -29,7 +28,6 @@ export class StockChart {
         this.latestCandle = null;
 
         this.indicatorState = {
-            sma20: true,
             sma50: true,
             sma200: true,
             volume: true,
@@ -37,7 +35,6 @@ export class StockChart {
         };
 
         this.cachedIndicators = {
-            sma20: [],
             sma50: [],
             sma200: [],
             rsi: [],
@@ -96,6 +93,7 @@ export class StockChart {
                 borderColor: '#e2e8f0',
                 timeVisible: true,
                 secondsVisible: false,
+                rightOffset: 12,
             },
             rightPriceScale: {
                 borderColor: '#e2e8f0',
@@ -136,20 +134,11 @@ export class StockChart {
         });
 
         // 3. SMA Overlays (Pane 0)
-        this.sma20Series = this.chart.addSeries(LC.LineSeries, {
-            color: '#2563eb', // Blue
-            lineWidth: 2,
-            priceLineVisible: false,
-            lastValueVisible: false,
-            title: 'SMA 20',
-        }, 0);
-
         this.sma50Series = this.chart.addSeries(LC.LineSeries, {
             color: '#d97706', // Amber / Orange
             lineWidth: 2,
             priceLineVisible: false,
             lastValueVisible: false,
-            title: 'SMA 50',
         }, 0);
 
         this.sma200Series = this.chart.addSeries(LC.LineSeries, {
@@ -157,7 +146,6 @@ export class StockChart {
             lineWidth: 2,
             priceLineVisible: false,
             lastValueVisible: false,
-            title: 'SMA 200',
         }, 0);
 
         // 4. RSI (Pane 1)
@@ -200,7 +188,6 @@ export class StockChart {
                     maxValue: 90,
                 },
             }),
-            title: 'RSI 14',
         }, 1); // Pane index 1
 
         // Reference lines at 70 and 30
@@ -210,7 +197,6 @@ export class StockChart {
             lineWidth: 1,
             lineStyle: LC.LineStyle.Dashed,
             axisLabelVisible: true,
-            title: '70 Overbought',
         });
 
         this.rsiSeries.createPriceLine({
@@ -219,7 +205,6 @@ export class StockChart {
             lineWidth: 1,
             lineStyle: LC.LineStyle.Dashed,
             axisLabelVisible: true,
-            title: '30 Oversold',
         });
 
         // Populate cached RSI if present
@@ -239,7 +224,6 @@ export class StockChart {
 
             const candle = param.seriesData.get(this.candlestickSeries);
             const volumeData = this.volumeSeries ? param.seriesData.get(this.volumeSeries) : null;
-            const sma20 = (this.indicatorState.sma20 && this.sma20Series) ? param.seriesData.get(this.sma20Series) : null;
             const sma50 = (this.indicatorState.sma50 && this.sma50Series) ? param.seriesData.get(this.sma50Series) : null;
             const sma200 = (this.indicatorState.sma200 && this.sma200Series) ? param.seriesData.get(this.sma200Series) : null;
             const rsi = (this.indicatorState.rsi && this.rsiSeries) ? param.seriesData.get(this.rsiSeries) : null;
@@ -251,7 +235,6 @@ export class StockChart {
                 low: candle ? candle.low : null,
                 close: candle ? candle.close : null,
                 volume: volumeData ? volumeData.value : null,
-                sma20: sma20 ? sma20.value : null,
                 sma50: sma50 ? sma50.value : null,
                 sma200: sma200 ? sma200.value : null,
                 rsi: rsi ? rsi.value : null,
@@ -310,13 +293,11 @@ export class StockChart {
         this.volumeSeries.setData(volumeData);
 
         // Calculate and cache indicators locally
-        this.cachedIndicators.sma20 = calculateSMA(candles, 20);
         this.cachedIndicators.sma50 = calculateSMA(candles, 50);
         this.cachedIndicators.sma200 = calculateSMA(candles, 200);
         this.cachedIndicators.rsi = calculateRSI(candles, 14);
 
         // Apply data to indicator series
-        this.sma20Series.setData(this.cachedIndicators.sma20);
         this.sma50Series.setData(this.cachedIndicators.sma50);
         this.sma200Series.setData(this.cachedIndicators.sma200);
 
@@ -337,7 +318,7 @@ export class StockChart {
     /**
      * Toggle indicator visibility without making another API request.
      *
-     * @param {string} name - 'sma20' | 'sma50' | 'sma200' | 'volume' | 'rsi'.
+     * @param {string} name - 'sma50' | 'sma200' | 'volume' | 'rsi'.
      * @param {boolean} isVisible - Active state.
      */
     toggleIndicator(name, isVisible) {
@@ -357,7 +338,6 @@ export class StockChart {
             }
         } else {
             const seriesMap = {
-                sma20: this.sma20Series,
                 sma50: this.sma50Series,
                 sma200: this.sma200Series,
                 volume: this.volumeSeries,
@@ -373,7 +353,6 @@ export class StockChart {
 
     _syncIndicatorVisibilities() {
         const seriesMap = {
-            sma20: this.sma20Series,
             sma50: this.sma50Series,
             sma200: this.sma200Series,
             volume: this.volumeSeries,
@@ -424,7 +403,6 @@ export class StockChart {
         const prevClose = prevCandle ? prevCandle.close : c.open;
         const { change, pctChange } = computePriceChange(c.close, prevClose);
 
-        const latestSma20 = this.cachedIndicators.sma20.length ? this.cachedIndicators.sma20[this.cachedIndicators.sma20.length - 1].value : null;
         const latestSma50 = this.cachedIndicators.sma50.length ? this.cachedIndicators.sma50[this.cachedIndicators.sma50.length - 1].value : null;
         const latestSma200 = this.cachedIndicators.sma200.length ? this.cachedIndicators.sma200[this.cachedIndicators.sma200.length - 1].value : null;
         const latestRsi = this.cachedIndicators.rsi.length ? this.cachedIndicators.rsi[this.cachedIndicators.rsi.length - 1].value : null;
@@ -438,7 +416,6 @@ export class StockChart {
             volume: c.volume,
             change: change,
             pctChange: pctChange,
-            sma20: latestSma20,
             sma50: latestSma50,
             sma200: latestSma200,
             rsi: latestRsi,
@@ -464,9 +441,6 @@ export class StockChart {
         }
 
         let indicatorsHtml = '<div class="legend-indicators-group">';
-        if (this.indicatorState.sma20 && data.sma20 != null) {
-            indicatorsHtml += `<span class="legend-badge badge-sma20">SMA 20: ${data.sma20.toFixed(2)}</span>`;
-        }
         if (this.indicatorState.sma50 && data.sma50 != null) {
             indicatorsHtml += `<span class="legend-badge badge-sma50">SMA 50: ${data.sma50.toFixed(2)}</span>`;
         }

@@ -94,7 +94,6 @@ export function initStockPage() {
 
     // Indicator checkboxes
     const indicatorToggles = [
-        { id: 'toggle-sma20', name: 'sma20' },
         { id: 'toggle-sma50', name: 'sma50' },
         { id: 'toggle-sma200', name: 'sma200' },
         { id: 'toggle-volume', name: 'volume' },
