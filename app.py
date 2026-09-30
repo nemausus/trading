@@ -447,7 +447,7 @@ def schwab_get_roll_chain(decoded_token):
     if not symbol:
         return jsonify({"error": "Parameter symbol is required"}), 400
 
-    account_number = request.args.get("account")
+    account_number = request.args.get("account") or request.args.get("account_number")
     if not account_number:
         return jsonify({"error": "Parameter account is required"}), 400
 

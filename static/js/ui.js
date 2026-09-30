@@ -7,7 +7,7 @@ import {
 } from './utils.js';
 
 export let lastPositions = [];
-export let lastOrders = [];
+let lastOrders = [];
 
 // ── Shared UI helpers ──────────────────────────────────────────────────────
 
@@ -43,11 +43,6 @@ export function showView(viewId) {
 }
 
 export function clearDashboard() {
-    const actionsContainer = document.getElementById('actions-container');
-    if (actionsContainer) {
-        actionsContainer.innerHTML = '';
-    }
-
     const posContainer = document.getElementById('positions-container');
     if (posContainer) {
         posContainer.innerHTML = _noDataHtml('Connect your Schwab account to retrieve positions.');
@@ -1217,6 +1212,26 @@ export function renderRollCandidatesTable(candidates, rollContext, selectedSymbo
 }
 
 
+function _populateModalAccounts(selectEl, selectedAccount) {
+    if (!selectEl) return;
+    const accNums = new Set();
+    (lastPositions || []).forEach(p => {
+        if (p.accountNumber) accNums.add(String(p.accountNumber));
+    });
+    if (accNums.size === 0) {
+        accNums.add('primary');
+        accNums.add('secondary');
+    }
+    selectEl.innerHTML = '';
+    accNums.forEach(acc => {
+        const opt = document.createElement('option');
+        opt.value = acc;
+        opt.textContent = `Account ${acc}`;
+        if (String(acc) === String(selectedAccount)) opt.selected = true;
+        selectEl.appendChild(opt);
+    });
+}
+
 export function openOrderModal(params = {}) {
     const modal = document.getElementById('order-modal');
     if (!modal) return;
@@ -1224,8 +1239,7 @@ export function openOrderModal(params = {}) {
     const isRollMode = (params.mode === 'roll');
     const modalCard = modal.querySelector('.order-modal-card');
     if (modalCard) {
-        if (isRollMode) modalCard.classList.add('roll-mode');
-        else modalCard.classList.remove('roll-mode');
+        modalCard.classList.toggle('roll-mode', isRollMode);
     }
 
     const singleSection = document.getElementById('order-single-section');
@@ -1242,15 +1256,6 @@ export function openOrderModal(params = {}) {
     if (statusEl) {
         statusEl.className = 'order-status-msg hidden';
         statusEl.innerHTML = '';
-    }
-
-    const accNums = new Set();
-    (lastPositions || []).forEach(p => {
-        if (p.accountNumber) accNums.add(String(p.accountNumber));
-    });
-    if (accNums.size === 0) {
-        accNums.add('primary');
-        accNums.add('secondary');
     }
 
     if (isRollMode) {
@@ -1289,17 +1294,7 @@ export function openOrderModal(params = {}) {
         if (rollPriceHint) rollPriceHint.textContent = 'Select a target contract below to auto-calculate Net Credit/Debit';
 
         // Accounts dropdown
-        const rollAccEl = document.getElementById('roll-account');
-        if (rollAccEl) {
-            rollAccEl.innerHTML = '';
-            accNums.forEach(acc => {
-                const opt = document.createElement('option');
-                opt.value = acc;
-                opt.textContent = `Account ${acc}`;
-                if (String(acc) === String(params.account)) opt.selected = true;
-                rollAccEl.appendChild(opt);
-            });
-        }
+        _populateModalAccounts(document.getElementById('roll-account'), params.account);
 
         // Quantity
         const rollQtyEl = document.getElementById('roll-quantity');
@@ -1352,26 +1347,14 @@ export function openOrderModal(params = {}) {
         if (durationEl) durationEl.value = duration;
 
         // Populate accounts dropdown
-        const accEl = document.getElementById('order-account');
-        if (accEl) {
-            accEl.innerHTML = '';
-            accNums.forEach(acc => {
-                const opt = document.createElement('option');
-                opt.value = acc;
-                opt.textContent = `Account ${acc}`;
-                if (String(acc) === String(account)) opt.selected = true;
-                accEl.appendChild(opt);
-            });
-        }
+        _populateModalAccounts(document.getElementById('order-account'), account);
 
         // Price hint text
         const hintEl = document.getElementById('order-price-hint');
         if (hintEl) {
             if (params.mark !== undefined) {
-                const bidStr = params.bid && Number(params.bid) > 0 ? `$${Number(params.bid).toFixed(2)}` : '-';
-                const askStr = params.ask && Number(params.ask) > 0 ? `$${Number(params.ask).toFixed(2)}` : '-';
-                const markStr = params.mark && Number(params.mark) > 0 ? `$${Number(params.mark).toFixed(2)}` : '-';
-                hintEl.textContent = `Bid: ${bidStr} | Mark: ${markStr} | Ask: ${askStr}`;
+                const fmt = v => (v && Number(v) > 0) ? `$${Number(v).toFixed(2)}` : '-';
+                hintEl.textContent = `Bid: ${fmt(params.bid)} | Mark: ${fmt(params.mark)} | Ask: ${fmt(params.ask)}`;
             } else if (params.buyPrice !== undefined && Number(params.buyPrice) > 0) {
                 hintEl.textContent = `Open Cost: $${Number(params.buyPrice).toFixed(2)} (Target 30%: $${Number(price).toFixed(2)})`;
             } else {

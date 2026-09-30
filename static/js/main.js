@@ -1,5 +1,5 @@
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './auth.js';
-import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, applyTransactionFilters, rawChainData, fetchRealized, applyRealizedFilters, fetchAndShowRollChain, submitOrder, fetchOptionChainRaw } from './api.js';
+import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData, fetchRealized, fetchAndShowRollChain, submitOrder, fetchOptionChainRaw } from './api.js';
 import { showView, clearDashboard, lastPositions, closeRollChainModal, openOrderModal, closeOrderModal, renderOptionChainTable, renderRollCandidatesTable } from './ui.js';
 import { baseUnderlying, isPutOption, formatOptionSymbol, escapeHtml } from './utils.js';
 import { initStockPage, loadStockData, onStocksTabActivated, resizeStockChart } from './stocks/stock-page.js';
@@ -52,73 +52,41 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
 
 let currentTabKey = 'portfolio';
 
+const TAB_REFRESH_ACTIONS = {
+    portfolio: fetchSchwabPortfolio,
+    stocks: loadStockData,
+    chain: fetchOptionChain,
+    box: fetchSPXBoxes,
+    transactions: syncTransactions,
+    realized: fetchRealized,
+};
+
 document.getElementById('btn-refresh-data')?.addEventListener('click', () => {
-    switch (currentTabKey) {
-        case 'portfolio':
-            fetchSchwabPortfolio();
-            break;
-        case 'stocks':
-            loadStockData();
-            break;
-        case 'chain':
-            fetchOptionChain();
-            break;
-        case 'box':
-            fetchSPXBoxes();
-            break;
-        case 'transactions':
-            syncTransactions();
-            break;
-        case 'realized':
-            fetchRealized();
-            break;
-        default:
-            fetchSchwabPortfolio();
-            break;
-    }
+    (TAB_REFRESH_ACTIONS[currentTabKey] || fetchSchwabPortfolio)();
 });
-
-
-
 
 // =====================================================================================
 // --- HEADER TAB NAVIGATION ---
 // =====================================================================================
-const tabBtnPortfolio = document.getElementById('tab-btn-portfolio');
-const tabBtnStocks = document.getElementById('tab-btn-stocks');
-const tabBtnChain = document.getElementById('tab-btn-chain');
-const tabBtnBox = document.getElementById('tab-btn-box');
-const tabBtnRealized = document.getElementById('tab-btn-realized');
-const tabBtnTransactions = document.getElementById('tab-btn-transactions');
-const tabContentPortfolio = document.getElementById('tab-content-portfolio');
-const tabContentStocks = document.getElementById('tab-content-stocks');
-const tabContentChain = document.getElementById('tab-content-chain');
-const tabContentBox = document.getElementById('tab-content-box');
-const tabContentRealized = document.getElementById('tab-content-realized');
-const tabContentTransactions = document.getElementById('tab-content-transactions');
-
-const allTabBtns = [tabBtnPortfolio, tabBtnStocks, tabBtnChain, tabBtnBox, tabBtnRealized, tabBtnTransactions];
-const allTabContents = [tabContentPortfolio, tabContentStocks, tabContentChain, tabContentBox, tabContentRealized, tabContentTransactions];
-
-// Map of hash fragment -> { btn, content } for each tab
-const TAB_MAP = {
-    portfolio:    { btn: tabBtnPortfolio,    content: tabContentPortfolio },
-    stocks:       { btn: tabBtnStocks,       content: tabContentStocks },
-    chain:        { btn: tabBtnChain,        content: tabContentChain },
-    box:          { btn: tabBtnBox,          content: tabContentBox },
-    realized:     { btn: tabBtnRealized,     content: tabContentRealized },
-    transactions: { btn: tabBtnTransactions, content: tabContentTransactions },
-};
+const TAB_KEYS = ['portfolio', 'stocks', 'chain', 'box', 'realized', 'transactions'];
+const TAB_MAP = Object.fromEntries(TAB_KEYS.map(key => [
+    key,
+    {
+        btn: document.getElementById(`tab-btn-${key}`),
+        content: document.getElementById(`tab-content-${key}`)
+    }
+]));
 
 let txnsLoaded = false;
 let realizedLoaded = false;
 
 function switchTab(activeBtn, activeContent, tabKey) {
-    allTabBtns.forEach(b => b && b.classList.remove('active'));
-    allTabContents.forEach(c => c && c.classList.remove('active-tab-content'));
-    if (activeBtn) activeBtn.classList.add('active');
-    if (activeContent) activeContent.classList.add('active-tab-content');
-    // Keep URL in sync (pushState so back/forward works)
+    Object.values(TAB_MAP).forEach(({ btn, content }) => {
+        btn?.classList.remove('active');
+        content?.classList.remove('active-tab-content');
+    });
+    activeBtn?.classList.add('active');
+    activeContent?.classList.add('active-tab-content');
     if (tabKey && window.location.hash !== '#' + tabKey) {
         history.pushState({ tab: tabKey }, '', '#' + tabKey);
     }
@@ -161,17 +129,11 @@ window.addEventListener('hashchange', () => {
     navigateToTab(hash || 'portfolio');
 });
 
-if (tabBtnPortfolio && tabBtnStocks && tabBtnChain && tabBtnBox && tabBtnRealized && tabBtnTransactions) {
-    tabBtnPortfolio.addEventListener('click',    () => navigateToTab('portfolio'));
-    tabBtnStocks.addEventListener('click',       () => navigateToTab('stocks'));
-    tabBtnChain.addEventListener('click',        () => navigateToTab('chain'));
-    tabBtnBox.addEventListener('click',          () => navigateToTab('box'));
-    tabBtnRealized.addEventListener('click',     () => navigateToTab('realized'));
-    tabBtnTransactions.addEventListener('click', () => navigateToTab('transactions'));
-}
+TAB_KEYS.forEach(key => {
+    TAB_MAP[key].btn?.addEventListener('click', () => navigateToTab(key));
+});
 
 window.addEventListener('resize', resizeStockChart);
-
 
 // =====================================================================================
 // --- OPTION CHAIN EXPLORER ---
@@ -183,11 +145,11 @@ document.getElementById('chain-symbol')?.addEventListener('keyup', (e) => {
     if (e.key === 'Enter') fetchOptionChain();
 });
 
-document.querySelectorAll('.preset-btn').forEach(btn => {
+document.querySelectorAll('#tab-content-chain .preset-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const symbol = btn.dataset.symbol;
         const input = document.getElementById('chain-symbol');
-        if (input) {
+        if (input && symbol) {
             input.value = symbol;
         }
     });
@@ -207,29 +169,24 @@ document.getElementById('btn-reset-filters')?.addEventListener('click', () => {
 document.getElementById('btn-fetch-boxes')?.addEventListener('click', fetchSPXBoxes);
 
 // =====================================================================================
+// --- TRANSACTIONS & REALIZED FILTER HELPERS ---
 // =====================================================================================
-// --- TRANSACTIONS ---
-// =====================================================================================
+function _bindFilterEvents(btnId, changeIds, enterIds, handler) {
+    document.getElementById(btnId)?.addEventListener('click', handler);
+    changeIds.forEach(id => document.getElementById(id)?.addEventListener('change', handler));
+    enterIds.forEach(id => document.getElementById(id)?.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') handler();
+    }));
+}
+
 document.getElementById('btn-sync-transactions')?.addEventListener('click', syncTransactions);
 
-const handleTransactionFilter = () => {
-    applyTransactionFilters();
-};
-
-document.getElementById('btn-filter-transactions')?.addEventListener('click', handleTransactionFilter);
-document.getElementById('txn-account')?.addEventListener('change', handleTransactionFilter);
-document.getElementById('txn-type')?.addEventListener('change', handleTransactionFilter);
-document.getElementById('txn-from-date')?.addEventListener('change', handleTransactionFilter);
-document.getElementById('txn-to-date')?.addEventListener('change', handleTransactionFilter);
-document.getElementById('txn-symbol')?.addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') handleTransactionFilter();
-});
-document.getElementById('txn-from-date')?.addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') handleTransactionFilter();
-});
-document.getElementById('txn-to-date')?.addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') handleTransactionFilter();
-});
+_bindFilterEvents(
+    'btn-filter-transactions',
+    ['txn-account', 'txn-type', 'txn-from-date', 'txn-to-date'],
+    ['txn-symbol', 'txn-from-date', 'txn-to-date'],
+    fetchTransactions
+);
 
 document.getElementById('btn-reset-transactions')?.addEventListener('click', () => {
     const symbolInput = document.getElementById('txn-symbol');
@@ -244,30 +201,15 @@ document.getElementById('btn-reset-transactions')?.addEventListener('click', () 
     if (fromDateInput) fromDateInput.value = '';
     if (toDateInput) toDateInput.value = '';
 
-    applyTransactionFilters();
+    fetchTransactions();
 });
 
-// =====================================================================================
-// --- REALIZED GAIN/LOSS ---
-// =====================================================================================
-const handleRealizedFilter = () => {
-    applyRealizedFilters();
-};
-
-document.getElementById('btn-filter-realized')?.addEventListener('click', handleRealizedFilter);
-document.getElementById('realized-account')?.addEventListener('change', handleRealizedFilter);
-document.getElementById('realized-type')?.addEventListener('change', handleRealizedFilter);
-document.getElementById('realized-symbol')?.addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') handleRealizedFilter();
-});
-document.getElementById('realized-from-date')?.addEventListener('change', handleRealizedFilter);
-document.getElementById('realized-from-date')?.addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') handleRealizedFilter();
-});
-document.getElementById('realized-to-date')?.addEventListener('change', handleRealizedFilter);
-document.getElementById('realized-to-date')?.addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') handleRealizedFilter();
-});
+_bindFilterEvents(
+    'btn-filter-realized',
+    ['realized-account', 'realized-type', 'realized-from-date', 'realized-to-date'],
+    ['realized-symbol', 'realized-from-date', 'realized-to-date'],
+    fetchRealized
+);
 
 document.getElementById('btn-reset-realized')?.addEventListener('click', () => {
     const symbolInput = document.getElementById('realized-symbol');
@@ -278,11 +220,10 @@ document.getElementById('btn-reset-realized')?.addEventListener('click', () => {
     if (symbolInput) symbolInput.value = 'ALL';
     if (accountSelect) accountSelect.value = 'ALL';
     if (typeSelect) typeSelect.value = 'ALL';
-    const currentYear = new Date().getFullYear();
-    const defaultFromDate = `${currentYear}-01-01`;
+    const defaultFromDate = `${new Date().getFullYear()}-01-01`;
     if (fromDateInput) fromDateInput.value = defaultFromDate;
     if (toDateInput) toDateInput.value = '';
-    applyRealizedFilters();
+    fetchRealized();
 });
 
 
@@ -448,16 +389,6 @@ document.addEventListener('click', (e) => {
         e.preventDefault();
         window.activeRollFilter = null;
         renderOptionChainTable(rawChainData.chain || []);
-        return;
-    }
-
-    // Roll Chain / Option Actions Button (legacy or fallback)
-    const chainBtn = e.target.closest('.btn-icon-chain');
-    if (chainBtn) {
-        e.preventDefault();
-        const symbol = chainBtn.getAttribute('data-symbol');
-        const account = chainBtn.getAttribute('data-account') || chainBtn.getAttribute('data-account-number') || '';
-        if (symbol) fetchAndShowRollChain(symbol, account);
         return;
     }
 

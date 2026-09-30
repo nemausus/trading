@@ -3,6 +3,27 @@ import { clearDashboard, renderDashboard, renderUnderlyingBanner, renderOptionCh
 
 export let rawChainData = { underlying: {}, chain: [] };
 
+async function _getAuthToken() {
+    const user = auth.currentUser;
+    if (!user) return null;
+    return await user.getIdToken();
+}
+
+function _populateAccountDropdown(accountSelect, accounts, defaultVal = 'ALL') {
+    if (!accountSelect || !accounts) return;
+    const currentSelection = accountSelect.value || defaultVal;
+    const sortedAccounts = Array.from(new Set(accounts)).sort();
+    accountSelect.innerHTML = '<option value="ALL">ALL</option>' +
+        sortedAccounts.map(acc => `<option value="${acc}">${acc}</option>`).join('');
+    accountSelect.value = sortedAccounts.includes(currentSelection) ? currentSelection : defaultVal;
+}
+
+function _renderConnectBtn(actionsDiv) {
+    if (!actionsDiv) return;
+    actionsDiv.innerHTML = `<button id="btn-connect" class="btn-header btn-connect">Connect</button>`;
+    document.getElementById('btn-connect')?.addEventListener('click', connectSchwab);
+}
+
 export function setRefreshBtnLoading(loading) {
     const btn = document.getElementById('btn-refresh-data');
     if (!btn) return;
@@ -16,14 +37,13 @@ export function setRefreshBtnLoading(loading) {
 }
 
 export async function checkSchwabStatus() {
-    const user = auth.currentUser;
-    if (!user) return;
+    const token = await _getAuthToken();
+    if (!token) return;
 
     const actionsDiv = document.getElementById('schwab-actions');
     const refreshBtn = document.getElementById('btn-refresh-data');
 
     try {
-        const token = await user.getIdToken();
         const response = await fetch('/api/schwab/status', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -31,29 +51,18 @@ export async function checkSchwabStatus() {
 
         if (data.connected) {
             if (refreshBtn) refreshBtn.style.display = "inline-block";
-
-            actionsDiv.innerHTML = `
-                <button id="btn-disconnect" class="btn-header btn-disconnect">Disconnect</button>
-            `;
-            document.getElementById('btn-disconnect').addEventListener('click', disconnectSchwab);
-
+            actionsDiv.innerHTML = `<button id="btn-disconnect" class="btn-header btn-disconnect">Disconnect</button>`;
+            document.getElementById('btn-disconnect')?.addEventListener('click', disconnectSchwab);
             fetchSchwabPortfolio();
         } else {
             if (refreshBtn) refreshBtn.style.display = "none";
-
-            actionsDiv.innerHTML = `
-                <button id="btn-connect" class="btn-header btn-connect">Connect</button>
-            `;
-            document.getElementById('btn-connect').addEventListener('click', connectSchwab);
+            _renderConnectBtn(actionsDiv);
             clearDashboard();
         }
     } catch (error) {
         console.error("Error checking Schwab status:", error);
         if (refreshBtn) refreshBtn.style.display = "none";
-        actionsDiv.innerHTML = `
-            <button id="btn-connect" class="btn-header btn-connect">Connect</button>
-        `;
-        document.getElementById('btn-connect')?.addEventListener('click', connectSchwab);
+        _renderConnectBtn(actionsDiv);
     }
 }
 
@@ -98,11 +107,10 @@ export async function disconnectSchwab() {
 }
 
 export async function fetchSchwabPortfolio() {
-    const user = auth.currentUser;
-    if (!user) return;
+    const token = await _getAuthToken();
+    if (!token) return;
 
     const positionsContainer = document.getElementById('positions-container');
-
     setRefreshBtnLoading(true);
 
     if (positionsContainer) {
@@ -110,7 +118,6 @@ export async function fetchSchwabPortfolio() {
     }
 
     try {
-        const token = await user.getIdToken();
         const response = await fetch('/api/schwab/accounts', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -135,8 +142,8 @@ export async function fetchSchwabPortfolio() {
 }
 
 export async function fetchOptionChain() {
-    const user = auth.currentUser;
-    if (!user) {
+    const token = await _getAuthToken();
+    if (!token) {
         alert("Please sign in first.");
         return;
     }
@@ -163,7 +170,6 @@ export async function fetchOptionChain() {
     chainContainer.innerHTML = `<div class="no-data-msg"><p>Fetching options chain for ${symbol}...</p></div>`;
 
     try {
-        const token = await user.getIdToken();
         const query = new URLSearchParams({
             symbol: symbol,
             contractType: typeSelect
@@ -201,8 +207,8 @@ export async function fetchOptionChain() {
 }
 
 export async function fetchSPXBoxes() {
-    const user = auth.currentUser;
-    if (!user) {
+    const token = await _getAuthToken();
+    if (!token) {
         alert("Please sign in first.");
         return;
     }
@@ -223,7 +229,6 @@ export async function fetchSPXBoxes() {
     boxContainer.innerHTML = `<div class="no-data-msg"><p>Scanning SPX options chain for box spread opportunities...</p></div>`;
 
     try {
-        const token = await user.getIdToken();
         const query = new URLSearchParams();
         if (fromDate) query.append('fromDate', fromDate);
         if (toDate) query.append('toDate', toDate);
@@ -257,11 +262,11 @@ export async function fetchSPXBoxes() {
 // --- TRANSACTIONS ---
 // =====================================================================================
 
-export let allTransactions = [];
+let allTransactions = [];
 
 export async function fetchTransactions() {
-    const user = auth.currentUser;
-    if (!user) return;
+    const token = await _getAuthToken();
+    if (!token) return;
 
     const container = document.getElementById('transactions-container');
     container.innerHTML = `<div class="no-data-msg"><p>Loading stored transactions...</p></div>`;
@@ -287,7 +292,6 @@ export async function fetchTransactions() {
     if (toDateVal) queryParams.set('to_date', toDateVal);
 
     try {
-        const token = await user.getIdToken();
         const url = `/api/schwab/transactions?${queryParams.toString()}`;
         const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -296,19 +300,7 @@ export async function fetchTransactions() {
 
         if (response.ok) {
             allTransactions = data.transactions || [];
-
-            // Populate account dropdown options dynamically from returned accounts
-            if (accountSelect && data.accounts) {
-                const currentSelection = accountSelect.value || 'ALL';
-                const sortedAccounts = Array.from(new Set(data.accounts)).sort();
-                accountSelect.innerHTML = '<option value="ALL">ALL</option>' +
-                    sortedAccounts.map(acc => `<option value="${acc}">${acc}</option>`).join('');
-                if (sortedAccounts.includes(currentSelection)) {
-                    accountSelect.value = currentSelection;
-                } else {
-                    accountSelect.value = 'ALL';
-                }
-            }
+            _populateAccountDropdown(accountSelect, data.accounts);
 
             // Populate any extra transaction types dynamically
             if (typeSelect && allTransactions.length > 0) {
@@ -339,13 +331,11 @@ export async function fetchTransactions() {
     }
 }
 
-export async function applyTransactionFilters() {
-    await fetchTransactions();
-}
+export const applyTransactionFilters = fetchTransactions;
 
 export async function syncTransactions() {
-    const user = auth.currentUser;
-    if (!user) return;
+    const token = await _getAuthToken();
+    if (!token) return;
 
     const syncBtn = document.getElementById('btn-sync-transactions');
     const statusSpan = document.getElementById('txn-sync-status');
@@ -361,7 +351,6 @@ export async function syncTransactions() {
     setRefreshBtnLoading(true);
 
     try {
-        const token = await user.getIdToken();
         const response = await fetch('/api/schwab/sync_transactions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -383,7 +372,6 @@ export async function syncTransactions() {
                 statusSpan.textContent = msg;
                 statusSpan.className = 'txn-sync-status txn-sync-ok';
             }
-            // Refresh the table after a successful sync
             await fetchTransactions();
         } else {
             const errMsg = data.error || 'Sync failed';
@@ -407,11 +395,11 @@ export async function syncTransactions() {
     }
 }
 
-export let allRealized = [];
+let allRealized = [];
 
 export async function fetchRealized() {
-    const user = auth.currentUser;
-    if (!user) return;
+    const token = await _getAuthToken();
+    if (!token) return;
 
     const container = document.getElementById('realized-container');
     container.innerHTML = `<div class="no-data-msg"><p>Loading realized transactions...</p></div>`;
@@ -424,8 +412,7 @@ export async function fetchRealized() {
     const typeSelect = document.getElementById('realized-type');
 
     // Default fromDate is 1st January of current year
-    const currentYear = new Date().getFullYear();
-    const defaultFromDate = `${currentYear}-01-01`;
+    const defaultFromDate = `${new Date().getFullYear()}-01-01`;
     if (fromDateInput && !fromDateInput.value) {
         fromDateInput.value = defaultFromDate;
     }
@@ -444,7 +431,6 @@ export async function fetchRealized() {
     if (toDateVal) queryParams.set('to_date', toDateVal);
 
     try {
-        const token = await user.getIdToken();
         const url = `/api/schwab/realized?${queryParams.toString()}`;
         const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -453,20 +439,7 @@ export async function fetchRealized() {
 
         if (response.ok) {
             allRealized = data.realized_transactions || [];
-
-            // Populate account dropdown options dynamically from returned accounts
-            if (accountSelect && data.accounts) {
-                const currentSelection = accountSelect.value || 'ALL';
-                const sortedAccounts = Array.from(new Set(data.accounts)).sort();
-                accountSelect.innerHTML = '<option value="ALL">ALL</option>' +
-                    sortedAccounts.map(acc => `<option value="${acc}">${acc}</option>`).join('');
-                if (sortedAccounts.includes(currentSelection)) {
-                    accountSelect.value = currentSelection;
-                } else {
-                    accountSelect.value = 'ALL';
-                }
-            }
-
+            _populateAccountDropdown(accountSelect, data.accounts);
             renderRealized(allRealized);
         } else {
             const errMsg = data.error || 'Failed to load realized transactions';
@@ -480,14 +453,11 @@ export async function fetchRealized() {
     }
 }
 
-export async function applyRealizedFilters() {
-    await fetchRealized();
-}
-
+export const applyRealizedFilters = fetchRealized;
 
 export async function fetchAndShowRollChain(symbol, accountNumber = '') {
-    const user = auth.currentUser;
-    if (!user) return;
+    const token = await _getAuthToken();
+    if (!token) return;
 
     if (!accountNumber && lastPositions && lastPositions.length > 0) {
         const matchingPos = lastPositions.find(p => p.symbol === symbol && (p.accountNumber || p.account));
@@ -504,7 +474,6 @@ export async function fetchAndShowRollChain(symbol, accountNumber = '') {
     renderRollChainModal({ roll_chain: { target_symbol: symbol, chain: [] } });
 
     try {
-        const token = await user.getIdToken();
         const queryParams = new URLSearchParams({
             symbol,
             account: accountNumber
@@ -524,12 +493,10 @@ export async function fetchAndShowRollChain(symbol, accountNumber = '') {
     }
 }
 
-
 export async function submitOrder(orderData) {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Please sign in first.");
+    const token = await _getAuthToken();
+    if (!token) throw new Error("Please sign in first.");
 
-    const token = await user.getIdToken();
     const response = await fetch('/api/schwab/order', {
         method: 'POST',
         headers: {
@@ -546,12 +513,10 @@ export async function submitOrder(orderData) {
     return result;
 }
 
-
 export async function fetchOptionChainRaw(symbol, contractType = 'CALL') {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Please sign in first.");
+    const token = await _getAuthToken();
+    if (!token) throw new Error("Please sign in first.");
 
-    const token = await user.getIdToken();
     const query = new URLSearchParams({
         symbol: symbol.trim().toUpperCase(),
         contractType: contractType.toUpperCase()

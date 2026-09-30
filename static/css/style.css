@@ -141,22 +141,12 @@ body {
     gap: 10px;
 }
 
-.header-logo {
-    font-size: 1.2rem;
-    font-weight: 800;
-    background: linear-gradient(to right, #0052a3, #0066cc);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
 .header-right {
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
 }
-
-
 
 /* ── Shared badge/pill base ─────────────────────────────────────────── */
 /* Use modifier classes (.badge-pill--green, --red, --blue, --amber) for colour */
@@ -192,24 +182,6 @@ body {
     background-color: rgba(217, 119, 6, 0.1);
     color: var(--accent-amber);
     border-color: rgba(217, 119, 6, 0.25);
-}
-
-/* status-pill: larger padding variant reuses badge-pill colour modifiers */
-.status-pill {
-    padding: 4px 12px;
-    font-size: 0.8rem;
-}
-
-.status-pill.connected {
-    background-color: rgba(16, 185, 129, 0.1);
-    color: var(--accent-green);
-    border-color: rgba(16, 185, 129, 0.3);
-}
-
-.status-pill.disconnected {
-    background-color: rgba(239, 68, 68, 0.1);
-    color: var(--accent-red);
-    border-color: rgba(239, 68, 68, 0.3);
 }
 
 .btn-header {
@@ -259,62 +231,6 @@ body {
     padding: 0 16px;
 }
 
-/* Summary Grid layout */
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 24px;
-    margin-bottom: 32px;
-}
-
-.summary-card {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 20px;
-    box-shadow: var(--shadow-md);
-}
-
-.summary-card h4 {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 12px;
-}
-
-.summary-value {
-    font-size: 1.8rem;
-    font-weight: 750;
-    margin-bottom: 6px;
-}
-
-.summary-subtext {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
-.summary-subtext strong {
-    color: var(--text-primary);
-}
-
-.todo-list-pills {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-top: 0;
-}
-
-.todo-pill {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    border-radius: 0 !important;
-    font-size: 0.80rem;
-    font-weight: 500;
-    line-height: 1.35;
-}
-
 .action-type-badge {
     font-weight: 600;
     font-size: 0.82rem;
@@ -330,39 +246,6 @@ body {
 
 .action-type-roll {
     color: var(--accent-red);
-}
-
-/* Inline Action Badges for Position Rows */
-.badge-action-inline {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 1px 6px;
-    border-radius: 4px;
-    margin-left: 0;
-    vertical-align: middle;
-    letter-spacing: 0.02em;
-    line-height: 1.25;
-}
-
-.badge-action-inline.action-type-sto {
-    background: rgba(37, 99, 235, 0.12);
-    color: var(--accent-blue);
-    border: 1px solid rgba(37, 99, 235, 0.25);
-}
-
-.badge-action-inline.action-type-btc {
-    background: rgba(16, 185, 129, 0.12);
-    color: #059669;
-    border: 1px solid rgba(16, 185, 129, 0.25);
-}
-
-.badge-action-inline.action-type-roll {
-    background: rgba(217, 119, 6, 0.12);
-    color: var(--accent-amber);
-    border: 1px solid rgba(217, 119, 6, 0.25);
 }
 
 /* Account Summary Bar (Desktop) */
@@ -413,23 +296,6 @@ body {
     gap: 4px;
 }
 
-.account-actions-section {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-color);
-    background-color: var(--bg-secondary);
-}
-
-.account-actions-header {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-/* Extends .badge-pill with amber colour modifier */
 .account-actions-count {
     font-size: 0.72rem;
     font-weight: 600;
@@ -626,9 +492,7 @@ tr:hover td {
     display: none;
 }
 
-.symbol-text,
-.badge-underlying,
-.badge-option {
+.symbol-text {
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
@@ -860,51 +724,6 @@ td[data-label="Symbol"] {
     color: var(--accent-blue);
 }
 
-.underlying-stats {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-}
-
-.underlying-stat {
-    display: flex;
-    flex-direction: column;
-}
-
-.underlying-stat-label {
-    font-size: 0.72rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    font-weight: 700;
-}
-
-.underlying-stat-value {
-    font-size: 1.1rem;
-    font-weight: 700;
-}
-
-/* Call / Put Badges — share structural base with .badge-pill */
-.badge-call,
-.badge-put {
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: 700;
-    font-size: 0.75rem;
-    border: 1px solid transparent;
-}
-
-.badge-call {
-    background-color: rgba(22, 163, 74, 0.1);
-    color: #15803d;
-    border-color: rgba(22, 163, 74, 0.25);
-}
-
-.badge-put {
-    background-color: rgba(220, 38, 38, 0.1);
-    color: #b91c1c;
-    border-color: rgba(220, 38, 38, 0.25);
-}
-
 /* DTE Group Visual Elements */
 .dte-group-row td {
     background: #f1f5f9 !important;
@@ -933,16 +752,6 @@ td[data-label="Symbol"] {
 .dte-group-date {
     font-size: 0.82rem;
     color: var(--text-primary);
-}
-
-.dte-pill {
-    background: rgba(37, 99, 235, 0.1);
-    color: var(--accent-blue-hover);
-    border: 1px solid rgba(37, 99, 235, 0.2);
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-weight: 700;
-    font-size: 0.8rem;
 }
 
 .dte-bg-group-0 {
@@ -995,9 +804,6 @@ tr.row-put:hover td {
         gap: 10px;
     }
 
-    .header-logo {
-        font-size: 1.2rem;
-    }
 
     .header-nav {
         width: 100%;
@@ -1033,11 +839,6 @@ tr.row-put:hover td {
         padding: 0 12px;
     }
 
-    .summary-grid {
-        grid-template-columns: 1fr;
-        gap: 16px;
-        margin-bottom: 20px;
-    }
 
     .section-card {
         padding: 16px 12px;
@@ -1155,10 +956,6 @@ tr.row-put:hover td {
         font-size: 1.1rem;
     }
 
-    .underlying-stats {
-        width: 100%;
-        justify-content: space-between;
-    }
 
     /* Tables horizontal scroll touch optimization */
     .table-responsive {
@@ -1206,14 +1003,6 @@ tr.row-put:hover td {
         gap: 4px;
     }
 
-    .account-actions-section {
-        padding: 8px 12px !important;
-    }
-
-    .account-actions-header {
-        margin-bottom: 6px !important;
-        font-size: 0.82rem !important;
-    }
 
     .mobile-action-row {
         display: flex;
@@ -1328,7 +1117,8 @@ tr.row-put:hover td {
     #positions-container tr.group-end-row.row-stripe-roll,
     #positions-container tr.row-stripe-roll:not(.group-header-row):not(.group-spacer-row),
     #positions-container tbody tr.row-stripe-roll:not(.group-header-row):not(.group-spacer-row),
-    .mobile-card-table tbody tr.row-stripe-roll {
+    .mobile-card-table tbody tr.row-stripe-roll,
+    .mobile-card-table tr.row-stripe-roll {
         border-left: 3.5px solid #eab308 !important;
     }
 
@@ -1337,7 +1127,8 @@ tr.row-put:hover td {
     #positions-container tr.group-end-row.row-stripe-btc,
     #positions-container tr.row-stripe-btc:not(.group-header-row):not(.group-spacer-row),
     #positions-container tbody tr.row-stripe-btc:not(.group-header-row):not(.group-spacer-row),
-    .mobile-card-table tbody tr.row-stripe-btc {
+    .mobile-card-table tbody tr.row-stripe-btc,
+    .mobile-card-table tr.row-stripe-btc {
         border-left: 3.5px solid #10b981 !important;
     }
 
@@ -1346,7 +1137,8 @@ tr.row-put:hover td {
     #positions-container tr.group-end-row.row-stripe-sto,
     #positions-container tr.row-stripe-sto:not(.group-header-row):not(.group-spacer-row),
     #positions-container tbody tr.row-stripe-sto:not(.group-header-row):not(.group-spacer-row),
-    .mobile-card-table tbody tr.row-stripe-sto {
+    .mobile-card-table tbody tr.row-stripe-sto,
+    .mobile-card-table tr.row-stripe-sto {
         border-left: 3.5px solid #3b82f6 !important;
     }
 
@@ -1488,9 +1280,6 @@ tr.row-put:hover td {
         display: none !important;
     }
 
-    .hide-if-empty {
-        display: none !important;
-    }
 }
 
 @media (max-width: 480px) {
@@ -1644,8 +1433,6 @@ tr.row-put:hover td {
    ============================================================ */
 
 /* Position Table Row Selection & Hover */
-
-/* Position Table Row Selection & Hover */
 .schwab-positions-table {
     border-collapse: collapse !important;
     width: 100%;
@@ -1729,10 +1516,6 @@ tr.row-put:hover td {
     font-size: 0.79rem;
 }
 
-.cost-basis-cell {
-    color: var(--text-primary) !important;
-    font-weight: 500;
-}
 
 /* Pending order rows */
 tr.pending-order-row td {
@@ -1798,23 +1581,6 @@ details.account-actions-section[open] .actions-collapsible-bar .actions-toggle-l
     display: none !important;
 }
 
-/* Roll Chain Button & Modal Styling */
-.btn-icon-chain {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-size: 0.85rem;
-    padding: 2px 4px;
-    margin-left: 4px;
-    border-radius: 4px;
-    transition: background 0.15s ease, transform 0.15s ease;
-    vertical-align: middle;
-}
-
-.btn-icon-chain:hover {
-    background: var(--bg-hover);
-    transform: scale(1.15);
-}
 
 .modal-overlay {
     position: fixed;
@@ -2177,7 +1943,8 @@ details.account-actions-section[open] .actions-collapsible-bar .actions-toggle-l
     #positions-container tr.group-end-row.row-stripe-roll,
     #positions-container tr.row-stripe-roll:not(.group-header-row):not(.group-spacer-row),
     #positions-container tbody tr.row-stripe-roll:not(.group-header-row):not(.group-spacer-row),
-    .mobile-card-table tbody tr.row-stripe-roll {
+    .mobile-card-table tbody tr.row-stripe-roll,
+    .mobile-card-table tr.row-stripe-roll {
         border-left: 3.5px solid #eab308 !important;
     }
     #positions-container tr.row-stripe-btc,
@@ -2185,7 +1952,8 @@ details.account-actions-section[open] .actions-collapsible-bar .actions-toggle-l
     #positions-container tr.group-end-row.row-stripe-btc,
     #positions-container tr.row-stripe-btc:not(.group-header-row):not(.group-spacer-row),
     #positions-container tbody tr.row-stripe-btc:not(.group-header-row):not(.group-spacer-row),
-    .mobile-card-table tbody tr.row-stripe-btc {
+    .mobile-card-table tbody tr.row-stripe-btc,
+    .mobile-card-table tr.row-stripe-btc {
         border-left: 3.5px solid #10b981 !important;
     }
     #positions-container tr.row-stripe-sto,
@@ -2193,10 +1961,12 @@ details.account-actions-section[open] .actions-collapsible-bar .actions-toggle-l
     #positions-container tr.group-end-row.row-stripe-sto,
     #positions-container tr.row-stripe-sto:not(.group-header-row):not(.group-spacer-row),
     #positions-container tbody tr.row-stripe-sto:not(.group-header-row):not(.group-spacer-row),
-    .mobile-card-table tbody tr.row-stripe-sto {
+    .mobile-card-table tbody tr.row-stripe-sto,
+    .mobile-card-table tr.row-stripe-sto {
         border-left: 3.5px solid #3b82f6 !important;
     }
 }
+
 
 /* --- Roll Mode Order Placement Modal Styling --- */
 .order-modal-card.roll-mode {
