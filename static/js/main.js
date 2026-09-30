@@ -68,7 +68,7 @@ document.getElementById('btn-refresh-data')?.addEventListener('click', () => {
 // =====================================================================================
 // --- HEADER TAB NAVIGATION ---
 // =====================================================================================
-const TAB_KEYS = ['portfolio', 'stocks', 'chain', 'box', 'realized', 'transactions'];
+const TAB_KEYS = ['portfolio', 'realized', 'transactions', 'stocks', 'chain', 'box'];
 const TAB_MAP = Object.fromEntries(TAB_KEYS.map(key => [
     key,
     {
