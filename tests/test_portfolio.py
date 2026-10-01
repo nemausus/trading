@@ -588,7 +588,7 @@ class TestAccountSummary(unittest.TestCase):
         self.assertEqual(summary["Todo"], "STO 2x MSFT (+2.50%)")
 
     def test_todo_actions_rollout(self):
-        """Test ROLLOUT rule triggers when sold call delta > 0.50."""
+        """Test ROLL rule triggers when sold call delta > 0.50."""
         short_call = _make_option_pos(
             "AAPL  271231C00295000", short_qty=1, avg_price=5.0, market_value=-500.0, short_pl=0.0
         )
@@ -606,7 +606,7 @@ class TestAccountSummary(unittest.TestCase):
             result = sp.process_accounts_data([account], "fake_token")
 
         summary = result["summaries"][0]
-        self.assertIn("ROLLOUT 1x AAPL  271231C00295000 (0.65,", summary["Todo"])
+        self.assertIn("ROLL 1x AAPL  271231C00295000 (0.65,", summary["Todo"])
 
 
 # ---------------------------------------------------------------------------

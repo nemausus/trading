@@ -459,6 +459,12 @@ tr:hover td {
     font-weight: 500;
 }
 
+.val-warning,
+.val-yellow {
+    color: var(--accent-amber);
+    font-weight: 500;
+}
+
 /* Table & text utility helper classes */
 .text-right {
     text-align: right !important;
@@ -1111,7 +1117,7 @@ tr.row-put:hover td {
         border-top-right-radius: 0 !important;
     }
 
-    /* Mobile Action Stripes (ROLL=yellow, BTC=green, STO=blue) */
+    /* Mobile Action Stripes (ROLL=yellow, BTC=green, STO=blue, EXIT=red) */
     #positions-container tr.row-stripe-roll,
     #positions-container tr.group-start-row.row-stripe-roll,
     #positions-container tr.group-end-row.row-stripe-roll,
@@ -1140,6 +1146,23 @@ tr.row-put:hover td {
     .mobile-card-table tbody tr.row-stripe-sto,
     .mobile-card-table tr.row-stripe-sto {
         border-left: 3.5px solid #3b82f6 !important;
+    }
+
+    #positions-container tr.row-stripe-exit,
+    #positions-container tr.row-strip-exit,
+    #positions-container tr.group-start-row.row-stripe-exit,
+    #positions-container tr.group-start-row.row-strip-exit,
+    #positions-container tr.group-end-row.row-stripe-exit,
+    #positions-container tr.group-end-row.row-strip-exit,
+    #positions-container tr.row-stripe-exit:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tr.row-strip-exit:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tbody tr.row-stripe-exit:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tbody tr.row-strip-exit:not(.group-header-row):not(.group-spacer-row),
+    .mobile-card-table tbody tr.row-stripe-exit,
+    .mobile-card-table tbody tr.row-strip-exit,
+    .mobile-card-table tr.row-stripe-exit,
+    .mobile-card-table tr.row-strip-exit {
+        border-left: 3.5px solid #ef4444 !important;
     }
 
     #box-container tr.group-start-row:not(:first-child) {
@@ -1936,6 +1959,10 @@ details.account-actions-section[open] .actions-collapsible-bar .actions-toggle-l
 .row-stripe-sto > td:first-child {
     border-left: 3.5px solid #3b82f6 !important;
 }
+.row-stripe-exit > td:first-child,
+.row-strip-exit > td:first-child {
+    border-left: 3.5px solid #ef4444 !important;
+}
 
 @media (max-width: 900px) {
     #positions-container tr.row-stripe-roll,
@@ -1964,6 +1991,22 @@ details.account-actions-section[open] .actions-collapsible-bar .actions-toggle-l
     .mobile-card-table tbody tr.row-stripe-sto,
     .mobile-card-table tr.row-stripe-sto {
         border-left: 3.5px solid #3b82f6 !important;
+    }
+    #positions-container tr.row-stripe-exit,
+    #positions-container tr.row-strip-exit,
+    #positions-container tr.group-start-row.row-stripe-exit,
+    #positions-container tr.group-start-row.row-strip-exit,
+    #positions-container tr.group-end-row.row-stripe-exit,
+    #positions-container tr.group-end-row.row-strip-exit,
+    #positions-container tr.row-stripe-exit:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tr.row-strip-exit:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tbody tr.row-stripe-exit:not(.group-header-row):not(.group-spacer-row),
+    #positions-container tbody tr.row-strip-exit:not(.group-header-row):not(.group-spacer-row),
+    .mobile-card-table tbody tr.row-stripe-exit,
+    .mobile-card-table tbody tr.row-strip-exit,
+    .mobile-card-table tr.row-stripe-exit,
+    .mobile-card-table tr.row-strip-exit {
+        border-left: 3.5px solid #ef4444 !important;
     }
 }
 

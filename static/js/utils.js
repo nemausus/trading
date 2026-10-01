@@ -83,6 +83,16 @@ export function getPLPercentFormatting(plPercent, decimals = 2) {
     };
 }
 
+export function getDeltaCssClass(delta) {
+    if (delta === null || delta === undefined || delta === 0 || isNaN(delta)) {
+        return '';
+    }
+    const absDelta = Math.abs(delta);
+    if (absDelta > 0.70) return 'val-negative';
+    if (absDelta > 0.50) return 'val-warning val-yellow';
+    return 'val-positive';
+}
+
 export function getTradeTypeBadgeClass(tradeType) {
     switch (tradeType) {
         case 'Call Short':

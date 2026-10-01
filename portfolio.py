@@ -42,9 +42,10 @@ _SPX_BOX_ROUNDING = 10_000.0
 _TODO_EXCLUDE = frozenset(("QQQM", "VTI", "SPX"))
 
 # Strategy thresholds for action recommendations
-_BTC_PROFIT_TAKE_PCT = 60.0
-_BTC_DELTA_LOW_THRESHOLD = 0.10
-_ROLLOUT_DELTA_HIGH_THRESHOLD = 0.50
+_BTC_PROFIT_TAKE_PCT = 50.0
+_BTC_DELTA_THRESHOLD = 0.10
+_ROLL_DELTA_THRESHOLD = 0.50
+_EXIT_DELTA_THRESHOLD = 0.70
 _MPR_ANNUALIZATION_FACTOR = 3000.0
 
 
@@ -311,7 +312,7 @@ def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]
                 ):
                     pos["action"] = f"STO {underlying}"
 
-    # 2. Sold call options rules: BTC (P/L% >= 60% or delta < 0.10) and ROLLOUT (delta > 0.50)
+    # 2. Sold call options rules: BTC (P/L% >= 60% or delta < 0.10) and ROLL (delta > 0.50)
     for pos in positions:
         acc = pos["accountNumber"]
         symbol = pos["symbol"]
@@ -328,28 +329,22 @@ def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]
                     opt_qty_str = f"{abs(int(qty))}x "
 
                     # BTC rule: total gain >= 60% OR (0.0 < delta < 0.10)
-                    if pl_pct >= _BTC_PROFIT_TAKE_PCT or (0.0 < delta < _BTC_DELTA_LOW_THRESHOLD):
-                        actions_by_account.setdefault(acc, []).append(
-                            _opt_action_str("BTC", opt_qty_str, symbol, delta, dte, mpr)
-                        )
-                        pos["action"] = f"BTC {symbol}"
+                    action = None
+                    if pl_pct >= _BTC_PROFIT_TAKE_PCT or (0.0 < delta < _BTC_DELTA_THRESHOLD):
+                        action = "BTC"
+                    elif delta > _EXIT_DELTA_THRESHOLD:
+                        action = "EXIT"
+                    elif delta > _ROLL_DELTA_THRESHOLD:
+                        action = "ROLL"
 
-                    if delta > _ROLLOUT_DELTA_HIGH_THRESHOLD:
-                        actions_by_account.setdefault(acc, []).append(
-                            _opt_action_str("ROLLOUT", opt_qty_str, symbol, delta, dte, mpr)
-                        )
-                        pos["action"] = f"ROLL {symbol}"
+                    if action:
+                        actions_by_account.setdefault(acc, []).append(f"{action} {opt_qty_str}{symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)")
+                        pos["action"] = f"{action} {symbol}"
+
             except Exception as e:
                 logging.warning("Could not parse option symbol %s for action check: %s", symbol, e)
 
     return {acc: "; ".join(items) for acc, items in actions_by_account.items()}
-
-
-def _opt_action_str(
-    prefix: str, qty_str: str, symbol: str, delta: float, dte: int, mpr: float
-) -> str:
-    """Format a BTC/ROLLOUT action string for display in the Todo field."""
-    return f"{prefix} {qty_str}{symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
 
 
 def _enrich_quotes(positions: list, quotes: dict) -> None:

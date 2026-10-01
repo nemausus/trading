@@ -2,7 +2,7 @@ import {
     formatCurrency, formatPercent, formatNumber,
     baseUnderlying, sortPositionsGrouped, isOption,
     getPLFormatting, getPLPercentFormatting, getSymbolBadgeClass,
-    formatOptionSymbol, getTradeTypeBadgeClass,
+    formatOptionSymbol, getTradeTypeBadgeClass, getDeltaCssClass,
     escapeHtml
 } from './utils.js';
 
@@ -81,7 +81,7 @@ export function renderDashboard(data) {
 }
 
 function parseActionItem(accNum, actionStr) {
-    const match = actionStr.match(/^(STO|BTC|ROLLOUT)\s+(\d+x)\s+(.+?)\s+\((.+?)\)$/);
+    const match = actionStr.match(/^(STO|BTC|ROLL|EXIT)\s+(\d+x)\s+(.+?)\s+\((.+?)\)$/);
     if (match) {
         return {
             account: accNum,
@@ -103,7 +103,7 @@ function parseActionItem(accNum, actionStr) {
 function renderAccountActionsHtml(sum) {
     if (!sum || !sum.Todo) return '';
 
-    const itemStrs = sum.Todo.split(/;\s*|,\s*(?=(?:STO|BTC|ROLLOUT)\b)/).map(s => s.trim()).filter(Boolean);
+    const itemStrs = sum.Todo.split(/;\s*|,\s*(?=(?:STO|BTC|ROLL|EXIT)\b)/).map(s => s.trim()).filter(Boolean);
     if (itemStrs.length === 0) return '';
 
     const actions = itemStrs.map(s => parseActionItem(sum.accountNumber, s)).filter(Boolean);
@@ -115,7 +115,8 @@ function renderAccountActionsHtml(sum) {
     actions.forEach(act => {
         let typeClass = 'action-type-sto';
         if (act.type === 'BTC') typeClass = 'action-type-btc';
-        else if (act.type === 'ROLLOUT') typeClass = 'action-type-roll';
+        else if (act.type === 'ROLL') typeClass = 'action-type-roll';
+        else if (act.type === 'EXIT') typeClass = 'action-type-roll';
 
         rowsHtml += `
             <tr>
@@ -346,10 +347,7 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                 const hasOptionsMetrics = (pos.dte >= 0) || (pos.delta !== 0) || (pos.mpr !== 0);
 
                 const dteCssClass = (pos.dte >= 0 && pos.dte < 14) ? 'val-negative' : '';
-                let deltaCssClass = '';
-                if (pos.delta !== undefined && pos.delta !== 0) {
-                    deltaCssClass = Math.abs(pos.delta) < 0.50 ? 'val-positive' : 'val-negative';
-                }
+                const deltaCssClass = getDeltaCssClass(pos.delta);
 
                 let pendingOrdersDesktopHtml = '';
                 let pendingOrdersMobileHtml = '';
@@ -421,6 +419,8 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
                         stripeClass = 'row-stripe-btc';
                     } else if (actUpper.startsWith('STO')) {
                         stripeClass = 'row-stripe-sto';
+                    } else if (actUpper.startsWith('EXIT')) {
+                        stripeClass = 'row-stripe-exit';
                     }
                 }
 
@@ -1168,6 +1168,7 @@ export function renderRollCandidatesTable(candidates, rollContext, selectedSymbo
         const markDisplay = `$${candMark.toFixed(2)}`;
         const bidAskDisplay = `${c.bid !== undefined ? `$${Number(c.bid).toFixed(2)}` : '-'} / ${c.ask !== undefined ? `$${Number(c.ask).toFixed(2)}` : '-'}`;
         const deltaDisplay = (c.delta !== undefined && c.delta !== 0) ? Number(c.delta).toFixed(2) : '-';
+        const candDeltaCssClass = getDeltaCssClass(c.delta);
 
         return `
             <tr class="roll-candidate-row ${isSelected ? 'selected-roll-candidate' : ''}"
@@ -1180,7 +1181,7 @@ export function renderRollCandidatesTable(candidates, rollContext, selectedSymbo
                 <td style="text-align: right; font-weight: 600;">${strikeDisplay}</td>
                 <td style="text-align: right; font-weight: 600; color: var(--text-primary);">${markDisplay}</td>
                 <td style="text-align: right; color: var(--text-secondary); font-size: 0.74rem;">${bidAskDisplay}</td>
-                <td style="text-align: center;">${deltaDisplay}</td>
+                <td style="text-align: center;" class="${candDeltaCssClass}">${deltaDisplay}</td>
                 <td style="text-align: right;">${diffBadgeHtml}</td>
                 <td style="text-align: center;">
                     <button type="button" class="btn-select-target" data-symbol="${c.symbol}">
