@@ -11,30 +11,6 @@ import script
 
 class TestScriptCLI(unittest.TestCase):
 
-    @patch("script.constants.get_all_account_hashes")
-    @patch("script.constants.resolve_account_hash")
-    @patch("script.constants.get_account_hash_for_number")
-    def test_resolve_account_hashes(self, mock_get_hash, mock_resolve_hash, mock_all):
-        mock_all.return_value = ["hash1", "hash2"]
-        mock_resolve_hash.side_effect = lambda x: (
-            "hash_primary"
-            if x in ("primary", "ind")
-            else ("hash_secondary" if x in ("secondary", "ira") else None)
-        )
-        mock_get_hash.return_value = "hash_suffix"
-
-        self.assertEqual(script.resolve_account_hashes("all"), ["hash1", "hash2"])
-        self.assertEqual(script.resolve_account_hashes(None), ["hash1", "hash2"])
-        self.assertEqual(script.resolve_account_hashes("primary"), ["hash_primary"])
-        self.assertEqual(script.resolve_account_hashes("ind"), ["hash_primary"])
-        self.assertEqual(script.resolve_account_hashes("secondary"), ["hash_secondary"])
-        self.assertEqual(script.resolve_account_hashes("ira"), ["hash_secondary"])
-
-        mock_get_hash.assert_not_called()
-        res = script.resolve_account_hashes("acc2")
-        self.assertEqual(res, ["hash_suffix"])
-        mock_get_hash.assert_called_once_with("acc2")
-
     @patch("script.firestore_db.get_db")
     def test_resolve_uid_auto_discovery(self, mock_get_db):
         mock_doc = MagicMock()
@@ -92,6 +68,66 @@ class TestScriptCLI(unittest.TestCase):
             symbol="NVDA",
         )
 
+    def test_primary_transfer_item_and_enrichment(self):
+        txn_trade = {
+            "transferItems": [
+                {
+                    "positionEffect": "OPENING",
+                    "price": 2.5,
+                    "amount": 2.0,
+                    "instrument": {"assetType": "OPTION", "symbol": "AAPL  261219C00295000", "underlyingSymbol": "AAPL"},
+                },
+                {
+                    "instrument": {"assetType": "CURRENCY", "symbol": "CURRENCY_USD"},
+                },
+            ]
+        }
+        primary = script.firestore_db._primary_transfer_item(txn_trade)
+        self.assertIsNotNone(primary)
+        self.assertEqual(primary["instrument"]["symbol"], "AAPL  261219C00295000")
+
+        enriched = script.firestore_db.enrich_transaction(dict(txn_trade))
+        self.assertEqual(enriched["symbol"], "AAPL  261219C00295000")
+        self.assertEqual(enriched["underlyingSymbol"], "AAPL")
+        self.assertEqual(enriched["assetType"], "OPTION")
+        self.assertEqual(enriched["positionEffect"], "OPENING")
+        self.assertEqual(enriched["price"], 2.5)
+        self.assertEqual(enriched["amount"], 2.0)
+
+        txn_dividend = {
+            "transferItems": [
+                {
+                    "instrument": {"assetType": "CURRENCY", "symbol": "CURRENCY_USD"},
+                }
+            ]
+        }
+        primary_div = script.firestore_db._primary_transfer_item(txn_dividend)
+        self.assertIsNotNone(primary_div)
+        self.assertEqual(primary_div["instrument"]["symbol"], "CURRENCY_USD")
+
+        enriched_div = script.firestore_db.enrich_transaction(dict(txn_dividend))
+        self.assertEqual(enriched_div["symbol"], "—")
+
+        self.assertIsNone(script.firestore_db._primary_transfer_item({}))
+        self.assertIsNone(script.firestore_db._primary_transfer_item({"transferItems": []}))
+
+    def test_matches_txn_symbol_ignores_currency(self):
+        txn_trade = {
+            "transferItems": [
+                {
+                    "positionEffect": "OPENING",
+                    "instrument": {"assetType": "OPTION", "symbol": "AAPL  261219C00295000", "underlyingSymbol": "AAPL"},
+                },
+                {
+                    "instrument": {"assetType": "CURRENCY", "symbol": "CURRENCY_USD"},
+                },
+            ]
+        }
+        # Searching for USD should NOT match the cash leg of an equity/option trade
+        self.assertFalse(script.firestore_db._matches_txn_symbol(txn_trade, "USD"))
+        # Searching for the security symbol SHOULD match
+        self.assertTrue(script.firestore_db._matches_txn_symbol(txn_trade, "AAPL"))
+
     def test_build_parser_order(self):
         parser = script.build_parser()
 
@@ -136,8 +172,7 @@ class TestScriptCLI(unittest.TestCase):
     @patch("script.SchwabAuthManager")
     @patch("script.orders.execute_order")
     @patch("script.orders.build_single_order")
-    @patch("script.constants.get_account_number_for_hash", return_value="acc1")
-    def test_handle_order_command(self, mock_acc_num, mock_build, mock_execute, mock_auth_cls):
+    def test_handle_order_command(self, mock_build, mock_execute, mock_auth_cls):
         mock_auth = MagicMock()
         mock_auth.refresh_user_tokens_if_needed.return_value = "valid_token"
         mock_auth_cls.return_value = mock_auth
@@ -149,7 +184,7 @@ class TestScriptCLI(unittest.TestCase):
         with patch("sys.stdout"):
             script.handle_order_command(
                 uid="uid1",
-                account_hash="hash123",
+                acc_num="acc1",
                 symbol="AAPL  260821C00205000",
                 quantity=1,
                 instruction="BTC",
@@ -184,7 +219,7 @@ class TestScriptCLI(unittest.TestCase):
         with patch("sys.stdout"):
             script.handle_order_command(
                 uid="uid1",
-                account_hash="hash123",
+                acc_num="acc1",
                 symbol="AAPL  260821C00205000",
                 quantity=1,
                 instruction="BTC",

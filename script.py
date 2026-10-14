@@ -60,6 +60,7 @@ def resolve_uid(uid_arg: str | None) -> str:
 
     raise RuntimeError("No user UID specified and no users found in Firestore.")
 
+
 def handle_txns_command(
     uid: str,
     account_numbers: list[str],
@@ -116,25 +117,18 @@ def handle_txns_command(
         time_str = str(t.get("time", ""))[:10]
         acc_num = t.get("accountNumber", "N/A")
         processed = str(t.get("processed", False))
+        net_amt = t.get("netAmount", 0.0)
 
-        transfer_items = t.get("transferItems", [])
-        if transfer_items:
-            for item in transfer_items:
-                inst = item.get("instrument", {}) or {}
-                sym = inst.get("symbol", "N/A")[:24]
-                pos_eff = item.get("positionEffect") or "N/A"
-                amount = item.get("amount", 0.0)
-                price = item.get("price", 0.0)
-                net_amt = t.get("netAmount", 0.0)
-                print(
-                    f"{act_id:<15} {time_str:<12} {acc_num:<8} {sym:<24} {pos_eff:<10} {amount:>8.2f} {price:>10.2f} {net_amt:>12.2f} {processed:<10}"
-                )
-        else:
-            net_amt = t.get("netAmount", 0.0)
-            txn_type = t.get("type", "N/A")[:24]
-            print(
-                f"{act_id:<15} {time_str:<12} {acc_num:<8} {txn_type:<24} {'N/A':<10} {'0.00':>8} {'0.00':>10} {net_amt:>12.2f} {processed:<10}"
-            )
+        sym = str(t.get("symbol") or "—")[:24]
+        if sym == "—" and t.get("type"):
+            sym = str(t.get("type"))[:24]
+        pos_eff = t.get("positionEffect") or "N/A"
+        amount = t.get("amount", 0.0)
+        price = t.get("price", 0.0)
+
+        print(
+            f"{act_id:<15} {time_str:<12} {acc_num:<8} {sym:<24} {pos_eff:<10} {amount:>8.2f} {price:>10.2f} {net_amt:>12.2f} {processed:<10}"
+        )
 
     print(f"\nTotal: {len(txns)} transaction(s) listed.")
 

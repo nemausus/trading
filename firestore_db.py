@@ -115,17 +115,66 @@ def _txn_collection(db, uid: str, account_number: str):
     return _account_subcollection(db, uid, account_number, "transactions")
 
 
+def _primary_transfer_item(txn: dict) -> dict | None:
+    """Extract the primary non-currency transfer item from a transaction."""
+    items = txn.get("transferItems") or []
+    for it in items:
+        inst = it.get("instrument") or {}
+        if (inst.get("assetType") or "").upper() != "CURRENCY" and inst.get("symbol") != "CURRENCY_USD":
+            return it
+    return items[0] if items else None
+
+
+def enrich_transaction(txn: dict) -> dict:
+    """Enrich a transaction dict with normalized top-level instrument fields."""
+    if "symbol" in txn:
+        return txn
+
+    primary = _primary_transfer_item(txn)
+    if primary:
+        inst = primary.get("instrument", {}) or {}
+        raw_sym = inst.get("symbol") or ""
+        txn["symbol"] = "—" if raw_sym == "CURRENCY_USD" else raw_sym
+        und = inst.get("underlyingSymbol")
+        if not und and raw_sym and raw_sym != "CURRENCY_USD":
+            und = base_symbol(raw_sym)
+        txn["underlyingSymbol"] = und or ""
+        txn["assetType"] = inst.get("assetType") or ""
+        txn["positionEffect"] = primary.get("positionEffect") or ""
+        txn["price"] = primary.get("price", 0.0)
+        txn["amount"] = primary.get("amount", 0.0)
+    else:
+        txn.setdefault("symbol", "—")
+        txn.setdefault("underlyingSymbol", "")
+        txn.setdefault("assetType", "")
+        txn.setdefault("positionEffect", "")
+        txn.setdefault("price", 0.0)
+        txn.setdefault("amount", 0.0)
+    return txn
+
+
 def _matches_txn_symbol(txn: dict, symbol: str) -> bool:
     if not symbol or symbol.strip().upper() == "ALL":
         return True
+    enrich_transaction(txn)
     target = symbol.strip().upper()
+    sym = (txn.get("symbol") or "").strip().upper()
+    und_sym = (txn.get("underlyingSymbol") or "").strip().upper()
+    if sym and sym != "—" and target in sym:
+        return True
+    if und_sym and target in und_sym:
+        return True
+    if target == "CURRENCY_USD" and (sym == "CURRENCY_USD" or sym == "—"):
+        return True
     for item in txn.get("transferItems", []):
         inst = item.get("instrument", {}) or {}
-        raw_sym = (inst.get("symbol") or "").strip().upper()
-        und_sym = (inst.get("underlyingSymbol") or "").strip().upper()
-        if not und_sym and raw_sym:
-            und_sym = base_symbol(raw_sym).strip().upper()
-        if target in und_sym or target in raw_sym:
+        if (inst.get("assetType") or "").upper() == "CURRENCY" or inst.get("symbol") == "CURRENCY_USD":
+            continue
+        raw = (inst.get("symbol") or "").strip().upper()
+        und = (inst.get("underlyingSymbol") or "").strip().upper()
+        if not und and raw:
+            und = base_symbol(raw).strip().upper()
+        if (raw and target in raw) or (und and target in und):
             return True
     return False
 
@@ -177,6 +226,7 @@ def get_transactions(
         if "activityId" not in data:
             data["activityId"] = doc.id
         data.pop("fetched_at", None)
+        enrich_transaction(data)
 
         if target_type and (data.get("type") or "").upper() != target_type:
             continue
@@ -240,6 +290,7 @@ def get_unprocessed_transactions(
         if "activityId" not in data:
             data["activityId"] = doc.id
         data.pop("fetched_at", None)
+        enrich_transaction(data)
         unprocessed.append(data)
     unprocessed.sort(key=lambda x: x.get("time", ""))
     return unprocessed[:limit]

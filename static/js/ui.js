@@ -679,12 +679,11 @@ export function renderTransactions(transactions) {
     // --- Build rows ---
     let rowsHtml = transactions.map(txn => {
         const primary = _primaryTransferItem(txn);
-        const instrument = primary?.instrument || {};
-        const symbol = instrument.symbol || '—';
-        const assetType = instrument.assetType || '';
-        const posEffect = primary?.positionEffect || '';
-        const price = primary?.price;
-        const amount = primary?.amount;
+        const symbol = txn.symbol || primary?.instrument?.symbol || '—';
+        const assetType = txn.assetType !== undefined ? txn.assetType : (primary?.instrument?.assetType || '');
+        const posEffect = txn.positionEffect !== undefined ? txn.positionEffect : (primary?.positionEffect || '');
+        const price = txn.price !== undefined ? txn.price : primary?.price;
+        const amount = txn.amount !== undefined ? txn.amount : primary?.amount;
 
         const priceDisplay = price != null && price !== 0
             ? formatCurrency(price)
