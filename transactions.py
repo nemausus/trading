@@ -18,7 +18,7 @@ import logging
 
 import firestore_db
 import schwab_api
-from constants import SCHWAB_TZ, get_account_hash
+from constants import SCHWAB_TZ, get_account_hash_for_number
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ def _fetch_transactions_raw(
     """
     data = schwab_api.get_transactions(
         access_token,
-        get_account_hash(account_number),
+        get_account_hash_for_number(account_number),
         start_date=from_date,
         end_date=to_date,
     )

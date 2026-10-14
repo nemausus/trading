@@ -1,7 +1,7 @@
 import datetime
 import logging
 
-from constants import SCHWAB_TZ, get_account_hash
+from constants import SCHWAB_TZ, get_account_hash_for_number
 import schwab_api
 from schwab_api import SchwabAPIError
 from option_symbol import (
@@ -94,7 +94,7 @@ def fetch_active_orders(access_token: str, account_nums: list) -> list:
         try:
             orders_data = schwab_api.get_orders(
                 access_token,
-                get_account_hash(acc_num),
+                get_account_hash_for_number(acc_num),
                 from_entered_time=from_date,
                 to_entered_time=to_date,
             )

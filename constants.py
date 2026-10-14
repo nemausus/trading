@@ -39,18 +39,18 @@ def init_accounts() -> None:
     accounts = {ind.name: ind, ira.name: ira}
 
 
-def get_account_hash(account_number: str) -> str:
+def get_account_hash_for_number(account_number: str) -> str:
     for account in accounts.values():
         if account.number == account_number:
             return account.hash
-    raise ValueError("Invalid account number")
+    raise ValueError(f"Invalid account number: {account_number}")
 
 
 def get_account_number_for_hash(account_hash: str) -> str:
     for account in accounts.values():
         if account.hash == account_hash:
             return account.number
-    raise ValueError("Invalid account Hash")
+    raise ValueError(f"Invalid account Hash: {account_hash}")
 
 
 def get_all_account_hashes() -> list[str]:
@@ -67,7 +67,7 @@ def resolve_account_hash(account_param: str | None) -> list[str]:
     val = account_param.strip()
     if val in accounts:
         return [accounts[val].hash]
-    return [get_account_hash(val)]
+    return [get_account_hash_for_number(val)]
 
 
 def resolve_account_number(account_param: str | None) -> list[str]:
