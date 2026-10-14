@@ -303,7 +303,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Account name ('ind', 'ira', 'all') or account number.",
     )
     parser.add_argument(
-        "-s", "--symbol", type=str, help="Filter by ticker or underlying symbol (e.g. NVDA, IBIT)."
+        "-s",
+        "--symbol",
+        type=str,
+        help="Ticker or OCC option symbol (e.g. AAPL, NVDA, 'AAPL  260821C00205000').",
     )
     parser.add_argument(
         "--uid", type=str, help="Firebase User ID (auto-discovered from Firestore if omitted)."
@@ -383,13 +386,6 @@ def build_parser() -> argparse.ArgumentParser:
     # order subcommand
     order_parser = subparsers.add_parser(
         "order", aliases=["place-order"], help="Place or preview an order on Charles Schwab."
-    )
-    order_parser.add_argument(
-        "-s",
-        "--symbol",
-        type=str,
-        required=True,
-        help="Ticker or OCC option symbol (e.g. AAPL, 'AAPL  260821C00205000').",
     )
     order_parser.add_argument(
         "-q",
@@ -474,7 +470,9 @@ def main() -> None:
             to_date=getattr(args, "to_date", None),
             trade_type=getattr(args, "trade_type", None),
         )
-    elif args.command == "order":
+    elif args.command in ("order", "place-order"):
+        if not args.symbol:
+            parser.error("the following arguments are required: -s/--symbol")
         is_preview = args.preview
         assert len(account_hashes) == 1
         handle_order_command(

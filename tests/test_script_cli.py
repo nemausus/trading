@@ -133,6 +133,21 @@ class TestScriptCLI(unittest.TestCase):
         self.assertEqual(args_alias.symbol, "NVDA")
         self.assertEqual(args_alias.order_type, "MARKET")
 
+        args_main_first = parser.parse_args(
+            [
+                "-s",
+                "SPY",
+                "order",
+                "-q",
+                "5",
+                "-i",
+                "SELL",
+            ]
+        )
+        self.assertEqual(args_main_first.command, "order")
+        self.assertEqual(args_main_first.symbol, "SPY")
+        self.assertEqual(args_main_first.quantity, 5.0)
+
     @patch("script.SchwabAuthManager")
     @patch("script.orders.execute_order")
     @patch("script.orders.build_single_order")
