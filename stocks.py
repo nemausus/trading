@@ -5,6 +5,7 @@ Service module for historical stock price data, normalization, parameter validat
 and in-memory caching.
 """
 
+from collections import OrderedDict
 import logging
 import re
 import threading
@@ -19,6 +20,7 @@ _INTRADAY_INTERVALS = {"1M", "5M", "15M", "30M"}
 
 _DEFAULT_DAILY_TTL = 900  # 15 minutes for daily/weekly/monthly data
 _DEFAULT_INTRADAY_TTL = 60  # 1 minute for intraday data
+_DEFAULT_MAX_ENTRIES = 100  # maximum entries kept in cache
 
 _TICKER_REGEX = re.compile(r"^[A-Z0-9.\-\/\$]{1,10}$")
 
@@ -26,13 +28,25 @@ _TICKER_REGEX = re.compile(r"^[A-Z0-9.\-\/\$]{1,10}$")
 class StockHistoryCache:
     """Thread-safe in-memory cache for historical stock price data."""
 
+    MAX_ENTRIES = _DEFAULT_MAX_ENTRIES
+
     def __init__(
-        self, daily_ttl: int = _DEFAULT_DAILY_TTL, intraday_ttl: int = _DEFAULT_INTRADAY_TTL
+        self,
+        daily_ttl: int = _DEFAULT_DAILY_TTL,
+        intraday_ttl: int = _DEFAULT_INTRADAY_TTL,
+        max_entries: int = _DEFAULT_MAX_ENTRIES,
     ):
+        if max_entries <= 0:
+            raise ValueError("max_entries must be greater than 0.")
         self._daily_ttl = daily_ttl
         self._intraday_ttl = intraday_ttl
-        self._cache: dict[str, tuple[float, int, dict]] = {}
+        self._max_entries = max_entries
+        self._cache: OrderedDict[str, tuple[float, int, dict]] = OrderedDict()
         self._lock = threading.Lock()
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._cache)
 
     def _make_key(self, symbol: str, period: str, interval: str) -> str:
         return f"{symbol.upper()}|{period.upper()}|{interval.upper()}"
@@ -48,17 +62,38 @@ class StockHistoryCache:
             if time.time() - cached_at > ttl:
                 del self._cache[key]
                 return None
+            self._cache.move_to_end(key)
             return data
 
     def set(
         self, symbol: str, period: str, interval: str, data: dict, ttl: int | None = None
     ) -> None:
         """Store history data in cache with appropriate TTL."""
+        if self._max_entries <= 0:
+            return
         key = self._make_key(symbol, period, interval)
         if ttl is None:
             norm_interval = interval.strip().upper()
             ttl = self._intraday_ttl if norm_interval in _INTRADAY_INTERVALS else self._daily_ttl
         with self._lock:
+            if key in self._cache:
+                self._cache[key] = (time.time(), ttl, data)
+                self._cache.move_to_end(key)
+                return
+
+            if len(self._cache) >= self._max_entries:
+                now = time.time()
+                expired = [
+                    k
+                    for k, (cached_at, entry_ttl, _) in self._cache.items()
+                    if now - cached_at > entry_ttl
+                ]
+                for k in expired:
+                    del self._cache[k]
+
+            while len(self._cache) >= self._max_entries:
+                self._cache.popitem(last=False)
+
             self._cache[key] = (time.time(), ttl, data)
 
     def clear(self) -> None:

@@ -338,7 +338,9 @@ def _compute_todo(positions: list, quotes: dict | None = None) -> dict[str, str]
                         action = "ROLL"
 
                     if action:
-                        actions_by_account.setdefault(acc, []).append(f"{action} {opt_qty_str}{symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)")
+                        actions_by_account.setdefault(acc, []).append(
+                            f"{action} {opt_qty_str}{symbol} ({delta:.2f}, {dte}d, {mpr:.2f}%)"
+                        )
                         pos["action"] = f"{action} {symbol}"
 
             except Exception as e:

@@ -68,7 +68,9 @@ def _validate_chain_params(
     if max_strike is not None:
         _validate_range("max_strike", max_strike, lo=0.0, hi=1000000.0, typ=(int, float))
     if min_strike is not None and max_strike is not None and min_strike > max_strike:
-        raise ValueError(f"min_strike ({min_strike}) cannot be greater than max_strike ({max_strike}).")
+        raise ValueError(
+            f"min_strike ({min_strike}) cannot be greater than max_strike ({max_strike})."
+        )
 
 
 def parse_exp_map(exp_map: dict, stock_price: float, contract_type_label: str) -> list:

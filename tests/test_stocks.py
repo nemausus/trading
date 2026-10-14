@@ -268,6 +268,81 @@ class TestStockHistoryCache(unittest.TestCase):
         self.cache.clear()
         self.assertIsNone(self.cache.get("MSFT", "1Y", "1D"))
 
+    def test_default_max_entries(self):
+        self.assertEqual(StockHistoryCache.MAX_ENTRIES, 100)
+        self.assertEqual(stocks.stocks_cache._max_entries, 100)
+        new_cache = StockHistoryCache()
+        self.assertEqual(new_cache._max_entries, 100)
+        self.assertEqual(len(new_cache), 0)
+
+    def test_invalid_max_entries(self):
+        with self.assertRaises(ValueError):
+            StockHistoryCache(max_entries=0)
+        with self.assertRaises(ValueError):
+            StockHistoryCache(max_entries=-5)
+
+    def test_cache_max_entries_eviction(self):
+        small_cache = StockHistoryCache(max_entries=3)
+        small_cache.set("A", "1Y", "1D", {"val": "A"})
+        small_cache.set("B", "1Y", "1D", {"val": "B"})
+        small_cache.set("C", "1Y", "1D", {"val": "C"})
+        self.assertEqual(len(small_cache), 3)
+
+        # Adding 4th item should evict the oldest item 'A'
+        small_cache.set("D", "1Y", "1D", {"val": "D"})
+        self.assertEqual(len(small_cache), 3)
+        self.assertIsNone(small_cache.get("A", "1Y", "1D"))
+        self.assertEqual(small_cache.get("B", "1Y", "1D"), {"val": "B"})
+        self.assertEqual(small_cache.get("C", "1Y", "1D"), {"val": "C"})
+        self.assertEqual(small_cache.get("D", "1Y", "1D"), {"val": "D"})
+
+    def test_cache_lru_order_on_get(self):
+        small_cache = StockHistoryCache(max_entries=3)
+        small_cache.set("A", "1Y", "1D", {"val": "A"})
+        small_cache.set("B", "1Y", "1D", {"val": "B"})
+        small_cache.set("C", "1Y", "1D", {"val": "C"})
+
+        # Access 'A' to make it most recently used
+        self.assertEqual(small_cache.get("A", "1Y", "1D"), {"val": "A"})
+
+        # Now inserting 'D' should evict 'B' (the least recently used), preserving 'A'
+        small_cache.set("D", "1Y", "1D", {"val": "D"})
+        self.assertEqual(len(small_cache), 3)
+        self.assertIsNone(small_cache.get("B", "1Y", "1D"))
+        self.assertEqual(small_cache.get("A", "1Y", "1D"), {"val": "A"})
+        self.assertEqual(small_cache.get("C", "1Y", "1D"), {"val": "C"})
+        self.assertEqual(small_cache.get("D", "1Y", "1D"), {"val": "D"})
+
+    def test_cache_evicts_expired_before_lru(self):
+        small_cache = StockHistoryCache(max_entries=2)
+        small_cache.set("A", "1Y", "1D", {"val": "A"}, ttl=0.05)
+        small_cache.set("B", "1Y", "1D", {"val": "B"}, ttl=100)
+        time.sleep(0.08)
+
+        # 'A' has expired. Adding 'C' should prune 'A' rather than evicting valid 'B'
+        small_cache.set("C", "1Y", "1D", {"val": "C"})
+        self.assertEqual(len(small_cache), 2)
+        self.assertIsNone(small_cache.get("A", "1Y", "1D"))
+        self.assertEqual(small_cache.get("B", "1Y", "1D"), {"val": "B"})
+        self.assertEqual(small_cache.get("C", "1Y", "1D"), {"val": "C"})
+
+    def test_cache_update_existing_key_does_not_evict(self):
+        small_cache = StockHistoryCache(max_entries=2)
+        small_cache.set("A", "1Y", "1D", {"val": "A1"})
+        small_cache.set("B", "1Y", "1D", {"val": "B"})
+
+        # Updating existing key 'A'
+        small_cache.set("A", "1Y", "1D", {"val": "A2"})
+        self.assertEqual(len(small_cache), 2)
+        self.assertEqual(small_cache.get("A", "1Y", "1D"), {"val": "A2"})
+        self.assertEqual(small_cache.get("B", "1Y", "1D"), {"val": "B"})
+
+        # Adding 'C' now evicts 'B' since 'A' was updated more recently
+        small_cache.set("C", "1Y", "1D", {"val": "C"})
+        self.assertIsNone(small_cache.get("B", "1Y", "1D"))
+        self.assertEqual(small_cache.get("A", "1Y", "1D"), {"val": "A2"})
+        self.assertEqual(small_cache.get("C", "1Y", "1D"), {"val": "C"})
+
 
 class TestFetchStockHistoryService(unittest.TestCase):
     """Tests for high-level fetch_stock_history service function."""
