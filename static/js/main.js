@@ -2,7 +2,7 @@ import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from '.
 import { checkSchwabStatus, fetchSchwabPortfolio, fetchOptionChain, fetchSPXBoxes, fetchTransactions, syncTransactions, rawChainData, fetchRealized, fetchAndShowRollChain, submitOrder, fetchOptionChainRaw } from './api.js';
 import { showView, clearDashboard, lastPositions, closeRollChainModal, openOrderModal, closeOrderModal, renderOptionChainTable, renderRollCandidatesTable } from './ui.js';
 import { baseUnderlying, isPutOption, formatOptionSymbol, parseOptionStrike, isMarkWithinPercent, escapeHtml } from './utils.js';
-import { initStockPage, loadStockData, onStocksTabActivated, resizeStockChart } from './stocks/stock-page.js';
+import { loadAllCharts, onChartsTabActivated } from './stocks/charts-page.js';
 
 // Parse URL params on load
 const urlParams = new URLSearchParams(window.location.search);
@@ -54,7 +54,7 @@ let currentTabKey = 'portfolio';
 
 const TAB_REFRESH_ACTIONS = {
     portfolio: fetchSchwabPortfolio,
-    stocks: loadStockData,
+    charts: loadAllCharts,
     chain: fetchOptionChain,
     box: fetchSPXBoxes,
     transactions: syncTransactions,
@@ -62,13 +62,14 @@ const TAB_REFRESH_ACTIONS = {
 };
 
 document.getElementById('btn-refresh-data')?.addEventListener('click', () => {
-    (TAB_REFRESH_ACTIONS[currentTabKey] || fetchSchwabPortfolio)();
+    const action = TAB_REFRESH_ACTIONS[currentTabKey] || fetchSchwabPortfolio;
+    action(true);
 });
 
 // =====================================================================================
 // --- HEADER TAB NAVIGATION ---
 // =====================================================================================
-const TAB_KEYS = ['portfolio', 'realized', 'transactions', 'stocks', 'chain', 'box'];
+const TAB_KEYS = ['portfolio', 'realized', 'transactions', 'charts', 'chain', 'box'];
 const TAB_MAP = Object.fromEntries(TAB_KEYS.map(key => [
     key,
     {
@@ -102,8 +103,8 @@ function navigateToTab(tabKey) {
     const entry = TAB_MAP[currentTabKey];
     switchTab(entry.btn, entry.content, currentTabKey);
 
-    if (currentTabKey === 'stocks') {
-        onStocksTabActivated();
+    if (currentTabKey === 'charts') {
+        onChartsTabActivated();
     } else if (currentTabKey === 'transactions') {
         if (!txnsLoaded) {
             txnsLoaded = true;
@@ -132,8 +133,6 @@ window.addEventListener('hashchange', () => {
 TAB_KEYS.forEach(key => {
     TAB_MAP[key].btn?.addEventListener('click', () => navigateToTab(key));
 });
-
-window.addEventListener('resize', resizeStockChart);
 
 // =====================================================================================
 // --- OPTION CHAIN EXPLORER ---

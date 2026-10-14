@@ -1,0 +1,73 @@
+<!-- TAB: CHARTS CONTENT (multi-ticker chart grid) -->
+<div id="tab-content-charts" class="tab-content">
+    <div class="stocks-tab-container">
+
+        <!-- Controls Card: shared period/interval + indicator toggles for every chart -->
+        <div class="section-card">
+            <div class="stocks-filter-bar">
+                <div class="stocks-input-group charts-tickers-group">
+                    <label for="charts-tickers-input">Tickers:</label>
+                    <input type="text" id="charts-tickers-input" class="stocks-input-ticker charts-tickers-input"
+                           placeholder="e.g. AAPL, MSFT, NVDA" autocomplete="off" spellcheck="false">
+                    <button id="btn-charts-apply" class="btn-stock-load">Apply</button>
+                </div>
+
+                <div class="stocks-input-group">
+                    <label for="charts-period-select">Period:</label>
+                    <select id="charts-period-select" class="stocks-select">
+                        <option value="5D">5D</option>
+                        <option value="1M">1M</option>
+                        <option value="3M">3M</option>
+                        <option value="6M">6M</option>
+                        <option value="1Y" selected>1Y</option>
+                        <option value="2Y">2Y</option>
+                        <option value="5Y">5Y</option>
+                    </select>
+                </div>
+
+                <div class="stocks-input-group">
+                    <label for="charts-interval-select">Interval:</label>
+                    <select id="charts-interval-select" class="stocks-select">
+                        <option value="1M">1m</option>
+                        <option value="5M">5m</option>
+                        <option value="15M">15m</option>
+                        <option value="30M">30m</option>
+                        <option value="1D" selected>1D</option>
+                        <option value="1W">1W</option>
+                        <option value="1MO">1MO</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="indicators-bar">
+                <label class="indicator-checkbox-label">
+                    <input type="checkbox" id="charts-toggle-sma50" data-indicator="sma50" checked>
+                    <span class="indicator-dot dot-sma50"></span>
+                    SMA 50
+                </label>
+                <label class="indicator-checkbox-label">
+                    <input type="checkbox" id="charts-toggle-sma200" data-indicator="sma200" checked>
+                    <span class="indicator-dot dot-sma200"></span>
+                    SMA 200
+                </label>
+                <label class="indicator-checkbox-label">
+                    <input type="checkbox" id="charts-toggle-volume" data-indicator="volume" checked>
+                    <span class="indicator-dot dot-volume"></span>
+                    Volume
+                </label>
+                <label class="indicator-checkbox-label">
+                    <input type="checkbox" id="charts-toggle-rsi" data-indicator="rsi" checked>
+                    <span class="indicator-dot dot-rsi"></span>
+                    RSI 14
+                </label>
+            </div>
+        </div>
+
+        <!-- Validation / status message -->
+        <div id="charts-status-msg" style="display: none;"></div>
+
+        <!-- Chart grid: cards are injected by charts-page.js -->
+        <div id="charts-grid" class="charts-grid"></div>
+
+    </div>
+</div>

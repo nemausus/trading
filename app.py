@@ -314,9 +314,12 @@ def stock_history(decoded_token, access_token, ticker):
     uid = decoded_token["uid"]
     period = request.args.get("period", "1Y")
     interval = request.args.get("interval", "1D")
+    refresh = request.args.get("refresh", "").lower() in ("1", "true", "yes")
 
     try:
-        data = stocks.fetch_stock_history(access_token, ticker, period=period, interval=interval)
+        data = stocks.fetch_stock_history(
+            access_token, ticker, period=period, interval=interval, use_cache=not refresh
+        )
         return jsonify(data)
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 400

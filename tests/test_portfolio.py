@@ -244,11 +244,11 @@ class TestCSP(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# process_accounts_data — Todo / uncovered longs
+# process_accounts_data — Action assignment / uncovered longs
 # ---------------------------------------------------------------------------
 
 
-class TestTodoList(unittest.TestCase):
+class TestActionAssignment(unittest.TestCase):
 
     def _run(self, accounts_json):
         with patch.object(sp, "fetch_quotes", return_value={}), patch.object(
@@ -257,19 +257,18 @@ class TestTodoList(unittest.TestCase):
             return sp.process_accounts_data(accounts_json, "fake_token")
 
     def test_uncovered_stock(self):
-        """100 shares of AAPL, no covered call → Todo should mention AAPL."""
+        """100 shares of AAPL, no covered call → action should be STO AAPL."""
         equity = _make_equity_pos(
             "AAPL", long_qty=100, avg_price=200.0, market_value=20000.0, long_pl=0.0
         )
         account = _make_account("ACC1", [equity])
         result = self._run([account])
 
-        todo = result["summaries"][0]["Todo"]
-        self.assertIn("AAPL", todo)
-        self.assertIn("1x", todo)
+        pos = result["positions"][0]
+        self.assertEqual(pos["action"], "STO AAPL")
 
     def test_covered_stock(self):
-        """100 shares of AAPL + 1 short call → fully covered, no Todo."""
+        """100 shares of AAPL + 1 short call → fully covered, no STO action."""
         equity = _make_equity_pos("AAPL", long_qty=100, avg_price=200.0, market_value=20000.0)
         call = _make_option_pos(
             "AAPL  271231C00295000", short_qty=1, market_value=-500.0, short_pl=0.0
@@ -277,8 +276,8 @@ class TestTodoList(unittest.TestCase):
         account = _make_account("ACC1", [equity, call])
         result = self._run([account])
 
-        todo = result["summaries"][0]["Todo"]
-        self.assertNotIn("AAPL", todo)
+        stock_pos = next(p for p in result["positions"] if p["symbol"] == "AAPL")
+        self.assertEqual(stock_pos["action"], "")
 
     def test_partially_covered(self):
         """200 shares of AAPL + 1 short call → 1 contract still uncovered."""
@@ -289,39 +288,42 @@ class TestTodoList(unittest.TestCase):
         account = _make_account("ACC1", [equity, call])
         result = self._run([account])
 
-        todo = result["summaries"][0]["Todo"]
-        self.assertIn("AAPL", todo)
-        self.assertIn("1x", todo)
+        stock_pos = next(p for p in result["positions"] if p["symbol"] == "AAPL")
+        self.assertEqual(stock_pos["action"], "STO AAPL")
 
     def test_excluded_tickers_not_in_todo(self):
-        """QQQM, VTI, SPX should never appear in the Todo list."""
+        """QQQM, VTI, SPX should never get STO action recommendations."""
         for ticker in ("QQQM", "VTI"):
             equity = _make_equity_pos(ticker, long_qty=100, avg_price=100.0, market_value=10000.0)
             account = _make_account("ACC1", [equity])
             result = self._run([account])
-            todo = result["summaries"][0]["Todo"]
-            self.assertNotIn(ticker, todo, f"{ticker} should be excluded from Todo")
+            pos = result["positions"][0]
+            self.assertEqual(pos["action"], "", f"{ticker} should be excluded from STO")
 
     def test_snow_included_in_todo(self):
-        """SNOW is not excluded and should appear in Todo when uncovered."""
+        """SNOW is not excluded and should have STO action when uncovered."""
         equity = _make_equity_pos("SNOW", long_qty=100, avg_price=150.0, market_value=15000.0)
         account = _make_account("ACC1", [equity])
         result = self._run([account])
-        todo = result["summaries"][0]["Todo"]
-        self.assertIn("SNOW", todo)
-        self.assertIn("1x", todo)
+        pos = result["positions"][0]
+        self.assertEqual(pos["action"], "STO SNOW")
 
     def test_long_call_counted_as_long(self):
-        """A long call option (1 contract) counts as 1 unit toward longs."""
-        call = _make_option_pos(
+        """A long call option (1 contract) + 100 shares with 1 short call leaves stock uncovered."""
+        stock = _make_equity_pos(
+            "AAPL", long_qty=100, avg_price=200.0, market_value=20000.0, long_pl=0.0
+        )
+        long_call = _make_option_pos(
             "AAPL  271231C00295000", long_qty=1, market_value=500.0, long_pl=0.0
         )
-        account = _make_account("ACC1", [call])
+        short_call = _make_option_pos(
+            "AAPL  261231C00300000", short_qty=1, market_value=-500.0, short_pl=0.0
+        )
+        account = _make_account("ACC1", [stock, long_call, short_call])
         result = self._run([account])
 
-        todo = result["summaries"][0]["Todo"]
-        self.assertIn("AAPL", todo)
-        self.assertIn("1x", todo)
+        stock_pos = next(p for p in result["positions"] if p["symbol"] == "AAPL")
+        self.assertEqual(stock_pos["action"], "STO AAPL")
 
 
 # ---------------------------------------------------------------------------
@@ -512,7 +514,6 @@ class TestAccountSummary(unittest.TestCase):
             "MaintReq",
             "Risk",
             "Total Loan",
-            "Todo",
         ):
             self.assertIn(field, s, f"Missing summary field: {field}")
 
@@ -543,7 +544,7 @@ class TestAccountSummary(unittest.TestCase):
         self.assertAlmostEqual(result["summaries"][0]["Cash"], 1234.56)
 
     def test_todo_actions_sto_and_btc(self):
-        """Test STO rule for uncovered stocks and BTC rule for sold calls (P/L% >= 60% or delta < 0.10)."""
+        """Test STO rule for uncovered stocks and BTC rule for sold calls (P/L% >= 50% or delta < 0.10)."""
         equity_pos = _make_equity_pos("AAPL", long_qty=100, market_value=20000.0)
         winning_call = _make_option_pos(
             "AAPL  271231C00295000", short_qty=1, avg_price=5.0, market_value=-100.0, short_pl=400.0
@@ -566,11 +567,9 @@ class TestAccountSummary(unittest.TestCase):
         ):
             result = sp.process_accounts_data([account], "fake_token")
 
-        summary = result["summaries"][0]
-        todo_text = summary["Todo"]
-
-        self.assertIn("BTC 1x AAPL  271231C00295000 (0.20,", todo_text)
-        self.assertIn("BTC 1x NVDA  271231C00300000 (0.05,", todo_text)
+        positions = {p["symbol"]: p for p in result["positions"]}
+        self.assertEqual(positions["AAPL  271231C00295000"]["action"], "BTC AAPL  271231C00295000")
+        self.assertEqual(positions["NVDA  271231C00300000"]["action"], "BTC NVDA  271231C00300000")
 
     def test_todo_actions_uncovered_sto(self):
         """Test STO rule triggers for uncovered stock position."""
@@ -584,8 +583,8 @@ class TestAccountSummary(unittest.TestCase):
         ):
             result = sp.process_accounts_data([account], "fake_token")
 
-        summary = result["summaries"][0]
-        self.assertEqual(summary["Todo"], "STO 2x MSFT (+2.50%)")
+        msft = result["positions"][0]
+        self.assertEqual(msft["action"], "STO MSFT")
 
     def test_todo_actions_rollout(self):
         """Test ROLL rule triggers when sold call delta > 0.50."""
@@ -605,8 +604,8 @@ class TestAccountSummary(unittest.TestCase):
         ):
             result = sp.process_accounts_data([account], "fake_token")
 
-        summary = result["summaries"][0]
-        self.assertIn("ROLL 1x AAPL  271231C00295000 (0.65,", summary["Todo"])
+        short_call_result = result["positions"][0]
+        self.assertEqual(short_call_result["action"], "ROLL AAPL  271231C00295000")
 
 
 # ---------------------------------------------------------------------------
@@ -672,7 +671,15 @@ class TestEnrichQuotes(unittest.TestCase):
         self.assertEqual(stock_pos["markPercentChange"], 1.25)
 
         self.assertIn("markPercentChange", option_pos)
-        self.assertEqual(option_pos["markPercentChange"], 0.50)
+        # Short position sign reversed: +0.50% quote price change -> -0.50% Day P/L
+        self.assertEqual(option_pos["markPercentChange"], -0.50)
+
+    def test_enrich_quotes_short_position_price_drop(self):
+        """When an instrument price drops, Day P/L for a short position is positive."""
+        short_pos = {"symbol": "AAPL  271231C00295000", "quantity": -2, "cost": -1000.0, "P/L": 0.0}
+        quotes = {"AAPL  271231C00295000": {"quote": {"markPercentChange": -1.50}}}
+        sp._enrich_quotes([short_pos], quotes)
+        self.assertEqual(short_pos["markPercentChange"], 1.50)
 
     def test_enrich_quotes_missing_quote_stock(self):
         stock_pos = {"symbol": "MSFT", "quantity": 50, "cost": 5000.0, "P/L": 0.0}

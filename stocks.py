@@ -6,10 +6,12 @@ and in-memory caching.
 """
 
 from collections import OrderedDict
+import datetime
 import logging
 import re
 import threading
 import time
+import zoneinfo
 
 import schwab_api
 from schwab_api import SchwabAPIError
@@ -17,6 +19,8 @@ from schwab_api import SchwabAPIError
 _VALID_PERIODS = {"5D", "1M", "3M", "6M", "1Y", "2Y", "5Y"}
 _VALID_INTERVALS = {"1M", "5M", "15M", "30M", "1D", "1W", "1MO"}
 _INTRADAY_INTERVALS = {"1M", "5M", "15M", "30M"}
+
+_CHICAGO_TZ = zoneinfo.ZoneInfo("America/Chicago")
 
 _DEFAULT_DAILY_TTL = 900  # 15 minutes for daily/weekly/monthly data
 _DEFAULT_INTRADAY_TTL = 60  # 1 minute for intraday data
@@ -250,7 +254,33 @@ def _map_period_and_interval(period: str, interval: str) -> tuple[dict, int | No
     return schwab_params, slice_last_n
 
 
-def _normalize_candle(raw: dict) -> dict | None:
+def _normalize_candle_time(time_sec: int, is_intraday: bool = False) -> int:
+    """Normalize candle timestamp in epoch seconds.
+
+    For daily, weekly, and monthly candles, Schwab reports datetime with midnight
+    in Central Time (00:00:00 America/Chicago). We align this to 00:00:00 UTC on
+    the same calendar trading day so frontend charts and tooltip legends show
+    the correct day regardless of browser timezone.
+
+    For intraday candles (1M, 5M, 15M, 30M), the exact timestamp is preserved.
+    """
+    if is_intraday or time_sec < 86400 * 365:
+        return time_sec
+
+    dt = datetime.datetime.fromtimestamp(time_sec, tz=_CHICAGO_TZ)
+    # If the hour is late evening in Chicago (18:00 - 23:59), the timestamp
+    # came from a 00:00:00 UTC source (e.g. synthetic test candle), so its
+    # calendar day belongs to the next UTC day.
+    if dt.hour >= 18:
+        dt = dt + datetime.timedelta(hours=6)
+
+    utc_midnight = datetime.datetime(
+        dt.year, dt.month, dt.day, 0, 0, 0, tzinfo=datetime.timezone.utc
+    )
+    return int(utc_midnight.timestamp())
+
+
+def _normalize_candle(raw: dict, is_intraday: bool = False) -> dict | None:
     """Normalize a single raw Schwab candle dict.
 
     Returns:
@@ -262,7 +292,8 @@ def _normalize_candle(raw: dict) -> dict | None:
         return None
     try:
         # Schwab reports datetime in milliseconds since epoch
-        time_sec = int(raw_dt) // 1000
+        raw_sec = int(raw_dt) // 1000
+        time_sec = _normalize_candle_time(raw_sec, is_intraday=is_intraday)
         open_val = round(float(raw.get("open", 0.0)), 4)
         high_val = round(float(raw.get("high", 0.0)), 4)
         low_val = round(float(raw.get("low", 0.0)), 4)
@@ -282,7 +313,10 @@ def _normalize_candle(raw: dict) -> dict | None:
 
 
 def normalize_price_history(
-    raw_response: dict, symbol: str, slice_last_n: int | None = None
+    raw_response: dict,
+    symbol: str,
+    slice_last_n: int | None = None,
+    is_intraday: bool = False,
 ) -> dict:
     """Normalize raw Schwab price history JSON response into clean OHLCV format.
 
@@ -297,7 +331,7 @@ def normalize_price_history(
 
     parsed = []
     for c in raw_candles:
-        norm = _normalize_candle(c)
+        norm = _normalize_candle(c, is_intraday=is_intraday)
         if norm is not None:
             parsed.append(norm)
 
@@ -362,6 +396,7 @@ def fetch_stock_history(
     clean_ticker = _clean_ticker(ticker)
     norm_period = _normalize_period_str(period)
     norm_interval = _normalize_interval_str(interval)
+    is_intraday = norm_interval in _INTRADAY_INTERVALS
 
     # Check cache first
     if use_cache:
@@ -375,6 +410,11 @@ def fetch_stock_history(
     # Map parameters to Schwab API request kwargs
     schwab_params, slice_last_n = _map_period_and_interval(norm_period, norm_interval)
 
+    # 2a (test code): Send end_date=now (in ms) on daily/weekly/monthly requests
+    # to test whether Schwab returns today's current trading day candle.
+    if not is_intraday:
+        schwab_params["end_date"] = int(time.time() * 1000)
+
     # Invoke Schwab pricehistory endpoint
     raw_resp = schwab_api.get_price_history(
         access_token,
@@ -383,7 +423,9 @@ def fetch_stock_history(
     )
 
     # Normalize response
-    result = normalize_price_history(raw_resp, clean_ticker, slice_last_n=slice_last_n)
+    result = normalize_price_history(
+        raw_resp, clean_ticker, slice_last_n=slice_last_n, is_intraday=is_intraday
+    )
 
     # Cache successful non-empty result
     if use_cache and result.get("candles"):

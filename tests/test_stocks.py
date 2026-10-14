@@ -231,6 +231,32 @@ class TestCandleNormalization(unittest.TestCase):
         res = normalize_price_history({"candles": []}, "AAPL")
         self.assertEqual(res, {"symbol": "AAPL", "candles": []})
 
+    def test_normalize_price_history_chicago_dst_and_standard(self):
+        # DST: Oct 13 2026 00:00:00 CDT is 05:00:00 UTC (1791867600000 ms)
+        # Should align to Oct 13 2026 00:00:00 UTC (1791849600 s)
+        raw_dst = {
+            "candles": [{"datetime": 1791867600000, "open": 100, "high": 101, "low": 99, "close": 100.5, "volume": 1000}]
+        }
+        res_dst = normalize_price_history(raw_dst, "AAPL", is_intraday=False)
+        self.assertEqual(res_dst["candles"][0]["time"], 1791849600)
+
+        # Standard time: Nov 10 2025 00:00:00 CST is 06:00:00 UTC (1762754400000 ms)
+        # Should align to Nov 10 2025 00:00:00 UTC (1762732800 s)
+        raw_std = {
+            "candles": [{"datetime": 1762754400000, "open": 200, "high": 202, "low": 198, "close": 201.0, "volume": 2000}]
+        }
+        res_std = normalize_price_history(raw_std, "AAPL", is_intraday=False)
+        self.assertEqual(res_std["candles"][0]["time"], 1762732800)
+
+    def test_normalize_price_history_intraday_preserves_timestamp(self):
+        # Intraday candle at 14:35 UTC should NOT be rounded to midnight
+        ts_ms = 1791899700000  # 1791899700 s
+        raw = {
+            "candles": [{"datetime": ts_ms, "open": 100, "high": 101, "low": 99, "close": 100.5, "volume": 500}]
+        }
+        res = normalize_price_history(raw, "AAPL", is_intraday=True)
+        self.assertEqual(res["candles"][0]["time"], 1791899700)
+
 
 class TestStockHistoryCache(unittest.TestCase):
     """Tests for thread-safe in-memory cache."""
@@ -335,9 +361,8 @@ class TestStockHistoryCache(unittest.TestCase):
         small_cache.set("A", "1Y", "1D", {"val": "A2"})
         self.assertEqual(len(small_cache), 2)
         self.assertEqual(small_cache.get("A", "1Y", "1D"), {"val": "A2"})
-        self.assertEqual(small_cache.get("B", "1Y", "1D"), {"val": "B"})
 
-        # Adding 'C' now evicts 'B' since 'A' was updated more recently
+        # Adding 'C' now evicts 'B' since 'A' was updated and accessed more recently
         small_cache.set("C", "1Y", "1D", {"val": "C"})
         self.assertIsNone(small_cache.get("B", "1Y", "1D"))
         self.assertEqual(small_cache.get("A", "1Y", "1D"), {"val": "A2"})
@@ -375,6 +400,24 @@ class TestFetchStockHistoryService(unittest.TestCase):
         res2 = fetch_stock_history("tok123", "AAPL", "1Y", "1D")
         self.assertEqual(res1, res2)
         self.assertEqual(mock_get_history.call_count, 1)
+
+    @patch("schwab_api.get_price_history")
+    def test_fetch_stock_history_daily_includes_end_date(self, mock_get_history):
+        mock_get_history.return_value = {"symbol": "AAPL", "candles": []}
+
+        # Daily request includes end_date
+        fetch_stock_history("tok123", "AAPL", "1Y", "1D", use_cache=False)
+        self.assertEqual(mock_get_history.call_count, 1)
+        _, kwargs = mock_get_history.call_args
+        self.assertIn("end_date", kwargs)
+        self.assertIsInstance(kwargs["end_date"], int)
+
+        # Intraday request does not pass end_date
+        mock_get_history.reset_mock()
+        fetch_stock_history("tok123", "AAPL", "5D", "5M", use_cache=False)
+        self.assertEqual(mock_get_history.call_count, 1)
+        _, kwargs = mock_get_history.call_args
+        self.assertNotIn("end_date", kwargs)
 
 
 class TestStockHistoryEndpoint(unittest.TestCase):

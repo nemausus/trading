@@ -80,105 +80,6 @@ export function renderDashboard(data) {
     renderUnifiedAccounts(data.summaries || [], lastPositions, lastOrders);
 }
 
-function parseActionItem(accNum, actionStr) {
-    const match = actionStr.match(/^(STO|BTC|ROLL|EXIT)\s+(\d+x)\s+(.+?)\s+\((.+?)\)$/);
-    if (match) {
-        return {
-            account: accNum,
-            type: match[1],
-            qty: match[2],
-            symbol: match[3],
-            details: match[4]
-        };
-    }
-    return {
-        account: accNum,
-        type: 'ACTION',
-        qty: '-',
-        symbol: actionStr,
-        details: '-'
-    };
-}
-
-function renderAccountActionsHtml(sum) {
-    if (!sum || !sum.Todo) return '';
-
-    const itemStrs = sum.Todo.split(/;\s*|,\s*(?=(?:STO|BTC|ROLL|EXIT)\b)/).map(s => s.trim()).filter(Boolean);
-    if (itemStrs.length === 0) return '';
-
-    const actions = itemStrs.map(s => parseActionItem(sum.accountNumber, s)).filter(Boolean);
-    actions.sort((a, b) => (a.type || '').localeCompare(b.type || ''));
-
-    let rowsHtml = '';
-    let mobileListHtml = '';
-
-    actions.forEach(act => {
-        let typeClass = 'action-type-sto';
-        if (act.type === 'BTC') typeClass = 'action-type-btc';
-        else if (act.type === 'ROLL') typeClass = 'action-type-roll';
-        else if (act.type === 'EXIT') typeClass = 'action-type-roll';
-
-        rowsHtml += `
-            <tr>
-                <td><span class="action-type-badge ${typeClass}">${act.type}</span></td>
-                <td style="text-align: right; font-weight: 500;">${act.qty}</td>
-                <td><span class="symbol-text">${formatOptionSymbol(act.symbol)}</span></td>
-                <td style="color: var(--text-secondary); font-size: 0.78rem;">${act.details}</td>
-            </tr>
-        `;
-
-        mobileListHtml += `
-            <div class="mobile-action-row">
-                <div class="mobile-action-left">
-                    <span class="action-type-badge ${typeClass}">${act.type}</span>
-                    <span style="font-weight: 500;">${act.qty}</span>
-                    <span class="symbol-text" style="font-weight: 500;">${formatOptionSymbol(act.symbol)}</span>
-                </div>
-                <div class="mobile-action-right">${act.details}</div>
-            </div>
-        `;
-    });
-
-    const summaryListStr = actions.slice(0, 3).map(a => `${a.type} ${a.qty} ${formatOptionSymbol(a.symbol)}`).join(', ') + (actions.length > 3 ? '...' : '');
-
-    return `
-        <details class="account-actions-section">
-            <summary class="actions-collapsible-bar" role="button" aria-label="Toggle action items">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="actions-toggle-icon">▸</span>
-                    <strong style="color: var(--text-primary); font-size: 0.80rem;">⚡ Action Items</strong>
-                    <span class="account-actions-count">${actions.length} Pending</span>
-                    <span class="desktop-only-col" style="font-size: 0.76rem; color: var(--text-secondary); margin-left: 4px;">${summaryListStr}</span>
-                </div>
-                <span class="actions-toggle-label" style="font-size: 0.74rem; color: var(--schwab-link); font-weight: 600;"></span>
-            </summary>
-
-            <div class="actions-collapsible-content" style="padding: 6px 12px; background: #ffffff;">
-                <!-- Desktop Table View -->
-                <div class="desktop-only-action-table table-responsive" style="border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 4px;">
-                    <table style="font-size: 0.78rem;">
-                        <thead>
-                            <tr style="background-color: var(--bg-tertiary);">
-                                <th>Action</th>
-                                <th style="text-align: right;">Qty</th>
-                                <th>Symbol</th>
-                                <th>Metrics / Details</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rowsHtml}
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Mobile Compact List View -->
-                <div class="mobile-only-action-list">
-                    ${mobileListHtml}
-                </div>
-            </div>
-        </details>
-    `;
-}
 
 export function renderUnifiedAccounts(summaries = [], positions = [], orders = []) {
     const container = document.getElementById('positions-container');
@@ -296,7 +197,6 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
             `;
         }
 
-        const actionsHtml = sum ? renderAccountActionsHtml(sum) : '';
 
         // Render Positions Table / Cards for this account
         let tableHtml = '';
@@ -469,7 +369,6 @@ export function renderUnifiedAccounts(summaries = [], positions = [], orders = [
         html += `
             <div class="section-card account-card" style="margin-bottom: 12px; padding: 0; overflow: hidden; border-radius: 6px;">
                 ${summaryBarHtml}
-                ${actionsHtml}
                 ${tableHtml}
             </div>
         `;

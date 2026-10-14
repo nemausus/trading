@@ -8,9 +8,20 @@
  */
 
 import { calculateSMA, calculateRSI } from './indicators.js';
-import { formatVolume, computePriceChange } from '../utils.js';
+import { formatVolume } from '../utils.js';
+
+// Keep in sync with .stock-chart-wrapper min-height in stocks.css
+const CHART_HEIGHT = 380;
+// Empty bars kept to the right of the last candle. Lightweight Charts' default
+// of 12 left a visible blank strip next to the price scale on narrow charts.
+const RIGHT_OFFSET_BARS = 2;
+const SECONDS_PER_DAY = 86400;
 
 export class StockChart {
+    /**
+     * @param {HTMLElement} containerElement - Element the chart canvas mounts into.
+     * @param {HTMLElement|null} tooltipElement - Element for the live OHLCV legend.
+     */
     constructor(containerElement, tooltipElement = null) {
         this.container = containerElement;
         this.tooltip = tooltipElement;
@@ -21,10 +32,8 @@ export class StockChart {
         this.sma50Series = null;
         this.sma200Series = null;
         this.rsiSeries = null;
-        this.rsiPriceLines = [];
 
         this.currentCandles = [];
-        this.currentSymbol = '';
         this.latestCandle = null;
 
         this.indicatorState = {
@@ -54,7 +63,7 @@ export class StockChart {
 
         // Container sizing
         const width = this.container.clientWidth || 800;
-        const height = 520;
+        const height = CHART_HEIGHT;
 
         this.chart = LC.createChart(this.container, {
             width: width,
@@ -91,9 +100,9 @@ export class StockChart {
             },
             timeScale: {
                 borderColor: '#e2e8f0',
-                timeVisible: true,
+                timeVisible: false, // enabled in setData() for intraday candles
                 secondsVisible: false,
-                rightOffset: 12,
+                rightOffset: RIGHT_OFFSET_BARS,
             },
             rightPriceScale: {
                 borderColor: '#e2e8f0',
@@ -158,19 +167,24 @@ export class StockChart {
         this._setupResizeObserver();
     }
 
+    /**
+     * Remove the RSI series (and its pane) if present.
+     */
+    _removeRSISeries() {
+        if (!this.rsiSeries) return;
+        try {
+            this.chart.removeSeries(this.rsiSeries);
+        } catch (e) {
+            // Ignore if already removed
+        }
+        this.rsiSeries = null;
+    }
+
     _setupRSISeries() {
         if (!this.chart || !window.LightweightCharts) return;
         const LC = window.LightweightCharts;
 
-        if (this.rsiSeries) {
-            try {
-                this.chart.removeSeries(this.rsiSeries);
-            } catch (e) {
-                // Ignore if already removed
-            }
-            this.rsiSeries = null;
-        }
-
+        this._removeRSISeries();
         if (!this.indicatorState.rsi) {
             return;
         }
@@ -259,10 +273,9 @@ export class StockChart {
     /**
      * Set new candlestick data and recalculate all indicators.
      *
-     * @param {string} symbol - Ticker symbol.
      * @param {Array<Object>} candles - Array of normalized candles.
      */
-    setData(symbol, candles) {
+    setData(candles) {
         if (!this.chart) {
             this._initChart();
         }
@@ -270,9 +283,13 @@ export class StockChart {
             return;
         }
 
-        this.currentSymbol = symbol;
         this.currentCandles = candles;
         this.latestCandle = candles[candles.length - 1];
+
+        // Show time-of-day on the axis only for intraday candles (daily bars would show e.g. "06:00")
+        const isIntraday = candles.length > 1 && (candles[1].time - candles[0].time) < SECONDS_PER_DAY;
+        this.isIntraday = isIntraday;
+        this.chart.applyOptions({ timeScale: { timeVisible: isIntraday } });
 
         // Format candlestick data for Lightweight Charts
         const candleData = candles.map(c => ({
@@ -324,48 +341,26 @@ export class StockChart {
     toggleIndicator(name, isVisible) {
         if (!(name in this.indicatorState)) return;
         this.indicatorState[name] = Boolean(isVisible);
-
-        if (name === 'rsi') {
-            if (this.indicatorState.rsi) {
-                this._setupRSISeries();
-            } else if (this.rsiSeries) {
-                try {
-                    this.chart.removeSeries(this.rsiSeries);
-                } catch (e) {
-                    // Ignore
-                }
-                this.rsiSeries = null;
-            }
-        } else {
-            const seriesMap = {
-                sma50: this.sma50Series,
-                sma200: this.sma200Series,
-                volume: this.volumeSeries,
-            };
-            const series = seriesMap[name];
-            if (series) {
-                series.applyOptions({ visible: this.indicatorState[name] });
-            }
-        }
-
+        this._syncIndicatorVisibilities();
         this._renderDefaultLegend();
     }
 
+    /**
+     * Apply indicatorState to all series: overlays are shown/hidden,
+     * the RSI series (own pane) is added/removed.
+     */
     _syncIndicatorVisibilities() {
-        const seriesMap = {
+        const overlays = {
             sma50: this.sma50Series,
             sma200: this.sma200Series,
             volume: this.volumeSeries,
         };
-        for (const [name, series] of Object.entries(seriesMap)) {
+        for (const [name, series] of Object.entries(overlays)) {
             if (series) series.applyOptions({ visible: this.indicatorState[name] });
         }
-        if (!this.indicatorState.rsi && this.rsiSeries) {
-            try {
-                this.chart.removeSeries(this.rsiSeries);
-            } catch (e) {}
-            this.rsiSeries = null;
-        } else if (this.indicatorState.rsi && !this.rsiSeries) {
+        if (!this.indicatorState.rsi) {
+            this._removeRSISeries();
+        } else if (!this.rsiSeries) {
             this._setupRSISeries();
         }
     }
@@ -373,10 +368,21 @@ export class StockChart {
     _formatTime(timeVal) {
         if (!timeVal) return '';
         const d = new Date(timeVal * 1000);
+        if (this.isIntraday) {
+            return d.toLocaleDateString('en-US', {
+                timeZone: 'America/New_York',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+            });
+        }
         return d.toLocaleDateString('en-US', {
+            timeZone: 'UTC',
             year: 'numeric',
             month: 'short',
-            day: 'numeric'
+            day: 'numeric',
         });
     }
 
@@ -388,10 +394,6 @@ export class StockChart {
         });
     }
 
-    _formatVolume(vol) {
-        return formatVolume(vol);
-    }
-
     _renderDefaultLegend() {
         if (!this.latestCandle) {
             if (this.tooltip) this.tooltip.innerHTML = '';
@@ -399,10 +401,6 @@ export class StockChart {
         }
 
         const c = this.latestCandle;
-        const prevCandle = this.currentCandles.length > 1 ? this.currentCandles[this.currentCandles.length - 2] : null;
-        const prevClose = prevCandle ? prevCandle.close : c.open;
-        const { change, pctChange } = computePriceChange(c.close, prevClose);
-
         const latestSma50 = this.cachedIndicators.sma50.length ? this.cachedIndicators.sma50[this.cachedIndicators.sma50.length - 1].value : null;
         const latestSma200 = this.cachedIndicators.sma200.length ? this.cachedIndicators.sma200[this.cachedIndicators.sma200.length - 1].value : null;
         const latestRsi = this.cachedIndicators.rsi.length ? this.cachedIndicators.rsi[this.cachedIndicators.rsi.length - 1].value : null;
@@ -414,8 +412,6 @@ export class StockChart {
             low: c.low,
             close: c.close,
             volume: c.volume,
-            change: change,
-            pctChange: pctChange,
             sma50: latestSma50,
             sma200: latestSma200,
             rsi: latestRsi,
@@ -430,15 +426,7 @@ export class StockChart {
         const highStr = this._formatNumber(data.high);
         const lowStr = this._formatNumber(data.low);
         const closeStr = this._formatNumber(data.close);
-        const volStr = this._formatVolume(data.volume);
-
-        let changeHtml = '';
-        if (data.change != null && data.pctChange != null) {
-            const isPos = data.change >= 0;
-            const sign = isPos ? '+' : '';
-            const colorClass = isPos ? 'val-green' : 'val-red';
-            changeHtml = `<span class="${colorClass}">${sign}$${Math.abs(data.change).toFixed(2)} (${sign}${data.pctChange.toFixed(2)}%)</span>`;
-        }
+        const volStr = formatVolume(data.volume);
 
         let indicatorsHtml = '<div class="legend-indicators-group">';
         if (this.indicatorState.sma50 && data.sma50 != null) {
@@ -461,7 +449,6 @@ export class StockChart {
                 <span class="legend-ohlc">H: <strong>${highStr}</strong></span>
                 <span class="legend-ohlc">L: <strong>${lowStr}</strong></span>
                 <span class="legend-ohlc">C: <strong>${closeStr}</strong></span>
-                ${changeHtml ? `<span class="legend-change">${changeHtml}</span>` : ''}
                 ${this.indicatorState.volume ? `<span class="legend-vol">Vol: <strong>${volStr}</strong></span>` : ''}
             </div>
             ${indicatorsHtml}

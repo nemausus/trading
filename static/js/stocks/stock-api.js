@@ -14,7 +14,7 @@ import { auth } from '../auth.js';
  * @param {string} interval - Candle interval (e.g. '1D', '5m', '1W').
  * @returns {Promise<{ symbol: string, candles: Array<Object> }>}
  */
-export async function fetchStockHistory(ticker, period = '1Y', interval = '1D') {
+export async function fetchStockHistory(ticker, period = '1Y', interval = '1D', refresh = false) {
     const user = auth.currentUser;
     if (!user) {
         throw new Error("You must be logged in to fetch stock history.");
@@ -26,6 +26,9 @@ export async function fetchStockHistory(ticker, period = '1Y', interval = '1D') 
         period: (period || '1Y').trim(),
         interval: (interval || '1D').trim()
     });
+    if (refresh) {
+        query.set('refresh', 'true');
+    }
 
     const url = `/api/schwab/stocks/${cleanTicker}/history?${query.toString()}`;
     const response = await fetch(url, {

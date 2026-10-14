@@ -296,18 +296,6 @@ body {
     gap: 4px;
 }
 
-.account-actions-count {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--accent-amber);
-    background: rgba(217, 119, 6, 0.1);
-    padding: 1px 6px;
-    border-radius: 4px;
-}
-
-.mobile-only-action-list {
-    display: none;
-}
 
 /* Tables Section styling */
 .section-card {
@@ -998,41 +986,8 @@ tr.row-put:hover td {
         display: none !important;
     }
 
-    .desktop-only-col,
-    .desktop-only-action-table {
+    .desktop-only-col {
         display: none !important;
-    }
-
-    .mobile-only-action-list {
-        display: flex !important;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-
-    .mobile-action-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 3px 0;
-        border-bottom: 1px dashed var(--border-color);
-        font-size: 0.80rem;
-    }
-
-    .mobile-action-row:last-child {
-        border-bottom: none;
-        padding-bottom: 0;
-    }
-
-    .mobile-action-left {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .mobile-action-right {
-        text-align: right;
-        font-size: 0.78rem;
     }
 
     #positions-container tr.pending-order-row {
@@ -1548,57 +1503,6 @@ tr.pending-order-row td {
     padding: 3px 8px !important;
 }
 
-/* Action items collapsible drawer (Native <details> / <summary>) */
-details.account-actions-section {
-    padding: 0;
-    border-bottom: 1px solid var(--border-color);
-    background: transparent;
-}
-
-details.account-actions-section > summary {
-    list-style: none;
-    outline: none;
-}
-
-details.account-actions-section > summary::-webkit-details-marker {
-    display: none;
-}
-
-.actions-collapsible-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 12px;
-    background: #fffbeb;
-    border-bottom: 1px solid #fef3c7;
-    font-size: 0.80rem;
-    cursor: pointer;
-    user-select: none;
-    transition: background-color 0.15s ease;
-}
-
-.actions-collapsible-bar:hover {
-    background: #fef3c7;
-}
-
-.actions-collapsible-bar .actions-toggle-icon {
-    display: inline-block;
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    transition: transform 0.15s ease;
-}
-
-details.account-actions-section[open] .actions-collapsible-bar .actions-toggle-icon {
-    transform: rotate(90deg);
-}
-
-.actions-collapsible-bar .actions-toggle-label::after {
-    content: "Details ▾";
-}
-
-details.account-actions-section[open] .actions-collapsible-bar .actions-toggle-label::after {
-    content: "Hide ▴";
-}
 
 .hidden {
     display: none !important;

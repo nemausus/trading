@@ -50,6 +50,14 @@ export function calculateSMA(candles, period) {
 }
 
 /**
+ * Convert Wilder average gain/loss into an RSI value (0-100).
+ */
+function _rsiFromAverages(avgGain, avgLoss) {
+    if (avgLoss === 0) return avgGain === 0 ? 50 : 100;
+    return 100 - (100 / (1 + avgGain / avgLoss));
+}
+
+/**
  * Calculate Relative Strength Index (RSI) using Wilder's smoothing method.
  *
  * Wilder's Smoothing:
@@ -85,17 +93,9 @@ export function calculateRSI(candles, period = 14) {
     let avgLoss = lossSum / period;
 
     // First RSI data point at index `period`
-    let rsi;
-    if (avgLoss === 0) {
-        rsi = avgGain === 0 ? 50 : 100;
-    } else {
-        const rs = avgGain / avgLoss;
-        rsi = 100 - (100 / (1 + rs));
-    }
-
     result.push({
         time: candles[period].time,
-        value: Number(rsi.toFixed(2))
+        value: Number(_rsiFromAverages(avgGain, avgLoss).toFixed(2))
     });
 
     // Wilder's smoothing for subsequent candles
@@ -107,16 +107,9 @@ export function calculateRSI(candles, period = 14) {
         avgGain = (avgGain * (period - 1) + gain) / period;
         avgLoss = (avgLoss * (period - 1) + loss) / period;
 
-        if (avgLoss === 0) {
-            rsi = avgGain === 0 ? 50 : 100;
-        } else {
-            const rs = avgGain / avgLoss;
-            rsi = 100 - (100 / (1 + rs));
-        }
-
         result.push({
             time: candles[i].time,
-            value: Number(rsi.toFixed(2))
+            value: Number(_rsiFromAverages(avgGain, avgLoss).toFixed(2))
         });
     }
 
