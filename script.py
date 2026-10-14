@@ -60,41 +60,6 @@ def resolve_uid(uid_arg: str | None) -> str:
 
     raise RuntimeError("No user UID specified and no users found in Firestore.")
 
-
-def resolve_account_hashes(account_input: str | None) -> list[str]:
-    """Resolve account argument into a list of encrypted account hashes.
-
-    Args:
-        account_input: 'ira', 'ind', 'all' or account number
-
-    Returns:
-        List of matching account hash strings.
-    """
-    if not account_input or account_input.lower() == "all":
-        return constants.get_all_account_hashes()
-
-    acc_hash = constants.resolve_account_hash(account_input)
-    if acc_hash:
-        return [acc_hash]
-
-    if account_input in constants.accounts:
-        return [constants.accounts.get(account_input).hash]
-
-    return [constants.get_account_hash_for_number(account_input)]
-
-
-def resolve_account_numbers(account_input: str | None) -> list[str]:
-    """Resolve account argument into a list of account numbers.
-
-    Args:
-        account_input: 'ira', 'ind', 'all' or account number
-
-    Returns:
-        List of matching account number strings.
-    """
-    return constants.resolve_account_number(account_input)
-
-
 def handle_txns_command(
     uid: str,
     account_numbers: list[str],
@@ -230,7 +195,7 @@ def handle_realized_command(
 
 def handle_order_command(
     uid: str,
-    account_hash: str,
+    acc_num: str,
     symbol: str,
     quantity: float,
     instruction: str,
@@ -250,9 +215,8 @@ def handle_order_command(
         )
         sys.exit(1)
 
-    acc_num = constants.get_account_number_for_hash(account_hash) or "unknown"
     action_label = "Previewing" if preview else "Placing"
-    print(f"\n{action_label} order for account {acc_num} ({account_hash[:10]}...):")
+    print(f"\n{action_label} order for account {acc_num}:")
     print(f"  Symbol      : {symbol}")
     print(f"  Quantity    : {quantity}")
     print(f"  Instruction : {instruction}")
@@ -300,7 +264,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--account",
         type=str,
         default="all",
-        help="Account name ('ind', 'ira', 'all') or account number.",
+        help="Account name ('ind', 'ira', 'all').",
     )
     parser.add_argument(
         "-s",
@@ -441,8 +405,9 @@ def main() -> None:
 
     try:
         uid = resolve_uid(args.uid)
-        account_numbers = resolve_account_numbers(account_input)
-        account_hashes = resolve_account_hashes(account_input)
+        if account_input in ("ind", "ira"):
+            account_input = account_input + "_account"
+        account_numbers = constants.resolve_account_numbers(account_input)
     except Exception as err:
         print(f"Error: {err}", file=sys.stderr)
         sys.exit(1)
@@ -474,10 +439,10 @@ def main() -> None:
         if not args.symbol:
             parser.error("the following arguments are required: -s/--symbol")
         is_preview = args.preview
-        assert len(account_hashes) == 1
+        assert len(account_numbers) == 1
         handle_order_command(
             uid=uid,
-            account_hash=account_hashes[0],
+            acc_num=account_numbers[0],
             symbol=args.symbol,
             quantity=args.quantity,
             instruction=args.instruction,

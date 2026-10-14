@@ -1,7 +1,7 @@
 import datetime
 import logging
 
-from constants import SCHWAB_TZ, get_account_hash_for_number
+import constants
 import schwab_api
 from schwab_api import SchwabAPIError
 from option_symbol import (
@@ -57,13 +57,13 @@ _MPR_ANNUALIZATION_FACTOR = 3000.0
 def to_iso_datetime_str(d: str | None) -> str:
     """Convert a YYYY-MM-DD string (or None) to a timezone-aware ISO string."""
     if d is None:
-        return datetime.datetime.now(SCHWAB_TZ).isoformat()
+        return datetime.datetime.now(constants.SCHWAB_TZ).isoformat()
     try:
-        dt = datetime.datetime.strptime(d, "%Y-%m-%d").replace(tzinfo=SCHWAB_TZ)
+        dt = datetime.datetime.strptime(d, "%Y-%m-%d").replace(tzinfo=constants.SCHWAB_TZ)
         return dt.isoformat()
     except Exception as exc:
         logging.warning("Could not parse date '%s', defaulting to now: %s", d, exc)
-        return datetime.datetime.now(SCHWAB_TZ).isoformat()
+        return datetime.datetime.now(constants.SCHWAB_TZ).isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -85,16 +85,16 @@ def fetch_quotes(access_token: str, symbols: list) -> dict:
 def fetch_active_orders(access_token: str, account_nums: list) -> list:
     """Fetch open (no closeTime) orders for every account in *account_nums*."""
     from_date = to_iso_datetime_str(
-        (datetime.datetime.now(SCHWAB_TZ) - datetime.timedelta(days=7)).date().isoformat()
+        (datetime.datetime.now(constants.SCHWAB_TZ) - datetime.timedelta(days=7)).date().isoformat()
     )
-    to_date = datetime.datetime.now(SCHWAB_TZ).isoformat()
+    to_date = datetime.datetime.now(constants.SCHWAB_TZ).isoformat()
     active_orders: list = []
 
     for acc_num in account_nums:
         try:
             orders_data = schwab_api.get_orders(
                 access_token,
-                get_account_hash_for_number(acc_num),
+                constants.get_account_hash_for_number(acc_num),
                 from_entered_time=from_date,
                 to_entered_time=to_date,
             )
@@ -239,7 +239,7 @@ def _enrich_positions(positions: list) -> float:
         elif len(symbol) == 12 and symbol.startswith("SPX"):
             try:
                 exp_date = _parse_expiration_date(symbol[6:12])
-                today = datetime.datetime.now(SCHWAB_TZ).date()
+                today = datetime.datetime.now(constants.SCHWAB_TZ).date()
                 pos["dte"] = int((exp_date - today).days)
             except Exception as e:
                 logging.error("Error enriching SPX box %s: %s", symbol, e)

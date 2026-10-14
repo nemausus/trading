@@ -16,8 +16,8 @@ from flask_talisman import Talisman
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+import constants
 import firestore_db
-from constants import get_all_account_numbers, resolve_account_number, init_accounts
 from schwab_api import SchwabAPIError
 from schwab_auth import SchwabAuthManager
 import portfolio
@@ -29,7 +29,7 @@ import roll_chain
 import orders
 import stocks
 
-init_accounts()
+constants.init_accounts()
 schwab_auth = SchwabAuthManager()
 
 # app must be defined before Talisman/Limiter and before decorators that reference it.
@@ -375,7 +375,7 @@ def schwab_sync_transactions(decoded_token, access_token):
     uid = decoded_token["uid"]
     try:
         results = []
-        for acc_num in get_all_account_numbers():
+        for acc_num in constants.get_all_account_numbers():
             result = transactions.sync_transactions(uid, access_token, acc_num)
             if "error" in result:
                 app.logger.error("Transaction sync error for user %s: %s", uid, result["error"])
@@ -398,14 +398,14 @@ def schwab_sync_transactions(decoded_token, access_token):
 def schwab_get_transactions(decoded_token):
     uid = decoded_token["uid"]
     symbol = request.args.get("symbol", "").strip()
-    account_param = request.args.get("account", "").strip()
+    account_param = request.args.get("account", "all").strip()
     txn_type = request.args.get("type", "TRADE").strip()
     from_date = request.args.get("from_date", "").strip() or None
     to_date = request.args.get("to_date", "").strip() or None
     limit = _get_limit(100, 1000)
 
     try:
-        account_numbers = resolve_account_number(account_param)
+        account_numbers = constants.resolve_account_numbers(account_param)
 
         txns = firestore_db.get_transactions_for_accounts(
             uid,
@@ -420,7 +420,7 @@ def schwab_get_transactions(decoded_token):
         return jsonify(
             {
                 "transactions": txns,
-                "accounts": get_all_account_numbers(),
+                "accounts": constants.get_all_account_numbers(),
             }
         )
     except Exception as e:
@@ -434,14 +434,14 @@ def schwab_get_transactions(decoded_token):
 def schwab_get_realized(decoded_token):
     uid = decoded_token["uid"]
     symbol = request.args.get("symbol", "").strip()
-    account_param = request.args.get("account", "").strip()
+    account_param = request.args.get("account", "all").strip()
     trade_type = request.args.get("type", request.args.get("trade_type", "")).strip()
     from_date = request.args.get("from_date", "").strip() or None
     to_date = request.args.get("to_date", "").strip() or None
     limit = _get_limit(1000, 1000)
 
     try:
-        account_numbers = resolve_account_number(account_param)
+        account_numbers = constants.resolve_account_numbers(account_param)
 
         records = firestore_db.get_realized_pl_for_accounts(
             uid,
@@ -456,7 +456,7 @@ def schwab_get_realized(decoded_token):
         return jsonify(
             {
                 "realized_transactions": records,
-                "accounts": get_all_account_numbers(),
+                "accounts": constants.get_all_account_numbers(),
             }
         )
     except Exception as e:

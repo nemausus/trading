@@ -97,9 +97,9 @@ class TestScriptCLI(unittest.TestCase):
 
         args = parser.parse_args(
             [
-                "order",
                 "-s",
                 "AAPL  260821C00205000",
+                "order",
                 "-q",
                 "2",
                 "-p",
@@ -118,9 +118,9 @@ class TestScriptCLI(unittest.TestCase):
 
         args_alias = parser.parse_args(
             [
-                "place-order",
                 "-s",
                 "NVDA",
+                "place-order",
                 "-q",
                 "10",
                 "-i",
@@ -132,21 +132,6 @@ class TestScriptCLI(unittest.TestCase):
         self.assertEqual(args_alias.command, "place-order")
         self.assertEqual(args_alias.symbol, "NVDA")
         self.assertEqual(args_alias.order_type, "MARKET")
-
-        args_main_first = parser.parse_args(
-            [
-                "-s",
-                "SPY",
-                "order",
-                "-q",
-                "5",
-                "-i",
-                "SELL",
-            ]
-        )
-        self.assertEqual(args_main_first.command, "order")
-        self.assertEqual(args_main_first.symbol, "SPY")
-        self.assertEqual(args_main_first.quantity, 5.0)
 
     @patch("script.SchwabAuthManager")
     @patch("script.orders.execute_order")

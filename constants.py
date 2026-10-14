@@ -39,18 +39,24 @@ def init_accounts() -> None:
     accounts = {ind.name: ind, ira.name: ira}
 
 
+def _resolve_accounts(account_id: str) -> list[Account]:
+    if not account_id:
+        raise ValueError("Empty account input")
+    account_id = account_id.strip().upper()
+    if account_id == "ALL":
+        return list(accounts.values())
+    if account_id in accounts:
+        return [accounts[account_id]]
+    for account in accounts.values():
+        if account_id == account.number:
+            return [account]
+    raise ValueError(f"Invalid account input: {account_id}")
+
+
 def get_account_hash_for_number(account_number: str) -> str:
-    for account in accounts.values():
-        if account.number == account_number:
-            return account.hash
-    raise ValueError(f"Invalid account number: {account_number}")
-
-
-def get_account_number_for_hash(account_hash: str) -> str:
-    for account in accounts.values():
-        if account.hash == account_hash:
-            return account.number
-    raise ValueError(f"Invalid account Hash: {account_hash}")
+    account = _resolve_accounts(account_number)
+    assert len(account) == 1
+    return account[0].hash
 
 
 def get_all_account_hashes() -> list[str]:
@@ -61,16 +67,5 @@ def get_all_account_numbers() -> list[str]:
     return [acc.number for acc in accounts.values()]
 
 
-def resolve_account_hash(account_param: str | None) -> list[str]:
-    if not account_param or account_param.strip().upper() == "ALL":
-        return get_all_account_hashes()
-    val = account_param.strip()
-    if val in accounts:
-        return [accounts[val].hash]
-    return [get_account_hash_for_number(val)]
-
-
-def resolve_account_number(account_param: str | None) -> list[str]:
-    if not account_param or account_param.strip().upper() == "ALL":
-        return get_all_account_numbers()
-    return [account_param.strip()]
+def resolve_account_numbers(account_param: str) -> list[str]:
+    return [acc.number for acc in _resolve_accounts(account_param)]

@@ -8,7 +8,7 @@ Schwab orders, conforming to the schemas in ~/schwab_client.
 import logging
 from typing import Any
 
-from constants import get_account_hash_for_number
+import constants
 import schwab_api
 
 # ---------------------------------------------------------------------------
@@ -331,7 +331,7 @@ def execute_order(
     if not account_number:
         raise ValueError("execute_order: 'account_number' is required.")
 
-    account_hash = get_account_hash_for_number(account_number)
+    account_hash = constants.get_account_hash_for_number(account_number)
     action = "Previewing" if preview else "Submitting live"
     logging.info("%s order for account %s: %s", action, account_hash, order_payload)
 
