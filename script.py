@@ -12,6 +12,9 @@ Usage examples:
     python script.py --account ind realized --limit 50
     python script.py --account all txns --unprocessed
     python script.py --account ind realized --json
+    python script.py --account ind txns --json
+    python script.py --account ind calc-realized --dry-run
+    python script.py --account all calc-realized
 """
 
 import argparse
@@ -27,6 +30,7 @@ from schwab_auth import SchwabAuthManager
 import constants
 import firestore_db
 import orders
+import realized
 
 constants.init_accounts()
 
@@ -77,7 +81,11 @@ def handle_txns_command(
         fetch_limit = limit * 10 if symbol_filter else limit
         txns = []
         for acc_num in account_numbers:
-            txns.extend(firestore_db.get_unprocessed_transactions(uid, acc_num, limit=fetch_limit))
+            txns.extend(
+                firestore_db.get_unprocessed_transactions(
+                    uid, acc_num, limit=fetch_limit, raw=output_json
+                )
+            )
         txns.sort(key=lambda x: x.get("time", ""), reverse=True)
         if txn_type and txn_type.upper() != "ALL":
             txns = [t for t in txns if (t.get("type") or "").upper() == txn_type.upper()]
@@ -86,7 +94,7 @@ def handle_txns_command(
         if to_date:
             txns = [t for t in txns if (t.get("time") or "")[:10] <= to_date]
         if symbol_filter and symbol_filter.upper() != "ALL":
-            txns = [t for t in txns if firestore_db._matches_txn_symbol(t, symbol_filter)]
+            txns = [t for t in txns if firestore_db._matches_txn_symbol(dict(t), symbol_filter)]
         txns = txns[:limit]
     else:
         txns = firestore_db.get_transactions_for_accounts(
@@ -97,6 +105,7 @@ def handle_txns_command(
             to_date=to_date,
             txn_type=txn_type,
             symbol=symbol_filter,
+            raw=output_json,
         )
 
     if output_json:
@@ -133,6 +142,38 @@ def handle_txns_command(
     print(f"\nTotal: {len(txns)} transaction(s) listed.")
 
 
+def _print_realized_table(records: list[dict]) -> float:
+    """Print an ASCII table of realized P/L records and return total P/L."""
+    if not records:
+        print("No realized P/L records found.")
+        return 0.0
+
+    header = f"{'Record ID':<30} {'Account':<8} {'Type':<12} {'Symbol':<24} {'Buy Date':<10} {'Buy Price':>10} {'Sell Date':<10} {'Sell Price':>10} {'Amount':>8} {'P/L ($)':>12}"
+    print(header)
+    print("-" * len(header))
+
+    total_pl = 0.0
+    for r in records:
+        rec_id = str(r.get("id", "N/A"))[:30]
+        acc_num = r.get("accountNumber", "N/A")
+        trade_type = str(r.get("trade_type") or firestore_db._categorize_realized_trade(r))[:12]
+        sym = r.get("symbol", "N/A")[:24]
+        buy_date = str(r.get("buy_date", ""))[:10]
+        buy_price = float(r.get("buy_price") or 0.0)
+        sell_date = str(r.get("sell_date", ""))[:10]
+        sell_price = float(r.get("sell_price") or 0.0)
+        amount = float(r.get("amount") or 0.0)
+        pl = float(r.get("P/L") or 0.0)
+        total_pl += pl
+
+        print(
+            f"{rec_id:<30} {acc_num:<8} {trade_type:<12} {sym:<24} {buy_date:<10} {buy_price:>10.2f} {sell_date:<10} {sell_price:>10.2f} {amount:>8.2f} {pl:>12.2f}"
+        )
+
+    print(f"\nTotal Realized P/L: ${total_pl:,.2f} across {len(records)} record(s).")
+    return total_pl
+
+
 def handle_realized_command(
     uid: str,
     account_numbers: list[str],
@@ -158,33 +199,72 @@ def handle_realized_command(
         print(json.dumps(records, indent=2, default=str))
         return
 
-    if not records:
-        print("No realized P/L records found.")
+    _print_realized_table(records)
+
+
+def handle_calc_realized_command(
+    uid: str,
+    account_numbers: list[str],
+    dry_run: bool = False,
+    symbol_filter: str | None = None,
+    output_json: bool = False,
+) -> None:
+    """Iterate over unprocessed transactions, calculate realized P/L, and optionally persist.
+
+    Args:
+        uid: Firebase User ID.
+        account_numbers: List of account numbers to process.
+        dry_run: If True, calculate and display without persisting to Firestore.
+        symbol_filter: Optional ticker or OCC option symbol filter.
+        output_json: If True, print raw JSON output.
+    """
+    all_realized: list[dict] = []
+    total_processed_ids_count = 0
+
+    for acc_num in account_numbers:
+        records, processed_ids = realized.process_account_realized_pl(
+            uid=uid, account_number=acc_num, dry_run=dry_run
+        )
+        all_realized.extend(records)
+        total_processed_ids_count += len(processed_ids)
+
+    if symbol_filter and symbol_filter.upper() != "ALL":
+        all_realized = [
+            r for r in all_realized if firestore_db._matches_realized_symbol(r, symbol_filter)
+        ]
+
+    for r in all_realized:
+        if not r.get("trade_type"):
+            r["trade_type"] = firestore_db._categorize_realized_trade(r)
+
+    if output_json:
+        print(json.dumps(all_realized, indent=2, default=str))
         return
 
-    header = f"{'Record ID':<30} {'Account':<8} {'Type':<12} {'Symbol':<24} {'Buy Date':<10} {'Buy Price':>10} {'Sell Date':<10} {'Sell Price':>10} {'Amount':>8} {'P/L ($)':>12}"
-    print(header)
-    print("-" * len(header))
+    if not all_realized:
+        print("No realized P/L transactions calculated from unprocessed transactions.")
+        if dry_run:
+            print("[DRY RUN] No database changes were made.")
+        return
 
-    total_pl = 0.0
-    for r in records:
-        rec_id = str(r.get("id", "N/A"))[:30]
-        acc_num = r.get("accountNumber", "N/A")
-        trade_type = r.get("trade_type", "N/A")[:12]
-        sym = r.get("symbol", "N/A")[:24]
-        buy_date = r.get("buy_date", "")[:10]
-        buy_price = r.get("buy_price", 0.0)
-        sell_date = r.get("sell_date", "")[:10]
-        sell_price = r.get("sell_price", 0.0)
-        amount = r.get("amount", 0.0)
-        pl = r.get("P/L", 0.0)
-        total_pl += pl
+    if dry_run:
+        print(f"[DRY RUN] Calculated realized P/L records for {len(account_numbers)} account(s) (NOT saved to Firestore):\n")
+    else:
+        print(f"Calculated and saved realized P/L records for {len(account_numbers)} account(s):\n")
 
+    _print_realized_table(all_realized)
+
+    if dry_run:
         print(
-            f"{rec_id:<30} {acc_num:<8} {trade_type:<12} {sym:<24} {buy_date:<10} {buy_price:>10.2f} {sell_date:<10} {sell_price:>10.2f} {amount:>8.2f} {pl:>12.2f}"
+            f"\n[DRY RUN] {len(all_realized)} realized record(s) calculated, "
+            f"{total_processed_ids_count} transaction(s) would be marked processed."
         )
-
-    print(f"\nTotal Realized P/L: ${total_pl:,.2f} across {len(records)} record(s).")
+        print("Run without --dry-run to save these records to Firestore.")
+    else:
+        print(
+            f"\nSuccessfully saved {len(all_realized)} realized record(s) "
+            f"and marked {total_processed_ids_count} transaction(s) as processed in Firestore."
+        )
 
 
 def handle_order_command(
@@ -305,7 +385,9 @@ def build_parser() -> argparse.ArgumentParser:
         default="TRADE",
         help="Filter by transaction type (default: TRADE, use 'ALL' for all).",
     )
-    txns_parser.add_argument("--json", action="store_true", help="Output results in JSON format.")
+    txns_parser.add_argument(
+        "--json", action="store_true", help="Output raw database documents in JSON format."
+    )
 
     # realized subcommand
     realized_parser = subparsers.add_parser(
@@ -338,7 +420,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Filter by trade type (default: ALL).",
     )
     realized_parser.add_argument(
-        "--json", action="store_true", help="Output results in JSON format."
+        "--json", action="store_true", help="Output raw database documents in JSON format."
+    )
+
+    # calc-realized subcommand
+    calc_parser = subparsers.add_parser(
+        "calc-realized",
+        aliases=["calculate-realized", "process-realized"],
+        help="Calculate realized P/L from unprocessed transactions.",
+    )
+    calc_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Only calculate and display realized P/L without saving to Firestore or marking transactions processed.",
+    )
+    calc_parser.add_argument(
+        "--json", action="store_true", help="Output calculated realized records in JSON format."
     )
 
     # order subcommand
@@ -428,6 +525,14 @@ def main() -> None:
             from_date=getattr(args, "from_date", None),
             to_date=getattr(args, "to_date", None),
             trade_type=getattr(args, "trade_type", None),
+        )
+    elif args.command in ("calc-realized", "calculate-realized", "process-realized"):
+        handle_calc_realized_command(
+            uid=uid,
+            account_numbers=account_numbers,
+            dry_run=args.dry_run,
+            symbol_filter=args.symbol,
+            output_json=args.json,
         )
     elif args.command in ("order", "place-order"):
         if not args.symbol:

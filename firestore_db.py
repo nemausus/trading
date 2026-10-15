@@ -188,11 +188,14 @@ def get_transactions(
     to_date: str | None = None,
     txn_type: str | None = None,
     symbol: str | None = None,
+    raw: bool = False,
 ) -> list[dict]:
     """
     Returns stored transactions for the given user/account, ordered by
     time descending (most recent first), up to *limit* records.
     Filters are pushed down to Firestore query on time range wherever possible.
+    If raw is True, returns documents exactly as stored in Firestore without
+    enrichment or stripping of internal fields.
     """
     db = get_db()
     col = _txn_collection(db, uid, account_number)
@@ -223,10 +226,8 @@ def get_transactions(
 
     for doc in docs:
         data = doc.to_dict()
-        if "activityId" not in data:
-            data["activityId"] = doc.id
-        data.pop("fetched_at", None)
-        enrich_transaction(data)
+        if not raw:
+            enrich_transaction(data)
 
         if target_type and (data.get("type") or "").upper() != target_type:
             continue
@@ -250,6 +251,7 @@ def get_transactions_for_accounts(
     to_date: str | None = None,
     txn_type: str | None = None,
     symbol: str | None = None,
+    raw: bool = False,
 ) -> list[dict]:
     """
     Returns stored transactions for multiple accounts, ordered by time descending,
@@ -266,6 +268,7 @@ def get_transactions_for_accounts(
                 to_date=to_date,
                 txn_type=txn_type,
                 symbol=symbol,
+                raw=raw,
             )
         )
     results.sort(key=lambda x: x.get("time", ""), reverse=True)
@@ -276,9 +279,12 @@ def get_unprocessed_transactions(
     uid: str,
     account_number: str,
     limit: int = 1000,
+    *,
+    raw: bool = False,
 ) -> list[dict]:
     """
-    Returns unprocessed raw transactions for the given user/account, ordered by
+    Returns unprocessed raw transactions for the given user/account (including
+    those where the ``processed`` field is missing or False), ordered by
     time ascending (oldest first for FIFO matching), up to *limit* records.
     """
     db = get_db()
@@ -287,12 +293,10 @@ def get_unprocessed_transactions(
     unprocessed = []
     for doc in docs:
         data = doc.to_dict()
-        if "activityId" not in data:
-            data["activityId"] = doc.id
-        data.pop("fetched_at", None)
-        enrich_transaction(data)
+        if not raw:
+            enrich_transaction(data)
         unprocessed.append(data)
-    unprocessed.sort(key=lambda x: x.get("time", ""))
+    unprocessed.sort(key=lambda x: x.get("time") or "")
     return unprocessed[:limit]
 
 
@@ -485,15 +489,15 @@ def get_realized_pl_transactions(
 
     for doc in docs:
         data = doc.to_dict()
-        data.pop("created_at", None)
         tt = data.get("trade_type") or _categorize_realized_trade(data)
-        data["trade_type"] = tt
 
         if target_trade_type and tt.lower() != target_trade_type.lower():
             continue
 
         if symbol and not _matches_realized_symbol(data, symbol):
             continue
+
+        data["trade_type"] = tt
 
         results.append(data)
         if len(results) >= limit:

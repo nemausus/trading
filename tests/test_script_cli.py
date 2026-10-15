@@ -43,6 +43,52 @@ class TestScriptCLI(unittest.TestCase):
         self.assertEqual(args_realized.command, "realized")
         self.assertTrue(args_realized.json)
 
+    @patch("script.firestore_db.get_transactions_for_accounts")
+    def test_handle_txns_command_json(self, mock_get_txns):
+        raw_doc = {"activityId": "100", "fetched_at": "2026-06-01", "processed": False}
+        mock_get_txns.return_value = [raw_doc]
+        with patch("sys.stdout") as mock_stdout:
+            script.handle_txns_command(
+                uid="uid1",
+                account_numbers=["acc1"],
+                limit=10,
+                unprocessed_only=False,
+                symbol_filter=None,
+                output_json=True,
+            )
+        mock_get_txns.assert_called_once_with(
+            uid="uid1",
+            account_numbers=["acc1"],
+            limit=10,
+            from_date=None,
+            to_date=None,
+            txn_type="TRADE",
+            symbol=None,
+            raw=True,
+        )
+
+    @patch("script.firestore_db.get_realized_pl_for_accounts")
+    def test_handle_realized_command_json(self, mock_get_realized):
+        raw_doc = {"id": "rec1", "created_at": "2026-06-01", "P/L": 100.0}
+        mock_get_realized.return_value = [raw_doc]
+        with patch("sys.stdout") as mock_stdout:
+            script.handle_realized_command(
+                uid="uid1",
+                account_numbers=["acc1"],
+                limit=10,
+                symbol_filter=None,
+                output_json=True,
+            )
+        mock_get_realized.assert_called_once_with(
+            uid="uid1",
+            account_numbers=["acc1"],
+            limit=10,
+            from_date=None,
+            to_date=None,
+            trade_type=None,
+            symbol=None,
+        )
+
     @patch("script.firestore_db.get_realized_pl_for_accounts")
     def test_handle_realized_command_symbol_filter(self, mock_get_realized):
         mock_get_realized.return_value = [
@@ -232,6 +278,125 @@ class TestScriptCLI(unittest.TestCase):
             order_payload=mock_build.return_value,
             preview=False,
         )
+
+    def test_build_parser_calc_realized(self):
+        parser = script.build_parser()
+
+        args = parser.parse_args(["calc-realized", "--dry-run"])
+        self.assertEqual(args.command, "calc-realized")
+        self.assertTrue(args.dry_run)
+        self.assertFalse(args.json)
+
+        args_alias = parser.parse_args(["calculate-realized", "--json"])
+        self.assertEqual(args_alias.command, "calculate-realized")
+        self.assertFalse(args_alias.dry_run)
+        self.assertTrue(args_alias.json)
+
+        args_alias2 = parser.parse_args(["process-realized"])
+        self.assertEqual(args_alias2.command, "process-realized")
+
+    @patch("script.realized.process_account_realized_pl")
+    def test_handle_calc_realized_dry_run(self, mock_process):
+        mock_process.return_value = (
+            [
+                {
+                    "id": "rec_dry_1",
+                    "accountNumber": "acc1",
+                    "symbol": "AAPL  261231C00200000",
+                    "buy_date": "2026-06-01",
+                    "buy_price": 5.0,
+                    "sell_date": "2026-06-15",
+                    "sell_price": 2.0,
+                    "amount": 1.0,
+                    "P/L": 300.0,
+                }
+            ],
+            {"aid_1", "aid_2"},
+        )
+        with patch("sys.stdout"):
+            script.handle_calc_realized_command(
+                uid="uid1",
+                account_numbers=["acc1"],
+                dry_run=True,
+                symbol_filter=None,
+                output_json=False,
+            )
+        mock_process.assert_called_once_with(uid="uid1", account_number="acc1", dry_run=True)
+
+    @patch("script.realized.process_account_realized_pl")
+    def test_handle_calc_realized_persist(self, mock_process):
+        mock_process.return_value = (
+            [
+                {
+                    "id": "rec_live_1",
+                    "accountNumber": "acc1",
+                    "symbol": "NVDA",
+                    "buy_date": "2026-06-01",
+                    "buy_price": 100.0,
+                    "sell_date": "2026-06-15",
+                    "sell_price": 120.0,
+                    "amount": 10.0,
+                    "P/L": 200.0,
+                }
+            ],
+            {"aid_10"},
+        )
+        with patch("sys.stdout"):
+            script.handle_calc_realized_command(
+                uid="uid1",
+                account_numbers=["acc1"],
+                dry_run=False,
+                symbol_filter=None,
+                output_json=False,
+            )
+        mock_process.assert_called_once_with(uid="uid1", account_number="acc1", dry_run=False)
+
+    @patch("script.realized.process_account_realized_pl")
+    def test_handle_calc_realized_json(self, mock_process):
+        mock_process.return_value = (
+            [
+                {
+                    "id": "rec_json_1",
+                    "accountNumber": "acc1",
+                    "symbol": "NVDA",
+                    "buy_date": "2026-06-01",
+                    "buy_price": 100.0,
+                    "sell_date": "2026-06-15",
+                    "sell_price": 120.0,
+                    "amount": 10.0,
+                    "P/L": 200.0,
+                }
+            ],
+            {"aid_10"},
+        )
+        with patch("sys.stdout"):
+            script.handle_calc_realized_command(
+                uid="uid1",
+                account_numbers=["acc1"],
+                dry_run=True,
+                symbol_filter=None,
+                output_json=True,
+            )
+        mock_process.assert_called_once_with(uid="uid1", account_number="acc1", dry_run=True)
+
+    @patch("script.realized.process_account_realized_pl")
+    def test_handle_calc_realized_symbol_filter(self, mock_process):
+        mock_process.return_value = (
+            [
+                {"id": "rec_nvda", "symbol": "NVDA", "P/L": 100.0, "amount": 1.0, "accountNumber": "acc1"},
+                {"id": "rec_aapl", "symbol": "AAPL", "P/L": 50.0, "amount": 1.0, "accountNumber": "acc1"},
+            ],
+            {"aid_1"},
+        )
+        with patch("sys.stdout"):
+            script.handle_calc_realized_command(
+                uid="uid1",
+                account_numbers=["acc1"],
+                dry_run=True,
+                symbol_filter="NVDA",
+                output_json=False,
+            )
+        mock_process.assert_called_once_with(uid="uid1", account_number="acc1", dry_run=True)
 
 
 if __name__ == "__main__":

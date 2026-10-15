@@ -3,6 +3,7 @@ Unit tests for realized.py module.
 """
 
 import unittest
+from unittest.mock import patch, MagicMock
 import realized as realized_pl
 
 
@@ -44,16 +45,16 @@ class TestRealizedPL(unittest.TestCase):
                 ],
             },
             {
-                # SPX transfers excluded
-                "type": "TRADE",
-                "netAmount": -500.0,
+                # Non-trade transfer item without positionEffect excluded
+                "type": "JOURNAL",
+                "netAmount": 500.0,
                 "time": "2026-06-03T12:00:00-07:00",
                 "accountNumber": "ACC1",
                 "transferItems": [
                     {
-                        "positionEffect": "OPENING",
-                        "instrument": {"symbol": "SPX   261219C05000000", "instrumentId": "789"},
-                        "amount": 1.0,
+                        "positionEffect": None,
+                        "instrument": {"symbol": "CURRENCY_USD", "instrumentId": "789"},
+                        "amount": 500.0,
                     }
                 ],
             },
@@ -399,6 +400,198 @@ class TestRealizedPL(unittest.TestCase):
             _categorize_realized_trade({"symbol": "AAPL  261231P00200000", "sl": "long"}),
             "Put Long",
         )
+
+    @patch("firestore_db.mark_transactions_processed")
+    @patch("firestore_db.save_realized_pl_transactions")
+    @patch("realized.calculate_realized_pl_with_status")
+    @patch("firestore_db.get_unprocessed_transactions")
+    def test_process_account_realized_pl_dry_run(
+        self, mock_get_unprocessed, mock_calc, mock_save, mock_mark
+    ):
+        mock_get_unprocessed.return_value = [{"activityId": 101, "symbol": "AAPL"}]
+        mock_calc.return_value = (
+            [{"id": "rec1", "symbol": "AAPL", "P/L": 150.0}],
+            {"101", "102"},
+        )
+
+        records, processed_ids = realized_pl.process_account_realized_pl(
+            uid="user1", account_number="acc1", dry_run=True
+        )
+
+        mock_get_unprocessed.assert_called_once_with("user1", "acc1")
+        mock_calc.assert_called_once_with(mock_get_unprocessed.return_value)
+        mock_save.assert_not_called()
+        mock_mark.assert_not_called()
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["id"], "rec1")
+        self.assertEqual(processed_ids, {"101", "102"})
+
+    @patch("firestore_db.mark_transactions_processed")
+    @patch("firestore_db.save_realized_pl_transactions")
+    @patch("realized.calculate_realized_pl_with_status")
+    @patch("firestore_db.get_unprocessed_transactions")
+    def test_process_account_realized_pl_persist(
+        self, mock_get_unprocessed, mock_calc, mock_save, mock_mark
+    ):
+        mock_get_unprocessed.return_value = [{"activityId": 101, "symbol": "AAPL"}]
+        mock_calc.return_value = (
+            [{"id": "rec1", "symbol": "AAPL", "P/L": 150.0}],
+            {"101", "102"},
+        )
+
+        records, processed_ids = realized_pl.process_account_realized_pl(
+            uid="user1", account_number="acc1", dry_run=False
+        )
+
+        mock_get_unprocessed.assert_called_once_with("user1", "acc1")
+        mock_calc.assert_called_once_with(mock_get_unprocessed.return_value)
+        mock_save.assert_called_once_with("user1", "acc1", mock_calc.return_value[0])
+        mock_mark.assert_called_once_with("user1", "acc1", {"101", "102"})
+        self.assertEqual(len(records), 1)
+        self.assertEqual(processed_ids, {"101", "102"})
+
+    @patch("firestore_db.get_unprocessed_transactions")
+    def test_process_account_realized_pl_empty(self, mock_get_unprocessed):
+        mock_get_unprocessed.return_value = []
+        records, processed_ids = realized_pl.process_account_realized_pl(
+            uid="user1", account_number="acc1", dry_run=True
+        )
+        self.assertEqual(records, [])
+        self.assertEqual(processed_ids, set())
+
+    def test_is_cash_settled_index_option(self):
+        self.assertTrue(realized_pl._is_cash_settled_index_option("SPX   260618C06000000"))
+        self.assertTrue(realized_pl._is_cash_settled_index_option("NDX   260618C18000000"))
+        self.assertTrue(realized_pl._is_cash_settled_index_option("RUT   260618P02000000"))
+        self.assertFalse(realized_pl._is_cash_settled_index_option("AAPL  261231C00200000"))
+        self.assertFalse(realized_pl._is_cash_settled_index_option("NVDA"))
+        self.assertFalse(realized_pl._is_cash_settled_index_option(""))
+
+    def test_reconcile_cash_settled_index_options(self):
+        txns = [
+            {
+                "activityId": "trade_1",
+                "type": "TRADE",
+                "time": "2026-06-19T13:34:53+0000",
+                "netAmount": 0.0,
+                "accountNumber": "ACC1",
+                "transferItems": [
+                    {
+                        "positionEffect": "CLOSING",
+                        "amount": 1.0,
+                        "price": 0.0,
+                        "cost": 0.0,
+                        "instrument": {
+                            "symbol": "SPX   260618C06000000",
+                            "closingPrice": 1508.43,
+                            "optionPremiumMultiplier": 100,
+                        },
+                    }
+                ],
+            },
+            {
+                "activityId": "trade_otm",
+                "type": "TRADE",
+                "time": "2026-06-19T13:34:56+0000",
+                "netAmount": 0.0,
+                "accountNumber": "ACC1",
+                "transferItems": [
+                    {
+                        "positionEffect": "CLOSING",
+                        "amount": -1.0,
+                        "price": 0.0,
+                        "cost": 0.0,
+                        "instrument": {
+                            "symbol": "SPX   260618P06000000",
+                            "closingPrice": 0.0001,
+                            "optionPremiumMultiplier": 100,
+                        },
+                    }
+                ],
+            },
+            {
+                "activityId": "journal_1",
+                "type": "JOURNAL",
+                "time": "2026-06-19T16:18:27+0000",
+                "netAmount": -150843.0,
+                "accountNumber": "ACC1",
+            },
+        ]
+
+        reconciled = realized_pl._reconcile_cash_settled_index_options(txns)
+        # trade_1 should be updated with journal info
+        t1 = [t for t in reconciled if t.get("activityId") == "trade_1"][0]
+        self.assertEqual(t1["netAmount"], -150843.0)
+        self.assertEqual(t1["transferItems"][0]["price"], 1508.43)
+        self.assertEqual(t1["transferItems"][0]["cost"], -150843.0)
+        self.assertEqual(t1["linked_activity_ids"], ["journal_1"])
+
+        # trade_otm should NOT be modified
+        totm = [t for t in reconciled if t.get("activityId") == "trade_otm"][0]
+        self.assertEqual(totm["netAmount"], 0.0)
+        self.assertEqual(totm["transferItems"][0]["price"], 0.0)
+
+    def test_calculate_realized_pl_with_cash_settled_index_reconciliation(self):
+        txns = [
+            {
+                "activityId": "open_trade",
+                "type": "TRADE",
+                "time": "2026-01-20T19:58:53+0000",
+                "netAmount": 97100.71,
+                "accountNumber": "ACC1",
+                "transferItems": [
+                    {
+                        "positionEffect": "OPENING",
+                        "amount": -1.0,
+                        "price": 971.02,
+                        "cost": 97102.0,
+                        "instrument": {
+                            "symbol": "SPX   260618C06000000",
+                            "instrumentId": "123",
+                        },
+                    }
+                ],
+            },
+            {
+                "activityId": "close_trade",
+                "type": "TRADE",
+                "time": "2026-06-19T13:34:53+0000",
+                "netAmount": 0.0,
+                "accountNumber": "ACC1",
+                "transferItems": [
+                    {
+                        "positionEffect": "CLOSING",
+                        "amount": 1.0,
+                        "price": 0.0,
+                        "cost": 0.0,
+                        "instrument": {
+                            "symbol": "SPX   260618C06000000",
+                            "instrumentId": "123",
+                            "closingPrice": 1508.43,
+                            "optionPremiumMultiplier": 100,
+                        },
+                    }
+                ],
+            },
+            {
+                "activityId": "settle_journal",
+                "type": "JOURNAL",
+                "time": "2026-06-19T16:18:27+0000",
+                "netAmount": -150843.0,
+                "accountNumber": "ACC1",
+            },
+        ]
+
+        records, processed_ids = realized_pl.calculate_realized_pl_with_status(txns)
+        self.assertEqual(len(records), 1)
+        rec = records[0]
+        self.assertEqual(rec["symbol"], "SPX   260618C06000000")
+        self.assertEqual(rec["buy_price"], 971.02)
+        self.assertEqual(rec["sell_price"], 1508.43)
+        self.assertAlmostEqual(rec["P/L"], 97100.71 - 150843.0, places=2)
+        self.assertIn("open_trade", processed_ids)
+        self.assertIn("close_trade", processed_ids)
+        self.assertIn("settle_journal", processed_ids)
 
 
 if __name__ == "__main__":

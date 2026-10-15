@@ -13,6 +13,78 @@ import os
 logger = logging.getLogger(__name__)
 
 ROTH_REALIZED_CSV_PATH = os.environ.get("ROTH_REALIZED_CSV_PATH", "")
+_CASH_SETTLED_INDEX_PREFIXES: tuple[str, ...] = ("SPX", "NDX", "RUT", "VIX", "DJX", "XSP")
+
+
+def _is_cash_settled_index_option(symbol: str) -> bool:
+    """Return True if symbol corresponds to a cash-settled European index option."""
+    if not symbol:
+        return False
+    return symbol.strip().upper().startswith(_CASH_SETTLED_INDEX_PREFIXES)
+
+
+def _reconcile_cash_settled_index_options(txns: list[dict]) -> list[dict]:
+    """Reconcile European index option cash settlements with separate JOURNAL transactions.
+
+    Some brokers (e.g. Charles Schwab) occasionally record in-the-money cash-settled
+    index option expirations with price=0 and netAmount=0 on the option removal TRADE,
+    posting the actual cash settlement as separate JOURNAL entries later the same day.
+    This helper identifies those pairs, applies the settlement cash to the closing trade,
+    and links the JOURNAL activity IDs so they are marked processed upon matching.
+    """
+    available_journals = [t for t in txns if t.get("type") == "JOURNAL"]
+    if not available_journals:
+        return txns
+
+    reconciled_txns = []
+    for t in txns:
+        if t.get("type") != "TRADE":
+            reconciled_txns.append(t)
+            continue
+
+        net_amt = t.get("netAmount", 0.0)
+        items = t.get("transferItems", [])
+        new_items = []
+        new_t = dict(t)
+        for item in items:
+            new_item = dict(item)
+            pe = item.get("positionEffect")
+            inst = item.get("instrument", {}) or {}
+            sym = (inst.get("symbol") or "").strip()
+            price = item.get("price", 0.0)
+
+            if (
+                pe == "CLOSING"
+                and _is_cash_settled_index_option(sym)
+                and (net_amt == 0.0 or net_amt is None)
+                and (price == 0.0 or price is None)
+            ):
+                cp = float(inst.get("closingPrice") or 0.0)
+                mult = float(inst.get("optionPremiumMultiplier") or 100.0)
+                amt = float(item.get("amount") or 0.0)
+                t_date = (t.get("time") or t.get("tradeDate") or "")[:10]
+                expected_cash = -cp * mult * amt if amt != 0 else 0.0
+
+                if abs(expected_cash) > 0.01:
+                    for j in available_journals:
+                        j_date = (j.get("time") or j.get("tradeDate") or "")[:10]
+                        j_net = float(j.get("netAmount") or 0.0)
+                        if j_date == t_date and abs(j_net - expected_cash) < 0.01:
+                            available_journals.remove(j)
+                            new_item["price"] = cp
+                            new_item["cost"] = j_net
+                            new_t["netAmount"] = j_net
+                            linked = list(new_t.get("linked_activity_ids", []))
+                            if j.get("activityId") is not None:
+                                linked.append(str(j["activityId"]))
+                            new_t["linked_activity_ids"] = linked
+                            break
+
+            new_items.append(new_item)
+        new_t["transferItems"] = new_items
+        reconciled_txns.append(new_t)
+
+    return reconciled_txns
 
 
 def _join_aids(aids) -> str:
@@ -62,8 +134,8 @@ def normalize_transactions(txns: list[dict]) -> list[dict]:
                 continue
 
             symbol = instrument.get("symbol", "")
-            if symbol.startswith("SPX"):
-                continue
+            # if symbol.startswith("SPX"):
+            #     continue
             instrument_id = instrument.get("instrumentId", "")
             amount = item.get("amount", 0.0)
             cost = item.get("cost", 0.0)
@@ -74,11 +146,15 @@ def normalize_transactions(txns: list[dict]) -> list[dict]:
             else:
                 sl = "long"
 
+            aids = [str(txn["activityId"])] if txn.get("activityId") is not None else []
+            for la in txn.get("linked_activity_ids", []):
+                if str(la) not in aids:
+                    aids.append(str(la))
+
             rows.append(
                 {
-                    "activityId": (
-                        str(txn["activityId"]) if txn.get("activityId") is not None else None
-                    ),
+                    "activityId": aids[0] if aids else None,
+                    "activity_ids": aids,
                     "accountNumber": account_num,
                     "time": time_str,
                     "symbol": symbol,
@@ -104,7 +180,8 @@ def calculate_realized_pl_with_status(txns: list[dict]) -> tuple[list[dict], set
     Returns:
         Tuple of (list of realized P/L records, set of processed activity IDs).
     """
-    rows = normalize_transactions(txns)
+    reconciled_txns = _reconcile_cash_settled_index_options(txns)
+    rows = normalize_transactions(reconciled_txns)
 
     # Group transactions by key fields to consolidate partial fills
     aggregated: dict = {}
@@ -117,21 +194,26 @@ def calculate_realized_pl_with_status(txns: list[dict]) -> tuple[list[dict], set
             r["positionEffect"],
             r["sl"],
         )
+        r_aids = [str(aid) for aid in r.get("activity_ids", []) if aid is not None]
+        if not r_aids and r.get("activityId") is not None:
+            r_aids = [str(r["activityId"])]
+
         if key not in aggregated:
             aggregated[key] = {
                 "amount_sum": r["amount"],
                 "cost_sum": r["cost"],
                 "price_list": [r["price"]],
                 "netAmount_sum": r["netAmount"],
-                "activity_ids": [str(r["activityId"])] if r.get("activityId") is not None else [],
+                "activity_ids": list(r_aids),
             }
         else:
             aggregated[key]["amount_sum"] += r["amount"]
             aggregated[key]["cost_sum"] += r["cost"]
             aggregated[key]["price_list"].append(r["price"])
             aggregated[key]["netAmount_sum"] += r["netAmount"]
-            if r.get("activityId") is not None:
-                aggregated[key]["activity_ids"].append(str(r["activityId"]))
+            for aid in r_aids:
+                if aid not in aggregated[key]["activity_ids"]:
+                    aggregated[key]["activity_ids"].append(aid)
 
     grouped_rows = []
     for key, val in aggregated.items():
@@ -242,7 +324,7 @@ def calculate_realized_pl_with_status(txns: list[dict]) -> tuple[list[dict], set
             if closing_matched and row["amount"] == 0:
                 _collect_aids(processed_activity_ids, row)
 
-    result.sort(key=lambda x: x["sell_date"] or "", reverse=True)
+    result.sort(key=lambda x: (x["sell_date"], x["buy_date"]), reverse=True)
     return result, processed_activity_ids
 
 
@@ -259,28 +341,32 @@ def calculate_realized_pl(txns: list[dict]) -> list[dict]:
     return result
 
 
-def process_account_realized_pl(uid: str, account_number: str) -> int:
+def process_account_realized_pl(
+    uid: str, account_number: str, *, dry_run: bool = False
+) -> tuple[list[dict], set[str]]:
     """Fetch unprocessed raw transactions for an account, calculate realized P/L,
     save realized records to Firestore, and mark matched transactions processed.
 
     Args:
         uid: User ID.
         account_number: Schwab account number.
+        dry_run: If True, do not persist records or mark transactions processed in Firestore.
 
     Returns:
-        Number of realized P/L records saved.
+        Tuple of (realized_records, processed_activity_ids).
     """
     import firestore_db
 
     txns = firestore_db.get_unprocessed_transactions(uid, account_number)
     if not txns:
-        return 0
+        return [], set()
     realized_records, processed_ids = calculate_realized_pl_with_status(txns)
-    if realized_records:
-        firestore_db.save_realized_pl_transactions(uid, account_number, realized_records)
-    if processed_ids:
-        firestore_db.mark_transactions_processed(uid, account_number, processed_ids)
-    return len(realized_records)
+    if not dry_run:
+        if realized_records:
+            firestore_db.save_realized_pl_transactions(uid, account_number, realized_records)
+        if processed_ids:
+            firestore_db.mark_transactions_processed(uid, account_number, processed_ids)
+    return realized_records, processed_ids
 
 
 def _format_csv_symbol(symbol: str) -> str:
