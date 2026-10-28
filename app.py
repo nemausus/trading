@@ -56,6 +56,13 @@ def require_firebase_auth(f):
         except Exception as e:
             logging.warning("Token verification failed: %s", e)
             return jsonify({"error": "Unauthorized - Invalid or expired token"}), 401
+
+        if not app.config.get("TESTING"):
+            allowed_email = os.environ.get("ALLOWED_USER_EMAIL")
+            if allowed_email and decoded_token.get("email") != allowed_email:
+                logging.warning("Forbidden access attempt by user %s", decoded_token.get("uid"))
+                return jsonify({"error": "Forbidden - User not authorized"}), 403
+
         return f(decoded_token, *args, **kwargs)
 
     return decorated_function

@@ -1,11 +1,16 @@
 import datetime
+import os
+from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import firestore
 from option_symbol import base_symbol
 
+load_dotenv()
+
 # Initialize Firebase Admin SDK if not already initialized
 if not firebase_admin._apps:
-    firebase_admin.initialize_app(options={"projectId": "covered-calls-ab5d1"})
+    _project_id = os.environ.get("GCP_PROJECT_ID")
+    firebase_admin.initialize_app(options={"projectId": _project_id} if _project_id else None)
 
 # Firestore batch write limit.
 _BATCH_SIZE = 500
@@ -25,7 +30,8 @@ def get_db():
     """Returns the Firestore client, using the custom database ID if specified."""
     global _db
     if _db is None:
-        _db = firestore.client(database_id="covered-calls-db")
+        db_id = os.environ.get("FIRESTORE_DATABASE_ID")
+        _db = firestore.client(database_id=db_id) if db_id else firestore.client()
     return _db
 
 

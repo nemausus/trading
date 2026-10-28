@@ -12,7 +12,7 @@ This skill provides instructions to ensure all Python commands, test executions,
 1. **Always Use `.venv/bin/python` for Execution**:
    When invoking Python scripts, running tests, or executing CLI utilities in this workspace, ALWAYS use `./.venv/bin/python` instead of system `python` or `python3`:
    ```bash
-   ./.venv/bin/python script.py --account acc2 txns
+   ./.venv/bin/python script.py --account ind txns
    ./.venv/bin/python -m unittest discover tests
    ```
 
